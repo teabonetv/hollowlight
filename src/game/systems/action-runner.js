@@ -202,9 +202,10 @@ export function actionStatus(state, actionId) {
     durationMs: action?.durationMs ?? 0,
     frac: active && action ? Math.min(1, active.progressMs / action.durationMs) : 0,
     etaMs: active && action ? action.durationMs - active.progressMs : action?.durationMs ?? 0,
-    locked,
+    locked: locked,
     lockLevel: action?.unlockLevel ?? 1,
     affordable,
+    autoRestart: state.actions.autoRestart[actionId] ?? true,
     completed: state.actions.completed[actionId] ?? 0,
     mastery: skill?.mastery[actionId] ?? { xp: 0, level: 1 },
   };
