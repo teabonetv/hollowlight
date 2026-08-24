@@ -58,6 +58,7 @@ export class FakeNode {
     return n;
   }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
+  contains(n) { return n !== null && this._walk((m) => m === n); }
   setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'value') this.value = v; }
   getAttribute(k) { return this.attrs[k] ?? null; }
   addEventListener(type, fn) { (this._listeners[type] ??= []).push(fn); }

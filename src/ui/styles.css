@@ -705,3 +705,37 @@ html.reduced-motion *::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
 }
+
+/* ── Keeper's Camp: upgrade tracks (F1c) ───────────────────── */
+.section-title {
+  margin: 26px 0 2px;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 20px;
+  color: var(--gold-hi);
+  letter-spacing: 0.04em;
+}
+.section-sub { margin: 0 0 10px; font-size: 13px; }
+.camp-empty { padding: 14px 0 6px; }
+.camp-empty .empty-text { margin: 0; }
+
+.track-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+.track-card { display: flex; flex-direction: column; gap: 8px; }
+.track-head { display: flex; align-items: center; gap: 10px; }
+.track-title { display: flex; flex-direction: column; min-width: 0; }
+.track-name { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+.track-effect { font-size: 12.5px; color: var(--ok); letter-spacing: 0.02em; }
+.track-tier-name { font-size: 13.5px; color: var(--gold-hi); }
+.track-flavor { margin: 0; font-size: 13px; font-style: italic; line-height: 1.45; }
+.track-card .btn-wide { min-height: 46px; }
+
+/* ── Bank sell sheet ───────────────────────────────────────── */
+.sell-flavor { margin: 0 0 10px; font-style: italic; color: var(--muted); line-height: 1.5; }
+.sell-uses { margin-bottom: 10px; }
+.sell-line { margin: 0 0 14px; line-height: 1.7; }
+.sell-qty { color: var(--text); }
+.sell-worth { font-size: 14px; }
+.gold { color: var(--gold-hi); }
+.sell-actions { display: flex; gap: 8px; margin-bottom: 8px; }
+.sell-actions .btn { flex: 1; min-height: 46px; }
+.sell-actions + .btn { min-height: 46px; }

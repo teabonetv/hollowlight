@@ -36,3 +36,37 @@ export function bankSellValue(bank) {
   for (const [id, qty] of Object.entries(bank)) total += (ITEMS_BY_ID[id]?.sell ?? 0) * qty;
   return total;
 }
+
+// ── selling (F1c economy sink) ────────────────────────────────────
+
+/**
+ * Selling stacks larger than this via "Sell All" demands a confirm tap.
+ * Pure policy constant so UI and tests agree on the threshold.
+ */
+export const SELL_CONFIRM_THRESHOLD = 25;
+
+export function needsSellConfirm(qty) {
+  return qty > SELL_CONFIRM_THRESHOLD;
+}
+
+/**
+ * Sell `qty` of `itemId` from the bank at its registry sell value.
+ * Mutates state (bank + lumen). Returns
+ *   { ok:true, sold, gained } | { ok:false, error }
+ * Sells at most what the stack holds; qty ≤ 0 or an empty stack fails
+ * cleanly with no mutation.
+ */
+export function sellItems(state, itemId, qty) {
+  const item = ITEMS_BY_ID[itemId];
+  if (!item) return { ok: false, error: 'Unknown item.' };
+  const owned = bankCount(state.bank, itemId);
+  const n = Math.min(Math.floor(qty), owned);
+  if (!Number.isFinite(n) || n <= 0) {
+    return { ok: false, error: owned <= 0 ? 'None to sell.' : 'Nothing to sell.' };
+  }
+  state.bank[itemId] -= n;
+  if (state.bank[itemId] === 0) delete state.bank[itemId]; // tidy saves
+  const gained = n * item.sell;
+  state.lumen += gained;
+  return { ok: true, sold: n, gained };
+}

@@ -100,3 +100,53 @@ Offline grants use **expected-value yields**: ranged outputs roll their mean
 instant, honest. Materials bound completions (the calculator stops when the
 bank can't pay another cycle). The modal always shows: time away, credited
 time, and the 12 h cap notice when trimming occurred.
+
+## Keeper's Camp upgrade tracks (F1c economy sink)
+
+The first permanent Lumen **and material** sink. Three tracks, six tiers each,
+bought strictly in order; every tier costs Lumen plus specific gathered goods
+so surplus fogwort/palecap/tinderscrap/graveresin/bogmoss become sinks too.
+All data lives in `src/game/data/upgrades.js`; the engine is
+`src/game/systems/upgrades.js`; effects flow through the REAL math paths:
+
+| Track | Effect | Per tier | Cap | Where it bites |
+|---|---|---|---|---|
+| Lantern & Wick | global action speed | +5% | +30% | cycle duration = `round(durationMs / (1+frac))` — live ticks (`action-runner.tickActions`), UI bars/ETA (`actionStatus`), and offline completions (`offline.computeOfflineProgress`) all share `effectiveDurationMs` |
+| Keeper's Satchel | bonus-find chance per ITEM output | +4% | +35% | each item output rolls one extra unit at `yieldChance` after its base roll (`rollOutputs`), live only — offline keeps expected values |
+| Ember Altar | XP multiplier, all skills | +3% | +18% | `xp = round(base × masteryMult × altarMult)` — identical expression in live play and offline so the two never disagree by 1 |
+
+### Costs (Lumen / materials)
+
+| Tier | Lantern & Wick | Keeper's Satchel | Ember Altar |
+|---|---|---|---|
+| 1 | 40 + 10 tinder | 30 + 15 fogwort | 60 + 15 tinder |
+| 2 | 90 + 25 fogwort | 80 + 30 fogwort | 140 + 10 resin |
+| 3 | 200 + 12 bogmoss + 15 tinder | 180 + 25 palecap | 320 + 22 resin + 30 fogwort |
+| 4 | 450 + 30 palecap | 420 + 60 palecap + 20 tinder | 720 + 45 resin |
+| 5 | 1000 + 8 resin + 50 palecap | 950 + 12 resin + 60 palecap | 1600 + 90 resin + 60 tinder |
+| 6 | 2200 + 25 resin | 2100 + 30 resin + 40 bogmoss | 3600 + 180 resin |
+
+Lumen step per tier ≈ ×2.2–2.8 (geometric). Track totals: Wick 3,980 ✦,
+Satchel 3,760 ✦, Altar 6,440 ✦ — **14,180 ✦ all-in**.
+
+### Affordability arithmetic (mixed early play ≈ 50–70 ✦/min)
+
+- Income sources at Wave-0 rates: Tend the Flame drips 15 ✦/min; Gather Herbs
+  sells ≈18 fogwort/min × 3 ✦ = 54 ✦/min (+ resin/tinder bycatch); Gather
+  Fungi (Fo 5) ≈ 78 ✦/min. Selling makes gathering ≈ tending for raw income —
+  parity already planned in "Sell values" above.
+- **Tier 1 of any track: ~1–5 min** (e.g. Satchel 1 = 30 ✦ + 15 fogwort ≈ one
+  minute of herb runs past the starter stack).
+- **Tiers 2–3 inside 20–30 min**: e.g. Wick 1→3 costs 330 ✦ + materials that
+  are byproducts of the same 20 minutes of mixed play; Fo 5 (~7 min) opens
+  fungi for the satchel line. Verified against starter Lumen 20.
+- **Full track = hours–days**: 14,180 ✦ ≈ 4 h of *pure* income at 60 ✦/min;
+  with resin gates (347 graveresin total across tracks ≈ 4.8 h of pure herb
+  time at 1.2/min) real pacing spreads over days — matching the charter's
+  "minutes to feel progress, hours to master, weeks toward 99".
+- Material choice rationale: tinderscrap/fogwort gate the first minutes,
+  palecap (needs Fo 5) the middle, graveresin (10 % drop) the long tail —
+  every track's back half is paced by the scarcest renewable good.
+- Speed cap note: +30 % speed multiplies income AND sink affordability alike,
+  so late-track players re-earn the next tier ~30 % faster — self-balancing,
+  no death spiral in either direction.
