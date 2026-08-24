@@ -7,7 +7,7 @@ import { OFFLINE_CAP_HOURS } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
 import { ACTIONS } from '../game/data/actions.js';
-import { bankCount, SELL_CONFIRM_THRESHOLD } from '../game/systems/bank.js';
+import { bankCount, needsSellConfirm } from '../game/systems/bank.js';
 
 /**
  * Opens a modal. Returns { close, panel }. Only one modal at a time; Escape
@@ -159,12 +159,35 @@ export function showSettingsModal(mount, ctx) {
 }
 
 /**
- * Sell sheet — tap a bank stack, see its lore/uses/value, sell 1 / 10 / All.
- * "Sell All" on stacks above SELL_CONFIRM_THRESHOLD demands a second tap.
- * `ctx.sell(itemId, qty)` does the engine work and returns
- * { ok, sold?, gained? } / { ok:false, error }.
+ * F1d Fix 2 — Sell All two-tap confirm state.
+ *
+ * The confirm lives HERE, keyed by item id with a deadline — never in the
+ * DOM. Any number of re-renders, repaints, or even a full re-open of the
+ * sheet inside the window reflects the same pending confirmation, so a live
+ * update can no longer silently swallow it before the player's second tap
+ * lands. The two-tap safety above SELL_CONFIRM_THRESHOLD stays by design.
  */
-export function showSellSheet(mount, ctx, itemId) {
+const pendingSellConfirms = new Map(); // itemId -> deadline (ms epoch)
+
+export const SELL_CONFIRM_WINDOW_MS = 6000;
+
+export function sellConfirmPending(itemId, nowMs = Date.now()) {
+  const deadline = pendingSellConfirms.get(itemId);
+  if (deadline === undefined) return false;
+  if (deadline <= nowMs) { pendingSellConfirms.delete(itemId); return false; }
+  return true;
+}
+
+export function clearSellConfirm(itemId) {
+  pendingSellConfirms.delete(itemId);
+}
+/**
+ * Sell sheet — tap a bank stack, see its lore/uses/value, sell 1 / 10 / All.
+ * "Sell All" on stacks above SELL_CONFIRM_THRESHOLD demands a second tap
+ * (F1d Fix 2: the armed confirm is component state keyed by item id, so
+ * re-renders can't lose it). `ctx.sell(itemId, qty)` does the engine work.
+ */
+export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFIRM_WINDOW_MS } = {}) {
   const item = ITEMS_BY_ID[itemId];
   if (!item) return;
 
@@ -178,9 +201,13 @@ export function showSellSheet(mount, ctx, itemId) {
 
   const qtyLabel = el('span', { class: 'sell-qty' });
   const worthLabel = el('span', { class: 'sell-worth gold' });
-  const confirmBtn = el('button', { class: 'btn btn-danger btn-wide' });
-  let awaitingConfirm = false;
-  let confirmTimer = 0;
+  const confirmBtn = el('button', {
+    class: 'btn btn-danger btn-wide',
+    // Announce the armed confirm so a screen-reader player hears it too.
+    'aria-live': 'assertive',
+  });
+
+  function awaitingConfirm() { return sellConfirmPending(itemId); }
 
   function ownedQty() { return bankCount(ctx.state.bank, itemId); }
 
@@ -206,19 +233,25 @@ export function showSellSheet(mount, ctx, itemId) {
       sell1Btn.setAttribute('aria-disabled', 'true');
     }
 
-    if (!awaitingConfirm) {
+    if (awaitingConfirm()) {
+      // Armed: keep the danger styling and the live totals visible. Every
+      // re-render repaints this from component state — it can neither be
+      // lost nor show a stale amount.
+      confirmBtn.className = 'btn btn-danger btn-wide';
+      confirmBtn.textContent = `Tap again — sell all ${formatNumber(qty)} for ✦${formatNumber(qty * item.sell)}`;
+      confirmBtn.setAttribute('aria-disabled', 'false');
+    } else {
       confirmBtn.className = 'btn btn-wide ' + (qty > 0 ? 'btn-ghost' : 'btn-ghost btn-disabled');
       confirmBtn.textContent = `Sell All — ✦${formatNumber(qty * item.sell)}`;
       confirmBtn.setAttribute('aria-disabled', qty > 0 ? 'false' : 'true');
     }
-    // awaitingConfirm state paints itself in onClickAll below.
   }
 
   function doSell(qtyRequested) {
     const res = ctx.sell(itemId, qtyRequested);
     if (!res.ok) { ctx.toast(res.error ?? 'Could not sell.', 'warn'); return; }
+    clearSellConfirm(itemId);
     ctx.toast(`Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`, 'success');
-    awaitingConfirm = false;
     if (ownedQty() <= 0) { ref.close(); return; }
     paintButtons();
   }
@@ -226,18 +259,23 @@ export function showSellSheet(mount, ctx, itemId) {
   const sell1Btn = el('button', { class: 'btn btn-primary' , onclick: () => doSell(1) }, '');
   const sell10Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(10) }, '');
 
+  let expiryTimer = 0;
+  function armConfirm() {
+    pendingSellConfirms.set(itemId, Date.now() + confirmWindowMs);
+    clearTimeout(expiryTimer);
+    expiryTimer = setTimeout(() => { if (paintButtons) paintButtons(); }, confirmWindowMs + 20);
+  }
+
   confirmBtn.addEventListener('click', () => {
     const qty = ownedQty();
     if (qty <= 0) return;
-    if (qty > SELL_CONFIRM_THRESHOLD && !awaitingConfirm) {
-      awaitingConfirm = true;
-      confirmBtn.className = 'btn btn-danger btn-wide';
-      confirmBtn.textContent = `Tap again — sell all ${formatNumber(qty)} for ✦${formatNumber(qty * item.sell)}`;
-      clearTimeout(confirmTimer);
-      confirmTimer = setTimeout(() => { awaitingConfirm = false; paintButtons(); }, 4000);
+    if (needsSellConfirm(qty) && !awaitingConfirm()) {
+      armConfirm();
+      paintButtons();
       return;
     }
-    clearTimeout(confirmTimer);
+    clearSellConfirm(itemId);
+    clearTimeout(expiryTimer);
     doSell(qty);
   });
 
@@ -263,6 +301,9 @@ export function showSellSheet(mount, ctx, itemId) {
   // Keep the sheet honest while it is open (actions keep running).
   paintButtons();
   const origClose = ref.close;
-  ref.close = () => { clearTimeout(confirmTimer); origClose(); };
+  ref.close = () => { clearSellConfirm(itemId); clearTimeout(expiryTimer); origClose(); };
+  // F1d Fix 2: let callers/tests force a re-render tick; the armed confirm
+  // must survive it untouched.
+  ref.repaint = paintButtons;
   return ref;
 }

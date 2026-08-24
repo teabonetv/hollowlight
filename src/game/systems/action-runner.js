@@ -160,6 +160,11 @@ export function tickActions(state, dtMs, rng) {
 
       if (!autoRestartEnabled(state, action)) {
         delete state.actions.active[actionId];
+        // F1d Fix 1: surface the stop so the UI re-renders immediately.
+        // Without this event the screen kept showing a running action while
+        // state.actions.active was already empty — and every later save then
+        // serialized an empty runner, diverging from what the player sees.
+        events.push({ type: 'stopped', actionId, reason: 'completed' });
         progress = 0;
         break;
       }

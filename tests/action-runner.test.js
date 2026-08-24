@@ -191,3 +191,33 @@ test('unlock notices fire for actions whose unlockLevel is newly reached', () =>
   const unlock = events.find((e) => e.type === 'unlock' && e.actionId === FUNGI);
   assert.ok(unlock, 'gather-fungi should be announced at Foraging 5');
 });
+
+// ── F1d Fix 1: one-shot completion must be visible, not silent ──────
+
+test('tickActions emits a stopped event (and clears active) when a non-auto action completes', () => {
+  const state = freshState();
+  assert.equal(startAction(state, TEND).ok, true);
+  setAutoRestart(state, TEND, false);
+
+  const events = [];
+  let guard = 0;
+  while (state.actions.active[TEND] && guard++ < 100) {
+    events.push(...tickActions(state, 1_000, createRng(7)));
+  }
+
+  assert.ok(events.some((e) => e.type === 'stopped' && e.actionId === TEND),
+    'UI gets a renderable stop event');
+  assert.equal(state.actions.active[TEND], undefined,
+    'active entry cleared exactly once');
+});
+
+test('auto-restart ON still runs silently: cycles continue with no stopped event', () => {
+  const state = freshState();
+  startAction(state, TEND);
+  // Feed plenty of materials so nothing halts.
+  for (let i = 0; i < 40; i++) state.bank.tinderscrap = 99;
+
+  const events = tickActions(state, 12_000, createRng(7));
+  assert.ok(!events.some((e) => e.type === 'stopped'), 'no stop while auto-running');
+  assert.ok(state.actions.active[TEND], 'action keeps running');
+});

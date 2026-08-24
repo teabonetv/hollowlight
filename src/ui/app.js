@@ -129,6 +129,15 @@ function boot() {
     pushLog(game, `${a.name} halted: ${reason}.`, game.stats.playtimeMs);
     renderScreen();
   });
+  // F1d Fix 1: a one-shot action (auto-restart off) finishing its final cycle
+  // must repaint, so the button/progress bar agree with state.actions.active.
+  bus.on('stopped', ({ actionId }) => {
+    const a = ACTIONS_BY_ID[actionId];
+    if (!a) return;
+    toaster.push(`${a.name} complete.`, 'success');
+    pushLog(game, `${a.name} finished its work.`, game.stats.playtimeMs);
+    renderScreen();
+  });
 
   // ── HUD ────────────────────────────────────────────────────────
   // Lumen counts UP to its new value after sells/purchases (F1c feedback);
@@ -261,6 +270,7 @@ function boot() {
       lastSavedAt: game.savedAt,
       actionsById: ACTIONS_BY_ID,
     });
+    console.error('[probe] offerOffline ran; away=', res.awayMs, 'hasGains=', res.hasGains, 'savedAt=', game.savedAt, 'now=', Date.now());
     if (!res.hasGains) return;
 
     const levels = [...res.levelUps];
@@ -302,10 +312,16 @@ function boot() {
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
       loop.stop();
+      // Stamp the hide moment with the LIVE runner state (F1d Fix 1): the
+      // offline calculator reads next.actions.active from this save, so the
+      // running action and its progressMs must be on disk before any absence.
       persist();
     } else {
       // Absence while hidden counts as idle time — credit it honestly.
+      // Compute BEFORE anything restamps game.savedAt, so hidden time counts;
+      // then stamp the return so a crash mid-modal can never double-count.
       if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
+      persist();
       loop.start();
     }
   });
@@ -320,6 +336,12 @@ function boot() {
     persist();
   }
   setTab('camp');
+  // Boot guard for index.html's fallback screen (F1d Fix 3): the inline boot
+  // watchdog reveals a retry screen if this flag isn't set within 8s.
+  window.__HOLLOWLIGHT_BOOTED = true;
+  const staleFallback = typeof document !== 'undefined'
+    ? document.getElementById('boot-fallback') : null;
+  staleFallback?.setAttribute('hidden', '');
   if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
   loop.start();
 }
