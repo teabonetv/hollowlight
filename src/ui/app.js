@@ -110,6 +110,7 @@ function boot() {
     const name = SKILL_BY_ID[skillId]?.name ?? skillId;
     toaster.push(`${name} reached level ${level}.`, 'success');
     pushLog(game, `${name} rose to level ${level}.`, game.stats.playtimeMs);
+    renderScreen(); // Journal (and any open screen) shows the entry immediately
   });
   bus.on('unlock', ({ actionId }) => {
     const a = ACTIONS_BY_ID[actionId];

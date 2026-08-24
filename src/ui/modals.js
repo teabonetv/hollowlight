@@ -5,6 +5,7 @@ import { el, clear } from './dom.js';
 import { formatDuration, formatNumber } from '../core/format.js';
 import { OFFLINE_CAP_HOURS } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
+import { itemName } from '../game/data/items.js';
 
 /**
  * Opens a modal. Returns { close, panel }. Only one modal at a time; Escape
@@ -65,7 +66,7 @@ export function showOfflineModal(mount, summary, { onClaim }) {
   }
   for (const item of gains.items) {
     rows.push(el('div', { class: 'offline-line' },
-      el('span', { class: 'offline-name' }, item.name ?? item.id),
+      el('span', { class: 'offline-name' }, itemName(item.id) ?? item.name ?? item.id),
       el('span', { class: 'offline-detail' }, `+${formatNumber(item.qty)}`)));
   }
 

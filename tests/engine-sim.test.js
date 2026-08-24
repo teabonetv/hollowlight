@@ -57,22 +57,34 @@ test('invariant audit over a long mixed session (two skills, full loop)', () => 
   const rng = createRng(s.rngState);
 
   let cycles = 0;
+  let tinderDrops = 0;
   for (let i = 0; i < 3000; i++) { // 5 minutes of game time
-    cycles += tickActions(s, TICK_MS, rng).filter((e) => e.type === 'cycle').length;
+    for (const e of tickActions(s, TICK_MS, rng)) {
+      if (e.type !== 'cycle') continue;
+      cycles++;
+      tinderDrops += e.gains
+        .filter((g) => g.kind === 'item' && g.id === 'tinderscrap')
+        .reduce((n, g) => n + g.qty, 0);
+    }
     s.stats.playtimeMs += TICK_MS;
   }
 
   assert.equal(s.stats.playtimeMs, 300_000);
-  // Tend-the-flame gets 75 cycle windows in 300s but only 30 tinder → halts at 30.
-  assert.equal(s.actions.completed['tend-flame'], 30);
   assert.equal(s.actions.completed['gather-herbs'], 60); // 300s / 5s
-  assert.equal(cycles, 90, 'total completions = both skills combined');
+  const tend = s.actions.completed['tend-flame'];
+  // F1b economy: Gather Herbs drops tinderscrap (30% per cycle), so Tend no
+  // longer dead-ends at the starter's 30 — the interlock keeps feeding it.
+  assert.ok(tend > 30, `tinder income must carry Tend past the starter bank (got ${tend})`);
+  assert.ok(tend <= 30 + tinderDrops, 'Tend cycles bounded by total tinder supply');
+  assert.equal(cycles, tend + 60, 'total completions = both skills combined');
   // Flame/lumen reflect ONLY affordable cycles.
-  assert.equal(s.flame, 2 * 30);
-  assert.equal(s.lumen, 20 + 30);
-  // Mastery starts at level 1 (+1%); through 30 cycles the bonus never rounds
-  // tend-flame's 14 base XP up (×1.02–×1.03 still round to 14).
-  assert.equal(s.skills.emberkeeping.xp, Math.round(14 * 1.01) * 30);
+  assert.equal(s.flame, 2 * tend);
+  assert.equal(s.lumen, 20 + tend);
+  // Tinder accounting closes exactly: starter + drops − burned = bank.
+  assert.equal(s.bank.tinderscrap ?? 0, 30 + tinderDrops - tend);
+  // Emberkeeping XP ≥ base rate through every affordable cycle (mastery only helps).
+  assert.ok(s.skills.emberkeeping.xp >= Math.round(14 * 1.01) * tend,
+    'every funded Tend cycle paid at least base XP');
   // Foraging never blocked: xp compounds above base rate as mastery climbs.
   assert.ok(s.skills.foraging.xp > 60 * 16, 'mastery bonus compounds above base rate');
   assert.ok(s.bank.fogwort >= 60 && s.bank.fogwort <= 120, 'ranged yields stay in bounds');
