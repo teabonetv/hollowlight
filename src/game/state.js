@@ -43,6 +43,10 @@ export function createState({ nowMs = 0, rngSeed = 1 } = {}) {
       completed: {},     // actionId -> lifetime cycle count
     },
 
+    // Keeper's Camp upgrade levels, keyed by track id (systems/upgrades.js).
+    // Missing on pre-F1c saves; every read defaults to level 0.
+    campUpgrades: {},
+
     settings: {
       reducedMotion: false, // app boot syncs this with the media query once
     },

@@ -11,6 +11,7 @@
 
 import { levelFromXp } from './xp.js';
 import { masteryXpMultiplier } from '../game/systems/action-runner.js';
+import { effectiveDurationMs, xpMultiplier } from '../game/systems/upgrades.js';
 
 export const OFFLINE_CAP_HOURS = 12;
 export const OFFLINE_MIN_AWAY_MS = 60_000;
@@ -54,8 +55,9 @@ export function computeOfflineProgress({
       const autoOn = next.actions.autoRestart[actionId] ?? true;
       if (!autoOn) continue; // one-shot actions don't idle
 
-      // Whole cycles the window allows…
-      let completions = Math.floor(creditedMs / action.durationMs);
+      // Whole cycles the window allows — at the camp-upgrade-adjusted
+      // duration (same helper live play uses, so speeds apply offline too)…
+      let completions = Math.floor(creditedMs / effectiveDurationMs(next, action));
       // …bounded by materials for every cycle cost.
       for (const c of action.costs ?? []) {
         const have = next.bank[c.id] ?? 0;
@@ -74,6 +76,7 @@ export function computeOfflineProgress({
       if (!skill.mastery[actionId]) skill.mastery[actionId] = { xp: 0, level: 1 };
       const mastery = skill.mastery[actionId];
       const mult = masteryXpMultiplier(mastery.level);
+      const campMult = xpMultiplier(next); // Ember Altar applies offline too
 
       for (const o of action.outputs ?? []) {
         const expected = o.min !== undefined
@@ -99,7 +102,7 @@ export function computeOfflineProgress({
         }
       }
 
-      const perCycle = Math.round(action.xp * mult);
+      const perCycle = Math.round(action.xp * mult * campMult);
       const xpGain = perCycle * completions; // identical rounding to live play
       skill.xp += xpGain;
       xpGains[action.skill] = (xpGains[action.skill] ?? 0) + xpGain;

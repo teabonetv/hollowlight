@@ -17,6 +17,7 @@ import { SKILL_BY_ID } from '../data/skills.js';
 import { ITEMS_BY_ID } from '../data/items.js';
 import { levelFromXp } from '../../core/xp.js';
 import * as bank from './bank.js';
+import * as camp from './upgrades.js';
 
 /** +1% XP per mastery level of the running action (see balance-notes.md). */
 export const MASTERY_XP_BONUS_PER_LEVEL = 0.01;
@@ -30,15 +31,24 @@ function ensureMastery(skillState, actionId) {
   return skillState.mastery[actionId];
 }
 
-/** Roll one cycle's outputs. Chance gates resolve before quantity rolls. */
-export function rollOutputs(action, rng) {
+/**
+ * Roll one cycle's outputs. Chance gates resolve before quantity rolls.
+ * `extraYieldChance` (Keeper's Camp satchel) gives each ITEM output an extra
+ * roll for ONE bonus unit, after the base quantity is known. Deterministic:
+ * draws only from the passed RNG, in stable order.
+ */
+export function rollOutputs(action, rng, { extraYieldChance = 0 } = {}) {
   const gains = [];
   for (const o of action.outputs) {
     if (o.chance !== undefined && !rng.chance(o.chance)) continue;
     const qty = o.min !== undefined
       ? o.min + rng.int(o.max - o.min + 1)
       : o.qty;
-    gains.push({ ...o, qty });
+    let finalQty = qty;
+    if (o.kind === 'item' && extraYieldChance > 0 && rng.chance(extraYieldChance)) {
+      finalQty = qty + 1;
+    }
+    gains.push({ ...o, qty: finalQty });
   }
   return gains;
 }
@@ -73,7 +83,7 @@ export function completeCycle(state, action, rng) {
   }
 
   bank.bankPay(state.bank, action.costs);
-  const gains = rollOutputs(action, rng);
+  const gains = rollOutputs(action, rng, { extraYieldChance: camp.yieldChance(state) });
   const applied = applyGains(state, gains);
 
   const events = [];
@@ -81,7 +91,9 @@ export function completeCycle(state, action, rng) {
   const mastery = ensureMastery(skill, action.id);
   const beforeLevel = skill.level;
 
-  skill.xp += Math.round(action.xp * masteryXpMultiplier(mastery.level));
+  // XP: base × mastery × Ember Altar (identical expression order in the
+  // offline calculator so live and offline never disagree by 1).
+  skill.xp += Math.round(action.xp * masteryXpMultiplier(mastery.level) * camp.xpMultiplier(state));
 
   const mBefore = mastery.level;
   mastery.xp += action.masteryXp;
@@ -129,8 +141,11 @@ export function tickActions(state, dtMs, rng) {
     let progress = active.progressMs + dtMs;
     let guard = 0;
     while (guard++ < 10000) {
-      if (progress < action.durationMs) break;
-      progress -= action.durationMs;
+      // Lantern & Wick shortens every cycle; read per-iteration so a
+      // mid-run purchase applies from the next cycle onward.
+      const durationMs = camp.effectiveDurationMs(state, action);
+      if (progress < durationMs) break;
+      progress -= durationMs;
 
       const result = completeCycle(state, action, rng);
       if (result.halted) {
@@ -195,13 +210,15 @@ export function actionStatus(state, actionId) {
   const active = state.actions.active[actionId];
   const locked = !action || !skill || skill.level < action.unlockLevel;
   const affordable = bank.canAfford(state.bank, action?.costs ?? []);
+  // Duration reflects Lantern & Wick speed so bars/ETAs match real ticks.
+  const durationMs = action ? camp.effectiveDurationMs(state, action) : 0;
   return {
     action,
     running: !!active,
     progressMs: active?.progressMs ?? 0,
-    durationMs: action?.durationMs ?? 0,
-    frac: active && action ? Math.min(1, active.progressMs / action.durationMs) : 0,
-    etaMs: active && action ? action.durationMs - active.progressMs : action?.durationMs ?? 0,
+    durationMs,
+    frac: active && action ? Math.min(1, active.progressMs / durationMs) : 0,
+    etaMs: active && action ? durationMs - active.progressMs : durationMs,
     locked: locked,
     lockLevel: action?.unlockLevel ?? 1,
     affordable,
