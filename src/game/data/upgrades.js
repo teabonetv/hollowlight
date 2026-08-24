@@ -110,7 +110,7 @@ export function validateTracks() {
         if (!(qty > 0)) errors.push(`${t.id}: tier ${i} item ${id} needs positive qty`);
       }
     }
-    if (!(t.perTier > 0) || !(t.cap >= t.perTier * t.tiers.length)) {
+    if (!(t.perTier > 0) || !(t.cap + 1e-9 >= t.perTier * t.tiers.length)) {
       errors.push(`${t.id}: cap ${t.cap} must cover ${t.tiers.length} tiers × ${t.perTier}`);
     }
   }

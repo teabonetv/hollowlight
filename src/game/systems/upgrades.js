@@ -78,7 +78,9 @@ export function buyUpgrade(state, trackId) {
 /** Additive per-tier effect with hard cap, e.g. 3 tiers × 5% = 15%. */
 export function trackEffectFraction(state, track) {
   const raw = track.perTier * upgradeLevel(state, track.id);
-  return Math.min(track.cap, raw);
+  // Snap FP noise (0.05×3 = 0.15000000000000002) so multipliers stay exact.
+  const clean = Math.round(raw * 1e9) / 1e9;
+  return Math.min(track.cap, clean);
 }
 
 /** Global action-speed multiplier (≥1). Durations divide by this. */

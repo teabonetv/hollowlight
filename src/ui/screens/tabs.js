@@ -83,9 +83,10 @@ function buildTrackCard(ctx, track) {
 
   function paint() {
     const frac = camp.trackEffectFraction(ctx.state, track);
+    // Unowned: promise the per-tier gain. Owned: state the current total.
     effectLine.textContent = level() > 0
       ? `${effectLabel(track, frac)} now`
-      : effectLabel(track, frac);
+      : `${effectLabel(track, track.perTier)} per tier`;
 
     clearTier();
     if (maxed()) {
