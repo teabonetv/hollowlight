@@ -3,42 +3,58 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07090d">
+<meta name="description" content="Hollowlight — a dark-lantern gothic idle RPG about carrying light back into a world that lost it.">
 <title>Hollowlight</title>
-<style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  html,body { margin:0; height:100%; }
-  body {
-    background:#0b0d12; color:#dfe6ef;
-    font-family: Georgia, 'Times New Roman', serif;
-    display:flex; align-items:center; justify-content:center;
-    padding:24px;
-  }
-  .card {
-    max-width:420px; text-align:center;
-    border:1px solid #2a3142; border-radius:14px;
-    padding:36px 28px; background:linear-gradient(180deg,#11141c,#0b0d12);
-  }
-  h1 { font-size:34px; letter-spacing:.14em; margin:0 0 6px; color:#e8d9a8; }
-  .rule { width:56px; height:1px; background:#3a4257; margin:18px auto; }
-  p { line-height:1.65; color:#9aa5b5; margin:0 0 10px; }
-  .sigil {
-    width:64px;height:64px;border-radius:50%;margin:0 auto 18px;
-    background:radial-gradient(circle at 50% 42%, #ffe9b0 0%, #d9a441 45%, transparent 72%);
-    box-shadow:0 0 40px 8px rgba(217,164,65,.35);
-    animation:breathe 3.4s ease-in-out infinite;
-  }
-  @keyframes breathe { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.08);opacity:1} }
-  small { color:#5f6a7d; letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
-</style>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307090d'/%3E%3Ccircle cx='16' cy='15' r='7' fill='%23d9a441'/%3E%3Ccircle cx='16' cy='13.5' r='3.4' fill='%23ffe9b0'/%3E%3Crect x='11' y='24' width='10' height='2.4' rx='1.2' fill='%238a6a2a'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="./src/ui/styles.css">
 </head>
 <body>
-  <div class="card">
-    <div class="sigil"></div>
-    <h1>HOLLOWLIGHT</h1>
-    <div class="rule"></div>
-    <p>The lanterns went out a long time ago.<br>Someone is going to relight them.</p>
-    <p><small>Under construction — the campaign is in Wave&nbsp;0</small></p>
-  </div>
+<div id="app">
+
+  <header class="topbar">
+    <div class="brand" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5c2.2 2.8 4.8 4.4 4.8 7.9a4.8 4.8 0 0 1-9.6 0c0-1.9.9-3.2 1.9-4.6.4 1.3 1.1 2 2.2 2.1-.3-1.9-.1-3.7.7-5.4z"/><path d="M12 21v-2"/></svg>
+      <span>HOLLOWLIGHT</span>
+    </div>
+    <div class="wallet">
+      <span class="pill gold" id="hud-lumen" title="Lumen">✦ 20</span>
+      <span class="pill flame" id="hud-flame" title="Flame units">0 flame</span>
+      <button class="icon-btn" id="btn-settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h13"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="19" cy="17" r="2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="screen" aria-live="off"></main>
+
+  <nav class="tabbar" role="tablist" aria-label="Main navigation">
+    <button data-tab="camp" role="tab" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l8-13 8 13"/><path d="M8 20l4-6.5 4 6.5M2.5 20h19"/></svg>
+      <span>Camp</span>
+    </button>
+    <button data-tab="skills" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21v-2"/><path d="M12 3.5c2.2 2.8 4.8 4.4 4.8 7.9a4.8 4.8 0 0 1-9.6 0c0-1.9.9-3.2 1.9-4.6.4 1.3 1.1 2 2.2 2.1-.3-1.9-.1-3.7.7-5.4z"/></svg>
+      <span>Skills</span>
+    </button>
+    <button data-tab="bank" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="7" width="16" height="13" rx="2"/><path d="M4 12h16M4 10c0-2 2-3.5 5-4h6c3 .5 5 2 5 4"/><circle cx="12" cy="15" r="1.3"/></svg>
+      <span>Bank</span>
+    </button>
+    <button data-tab="map" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L4 6v14l5-2 6 2 5-2V4l-5 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>
+      <span>Map</span>
+    </button>
+    <button data-tab="journal" role="tab" aria-selected="false">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.4-3.6-2-6.5-2v14c2.9 0 5 .6 6.5 2 1.5-1.4 3.6-2 6.5-2V4c-2.9 0-5 .6-6.5 2z"/><path d="M12 6v14"/></svg>
+      <span>Journal</span>
+    </button>
+  </nav>
+
+  <div id="toasts" aria-live="polite"></div>
+  <div id="modal-root"></div>
+
+</div>
+<script type="module" src="./src/ui/app.js"></script>
 </body>
 </html>

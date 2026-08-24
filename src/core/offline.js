@@ -71,7 +71,8 @@ export function computeOfflineProgress({
 
       // expected-value yields
       const skill = next.skills[action.skill];
-      const mastery = skill.mastery[actionId] ?? { xp: 0, level: 1 };
+      if (!skill.mastery[actionId]) skill.mastery[actionId] = { xp: 0, level: 1 };
+      const mastery = skill.mastery[actionId];
       const mult = masteryXpMultiplier(mastery.level);
 
       for (const o of action.outputs ?? []) {
