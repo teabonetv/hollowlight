@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 0.5 — FIX ROUND QUEUED (blocked before Wave 1) |
-| Active lanes | — (campaign PAUSED by Luke; resume = dispatch F1b fix builder below) |
+| Wave | 0.5 — FIX ROUND IN FLIGHT |
+| Active lanes | wt-f1b (fresh fix-builder, dispatched 2026-08-24 ~17:05) — fixes D1/D2/D3/D4 from independent review |
 | Merged | F1 @ f1e52d6 (89/89 tests green on main; Pages deploy success) |
 | Critic verdicts | none delivered yet (3 attempts: approval wall / iteration cap / user-paused) |
-| Next | **PAUSED by Luke 13:54.** Independent /review (2026-08-24 ~16:40) verified two CRITICAL defects on live main: **D1** offline never assigns skill level (offline.js:114-118 — level desync, locked-content bug) · **D2** tinderscrap has no producer — Emberkeeping hard-capped at L3/420XP forever, fan-the-coals unreachable (actions.js). Plus D3 raw ids in offline modal, D4 journal no live-update, STATE.md dual-writer corruption, stale wt-f1 worktree, impossible offline-test method in critic briefs. Resume order: fresh builder lane F1b fixes D1+D2 (+tests asserting stored level == derived level; tinderscrap producer or free scavenge action) → D3/D4 one-liners → reconcile STATE.md + prune wt-f1 → THEN critic with corrected offline-test method (same-origin savedAt rewind) and split evidence/verdict passes. |
+| Next | verify+merge F1b when done → redeploy → THEN critic with corrected offline-test method (same-origin savedAt rewind) and split evidence/verdict passes → verdict gates Wave 1 (S1,S2,S4). Campaign RESUMED by Luke ~17:04. |
 
 ## Round log
 
