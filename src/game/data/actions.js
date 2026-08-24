@@ -60,6 +60,10 @@ export const ACTIONS = [
     outputs: [
       { kind: 'item', id: 'fogwort', min: 1, max: 2 },
       { kind: 'item', id: 'graveresin', min: 1, max: 1, chance: 0.1 },
+      // Dry tinder gathers at the fog-line — this is Emberkeeping's tinder
+      // income (see balance-notes.md "Action economy"): without it the skill
+      // dead-ends at the starter bank's 30 tinderscrap.
+      { kind: 'item', id: 'tinderscrap', min: 1, max: 1, chance: 0.3 },
     ],
     xp: 16,
     masteryXp: 12,

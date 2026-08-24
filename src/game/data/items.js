@@ -12,7 +12,7 @@
 export const ITEMS = [
   // --- fuels ---
   { id: 'tinderscrap', name: 'Tinderscrap', tier: 1, category: 'fuel', sell: 1, obtainable: true,
-    flavor: 'Shaved splinters saved from every dead lantern. The flame eats them first.' },
+    flavor: 'Shaved splinters saved from every dead lantern — and dry tinder picked along the fog-line.' },
   { id: 'bogmoss', name: 'Bog-moss', tier: 1, category: 'fuel', sell: 2, obtainable: true,
     flavor: 'Damp, patient moss. Burns slow and low, like a held breath.' },
   { id: 'cindercoal', name: 'Cinder-coal', tier: 1, category: 'fuel', sell: 5, obtainable: false,

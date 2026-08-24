@@ -40,7 +40,7 @@ MAX_LEVEL = 120, milestone level 99
 |---|---|---|---|---|---|
 | Tend the Flame (Ek 1) | 4 s | 1 Tinderscrap | +2 Flame, +1 Lumen | 14 | 10 |
 | Fan the Coals (Ek 10) | 6 s | 2 Tinderscrap, 1 Grave-resin | +6 Flame, +3 Lumen | 34 | 24 |
-| Gather Herbs (Fo 1) | 5 s | — | 1–2 Fogwort, 10% 1 Grave-resin | 16 | 12 |
+| Gather Herbs (Fo 1) | 5 s | — | 1–2 Fogwort, 10% 1 Grave-resin, 30% 1 Tinderscrap | 16 | 12 |
 | Gather Fungi (Fo 5) | 6.5 s | — | 1–3 Pale-cap, 15% 1 Bog-moss | 22 | 16 |
 
 Reasoning:
@@ -48,11 +48,21 @@ Reasoning:
 - **Costs settle at cycle completion, not start** (runner contract): no
   negative-balance windows mid-cycle; starting an action requires affording
   one cycle up front as a gate check.
-- Emberkeeping is the only *sink* among Wave 0 actions — it consumes tinder.
-  Tinder income is therefore the early bottleneck: starter bank holds 30, and
-  herbs/fungi actions refill nothing, so the player must alternate skills or
-  buy nothing yet. This friction is intentional (teaches interlock); Wave 1's
-  general store will soften it.
+- **Tinder economy (F1b fix — was a hard dead end).** Emberkeeping burns
+  tinder but nothing produced it: the starter bank's 30 tinderscrap capped
+  the skill at ~420 XP lifetime (level 3), leaving Fan the Coals (Ek 10)
+  permanently unreachable. Fix: **Gather Herbs yields 1 tinderscrap at 30%**
+  ("dry tinder gathers at the fog-line") rather than adding a free
+  emberkeeping action — keeping Emberkeeping a pure *sink* preserves its
+  identity and forces cross-skill interlock (charter §5 "no dead content"),
+  while a self-funding Ek action would have made the skill trivially AFK.
+  Arithmetic: herbs yield 0.30 tinder / 5 s = **216 tinder/h**. At the worst
+  conversion (Tend: 14 XP/tinder) that sustains ≈ 50 Ek XP/min of herb time;
+  level 10 needs 8,052 XP, starter tinder funds ~420, so Ek 10 arrives after
+  ≈ 2.5 h of mixed play. Fan the Coals improves efficiency to 17 XP/tinder
+  (~61 XP/min sustained). Tinder supply is unbounded ⇒ no lifetime ceiling;
+  with mastery multipliers compounding, the road to 99 stays "weeks" per
+  charter pacing.
 - Lumen drip: ~15/min from Tending at mastery 0. Sell values below make
   gathered goods worth 2–6 Lumen apiece later, so gathering ≈ tending for raw
   income once selling exists — deliberate parity, decided now so shops don't
