@@ -1,0 +1,95 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  SAVE_VERSION, serializeSave, deserializeSave, SaveError,
+  storageGet, storageSet,
+} from '../src/core/save.js';
+import { createState } from '../src/game/state.js';
+
+function fakeStorage() {
+  const map = new Map();
+  return {
+    getItem: (k) => (map.has(k) ? map.get(k) : null),
+    setItem: (k, v) => { map.set(k, String(v)); },
+    removeItem: (k) => { map.delete(k); },
+  };
+}
+
+test('serialize → deserialize round-trips the state byte-for-byte (deep equal)', () => {
+  const s = createState({ nowMs: 1_000_000, rngSeed: 424242 });
+  s.lumen = 777;
+  s.bank.fogwort = 99;
+  s.skills.emberkeeping.xp = 5321;
+  s.skills.emberkeeping.level = 8;
+  s.actions.active['tend-flame'] = { progressMs: 1234 };
+  s.log.push({ t: 5, text: 'kindled' });
+
+  const json = serializeSave(s, 9_999_999);
+  const parsed = deserializeSave(json);
+
+  assert.deepEqual(parsed.state, s, 'deserialized state must deep-equal the original');
+  assert.equal(parsed.savedAt, 9_999_999);
+});
+
+test('envelope is stamped with the current schema version', () => {
+  const json = serializeSave(createState(), 0);
+  assert.equal(JSON.parse(json).version, SAVE_VERSION);
+});
+
+test('corrupt JSON throws a typed SaveError with reason "corrupt"', () => {
+  try {
+    deserializeSave('{not json at all');
+    assert.fail('should have thrown');
+  } catch (e) {
+    assert.ok(e instanceof SaveError);
+    assert.equal(e.reason, 'corrupt');
+  }
+});
+
+test('structurally wrong payloads throw reason "malformed"', () => {
+  for (const bad of ['null', '"str"', '{"version":1}', '{"version":1,"state":42}']) {
+    assert.throws(() => deserializeSave(bad), SaveError);
+    try { deserializeSave(bad); } catch (e) { assert.equal(e.reason, 'malformed'); }
+  }
+});
+
+test('saves from NEWER versions are rejected, never silently mangled', () => {
+  const json = JSON.stringify({ version: SAVE_VERSION + 900, savedAt: 0, state: {} });
+  assert.throws(() => deserializeSave(json), (e) => e instanceof SaveError && e.reason === 'newer');
+});
+
+test('migration hook upgrades older saves in order', () => {
+  const oldSave = JSON.stringify({
+    version: 1,
+    savedAt: 55,
+    state: { lumen: 10, legacyField: true },
+  });
+  const migrations = [
+    { from: 1, migrate: (s) => ({ ...s, migratedOnce: true }) },
+    { from: 2, migrate: (s) => ({ ...s, migratedTwice: true }) },
+  ];
+  const { state } = deserializeSave(oldSave, { currentVersion: 3, migrations });
+  assert.equal(state.migratedOnce, true);
+  assert.equal(state.migratedTwice, true);
+  assert.equal(state.lumen, 10, 'existing fields survive migration');
+});
+
+test('a gap in the migration path is reported as unmigratable', () => {
+  const json = JSON.stringify({ version: 1, savedAt: 0, state: {} });
+  assert.throws(
+    () => deserializeSave(json, { currentVersion: 4, migrations: [] }),
+    (e) => e instanceof SaveError && e.reason === 'unmigratable',
+  );
+});
+
+test('storage helpers tolerate throwing backends (private mode / quota)', () => {
+  const evil = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('full'); } };
+  assert.equal(storageGet(evil), null);
+  assert.equal(storageSet(evil, '{}'), false);
+});
+
+test('storage set/get round-trip through a working backend', () => {
+  const store = fakeStorage();
+  storageSet(store, 'hello');
+  assert.equal(storageGet(store), 'hello');
+});
