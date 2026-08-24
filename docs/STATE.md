@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | Wave | 0.75 — RE-ROUND F1c IN FLIGHT |
-| Active lanes | wt-f1c fix-builder — closing the critic's named gap |
+| Active lanes | wt-f1c fix-builder RUNNING (`sa-0-46ce7c46`) — closing the critic's named gap. Note: first F1c dispatch died with a session; worktree was untouched; re-dispatched fresh 2026-08-24 ~14:15 |
 | Merged | F1 @ f1e52d6 · F1b @ b5b2b50 (93/93 green; D1/D2 verified live) |
 | Critic verdicts | **F1 v3 (2026-08-24 20:27): MELVOR wins, WOWED=no.** Single biggest gap: ZERO ECONOMY SINK — "3,300 fogwort and 51 lumen with nothing on earth to spend either on. The loop is clean, honest, and pretty — and then it just counts upward." Praise noted: clean/honest/pretty loop. Evidence: Temp/qa-critic/evidence.md E1-E27 + 21 screenshots incl. melvor-* side-by-side |
 | Next | F1c closes the sink gap (camp trader sell + Lumen upgrade tracks, pre-S2 scope) → verify+merge+deploy → critic v4 re-judge |
