@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 0.5 — FIX ROUND IN FLIGHT |
-| Active lanes | wt-f1b (fresh fix-builder, dispatched 2026-08-24 ~17:05) — fixes D1/D2/D3/D4 from independent review |
-| Merged | F1 @ f1e52d6 (89/89 tests green on main; Pages deploy success) |
-| Critic verdicts | none delivered yet (3 attempts: approval wall / iteration cap / user-paused) |
-| Next | verify+merge F1b when done → redeploy → THEN critic with corrected offline-test method (same-origin savedAt rewind) and split evidence/verdict passes → verdict gates Wave 1 (S1,S2,S4). Campaign RESUMED by Luke ~17:04. |
+| Wave | 0.5 — FIXES DEPLOYED, CRITIC IN FLIGHT |
+| Active lanes | F1 hostile critic v3 (fresh agent, corrected methodology) |
+| Merged | F1 @ f1e52d6 · **F1b @ b5b2b50** (93/93 green incl. regression tests; D1/D2 verified live on deploy) |
+| Critic verdicts | none yet (attempts 1-3 lost to harness/method issues, all since fixed) |
+| Next | F1 critic v3 verdict → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ named gap ⇒ re-round lane |
 
 ## Round log
 
