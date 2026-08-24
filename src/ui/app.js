@@ -16,13 +16,16 @@ import {
 import { computeOfflineProgress, OFFLINE_MIN_AWAY_MS } from '../core/offline.js';
 import { createState, pushLog } from '../game/state.js';
 import { ACTIONS_BY_ID } from '../game/data/actions.js';
+import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
+import * as camp from '../game/systems/upgrades.js';
+import { sellItems } from '../game/systems/bank.js';
 
 import { el, clear } from './dom.js';
 import { icon } from './icons.js';
 import { createToaster } from './toast.js';
-import { openModal, showOfflineModal, showSettingsModal } from './modals.js';
+import { openModal, showOfflineModal, showSettingsModal, showSellSheet } from './modals.js';
 import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
 import {
   renderCampScreen, renderBankScreen, renderMapScreen, renderJournalScreen,
@@ -128,9 +131,34 @@ function boot() {
   });
 
   // ── HUD ────────────────────────────────────────────────────────
+  // Lumen counts UP to its new value after sells/purchases (F1c feedback);
+  // reduced motion skips straight to the number.
+  let shownLumen = null;
+  let lumenAnimId = 0;
+  function paintLumen(v) {
+    hudLumen.textContent = `✦ ${formatNumber(v)}`;
+  }
   function updateHud() {
-    hudLumen.textContent = `✦ ${formatNumber(game.lumen)}`;
+    const target = game.lumen;
+    if (shownLumen === null || shownLumen === target || game.settings.reducedMotion) {
+      shownLumen = target;
+      paintLumen(target);
+    } else {
+      startLumenCountUp(shownLumen, target);
+    }
     hudFlame.textContent = `${formatNumber(game.flame)} flame`;
+  }
+  function startLumenCountUp(from, to) {
+    cancelAnimationFrame?.(lumenAnimId);
+    const t0 = performance.now();
+    const DUR_MS = 450;
+    const frame = (t) => {
+      const p = Math.min(1, (t - t0) / DUR_MS);
+      shownLumen = Math.round(from + (to - from) * p);
+      paintLumen(shownLumen);
+      if (p < 1) lumenAnimId = requestAnimationFrame(frame);
+    };
+    lumenAnimId = requestAnimationFrame(frame);
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -180,6 +208,26 @@ function boot() {
       renderScreen();
     },
     setAutoRestart(id, on) { runner.setAutoRestart(game, id, on); persist(); },
+    // ── F1c economy: selling + Keeper's Camp upgrades ──────────────
+    sell(itemId, qty) {
+      const res = sellItems(game, itemId, qty);
+      if (res.ok) { persist(); updateHud(); }
+      return res;
+    },
+    openSellSheet(itemId) {
+      showSellSheet(modalRoot, ctx, itemId);
+    },
+    buyUpgrade(trackId) {
+      const res = camp.buyUpgrade(game, trackId);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not buy that.', 'warn'); return res; }
+      const track = TRACKS_BY_ID[trackId];
+      toaster.push(`${track.name} — ${res.tier.name}. The camp brightens.`, 'success');
+      pushLog(game, `Upgraded ${track.name}: ${res.tier.name} (${camp.upgradeLevel(game, trackId)}/${track.tiers.length}).`, game.stats.playtimeMs);
+      persist();
+      updateHud();
+      renderScreen();
+      return res;
+    },
     openSkill(id) { ui.tab = 'skills'; ui.skillId = id; renderScreen(); },
     openSkillsList() { ui.skillId = null; renderScreen(); },
     isReducedMotion: () => !!game.settings.reducedMotion,
