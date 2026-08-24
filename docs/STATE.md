@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 0.8 — RE-ROUND F1d IN FLIGHT |
-| Active lanes | wt-f1d fix-builder — offline persistence + sell-all UX + boot resilience |
-| Merged | F1 · F1b · F1c @ 4cf99ea (120/120 green; sink live) |
-| Critic verdicts | v3: MELVOR (no sink) → fixed by F1c. **v4: MELVOR, WOWED=no** — gaps: (1) offline never computes: save has actions.active:{} while action runs (Conductor reproduced; runner state not persisted; modal code OK) (2) Sell All >25 needs second tap + confirm can be clobbered by live re-render (works when completed; Conductor verified 62→182✦) (3) blank boot on transient 503. Noted: our UI craft scored 8 vs Melvor 7 |
-| Next | F1d fixes the three → verify+merge+deploy → critic v5 (told Sell All is two-tap by design; judge as player) → pass ⇒ Wave 1 |
+| Wave | 1 GATE — critic v5 judging |
+| Active lanes | F1 critic v5 (fresh, blind) |
+| Merged | F1 · F1b · F1c · **F1d @ 8aff8c8** (136/136 green; offline persistence hardened, sell-all confirm re-render-proof, boot watchdog live) |
+| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline never computes / sell-all feels dead / blank boot) → F1d fixed. F1d's honest finding: single-tab persistence was already correct; real killers were one-shot-completion clearing runner state with no event + fragile hide/return ordering + multi-tab clobber (structural, noted) |
+| Next | v5 verdict → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ next gap lane |
 
 ## Round log
 
