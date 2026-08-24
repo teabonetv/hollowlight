@@ -114,6 +114,9 @@ export function computeOfflineProgress({
   const levelUps = [];
   for (const [id, s] of Object.entries(next.skills)) {
     const lvl = levelFromXp(s.xp);
+    // Assign the earned level into the save (D1 fix): XP alone is not enough —
+    // startAction gates on skill.level, so an unassigned level locks skills.
+    s.level = lvl;
     if (lvl > levelsBefore[id]) levelUps.push({ skillId: id, level: lvl });
   }
 
