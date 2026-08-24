@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 0.75 — RE-ROUND F1c IN FLIGHT |
-| Active lanes | wt-f1c fix-builder RUNNING (`sa-0-46ce7c46`) — closing the critic's named gap. Note: first F1c dispatch died with a session; worktree was untouched; re-dispatched fresh 2026-08-24 ~14:15 |
-| Merged | F1 @ f1e52d6 · F1b @ b5b2b50 (93/93 green; D1/D2 verified live) |
-| Critic verdicts | **F1 v3 (2026-08-24 20:27): MELVOR wins, WOWED=no.** Single biggest gap: ZERO ECONOMY SINK — "3,300 fogwort and 51 lumen with nothing on earth to spend either on. The loop is clean, honest, and pretty — and then it just counts upward." Praise noted: clean/honest/pretty loop. Evidence: Temp/qa-critic/evidence.md E1-E27 + 21 screenshots incl. melvor-* side-by-side |
-| Next | F1c closes the sink gap (camp trader sell + Lumen upgrade tracks, pre-S2 scope) → verify+merge+deploy → critic v4 re-judge |
+| Wave | 1 GATE — F1 re-judge (critic v4) next |
+| Active lanes | critic v4 about to dispatch; no builder lanes in flight |
+| Merged | F1 @ f1e52d6 · F1b @ b5b2b50 · **F1c @ 4cf99ea** (120/120 green on merged main incl. 27 camp-economy/UI tests; deploy success, upgrades.js live) |
+| Critic verdicts | F1 v3: MELVOR wins, WOWED=no — gap: zero economy sink ("3,300 fogwort and nothing to spend it on") |
+| Next | critic v4 judges the sink-closed build blind → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ named gap ⇒ new re-round lane. NOTE: heartbeat double-dispatch collision during F1c resolved — DISPATCH LOCK added to heartbeat prompt; unreferenced trader stubs excised pre-merge (3332f0f) |
 
 ## Round log
 
