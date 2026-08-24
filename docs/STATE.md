@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 1 GATE — F1 re-judge (critic v4) next |
-| Active lanes | critic v4 about to dispatch; no builder lanes in flight |
-| Merged | F1 @ f1e52d6 · F1b @ b5b2b50 · **F1c @ 4cf99ea** (120/120 green on merged main incl. 27 camp-economy/UI tests; deploy success, upgrades.js live) |
-| Critic verdicts | F1 v3: MELVOR wins, WOWED=no — gap: zero economy sink ("3,300 fogwort and nothing to spend it on") |
-| Next | critic v4 judges the sink-closed build blind → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ named gap ⇒ new re-round lane. NOTE: heartbeat double-dispatch collision during F1c resolved — DISPATCH LOCK added to heartbeat prompt; unreferenced trader stubs excised pre-merge (3332f0f) |
+| Wave | 0.8 — RE-ROUND F1d IN FLIGHT |
+| Active lanes | wt-f1d fix-builder — offline persistence + sell-all UX + boot resilience |
+| Merged | F1 · F1b · F1c @ 4cf99ea (120/120 green; sink live) |
+| Critic verdicts | v3: MELVOR (no sink) → fixed by F1c. **v4: MELVOR, WOWED=no** — gaps: (1) offline never computes: save has actions.active:{} while action runs (Conductor reproduced; runner state not persisted; modal code OK) (2) Sell All >25 needs second tap + confirm can be clobbered by live re-render (works when completed; Conductor verified 62→182✦) (3) blank boot on transient 503. Noted: our UI craft scored 8 vs Melvor 7 |
+| Next | F1d fixes the three → verify+merge+deploy → critic v5 (told Sell All is two-tap by design; judge as player) → pass ⇒ Wave 1 |
 
 ## Round log
 
