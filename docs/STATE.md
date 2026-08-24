@@ -11,12 +11,13 @@
 | Field | Value |
 |---|---|
 | Wave | 1 — dispatch pending |
-| Active lanes | — (F1 merged; F1 critic next) |
+| Active lanes | — (F1 critic running: sa-0-d73824b2) |
 | Merged | F1 @ f1e52d6 (89/89 tests green on main; Pages deploy success) |
-| Critic verdicts | — |
+| Critic verdicts | — (first F1 critic lost at session end, no verdict; fresh critic dispatched) |
 | Next | dispatch F1 hostile critic vs Melvor → verdict gates re-round or Wave 1 (S1,S2,S4) |
 
 ## Round log
 
 - 2026-08-24 Repo created; charter v1, AGENTS.md contract, placeholder live on Pages. F1 dispatched.
 - 2026-08-24 F1 verified (89/89 tests in lane incl. headless app-boot), merged --no-ff to main @ f1e52d6, pushed; Pages deploy success, live 200. F1 critic dispatch next.
+- 2026-08-24 First F1 critic agent died with the session, no verdict. Fresh hostile critic dispatched (sa-0-d73824b2) against live build vs Melvor; verdict gates F1 re-round or Wave 1 dispatch.
