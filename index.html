@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Hollowlight</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; }
+  body {
+    background:#0b0d12; color:#dfe6ef;
+    font-family: Georgia, 'Times New Roman', serif;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px;
+  }
+  .card {
+    max-width:420px; text-align:center;
+    border:1px solid #2a3142; border-radius:14px;
+    padding:36px 28px; background:linear-gradient(180deg,#11141c,#0b0d12);
+  }
+  h1 { font-size:34px; letter-spacing:.14em; margin:0 0 6px; color:#e8d9a8; }
+  .rule { width:56px; height:1px; background:#3a4257; margin:18px auto; }
+  p { line-height:1.65; color:#9aa5b5; margin:0 0 10px; }
+  .sigil {
+    width:64px;height:64px;border-radius:50%;margin:0 auto 18px;
+    background:radial-gradient(circle at 50% 42%, #ffe9b0 0%, #d9a441 45%, transparent 72%);
+    box-shadow:0 0 40px 8px rgba(217,164,65,.35);
+    animation:breathe 3.4s ease-in-out infinite;
+  }
+  @keyframes breathe { 0%,100%{transform:scale(1);opacity:.85} 50%{transform:scale(1.08);opacity:1} }
+  small { color:#5f6a7d; letter-spacing:.08em; text-transform:uppercase; font-size:11px; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="sigil"></div>
+    <h1>HOLLOWLIGHT</h1>
+    <div class="rule"></div>
+    <p>The lanterns went out a long time ago.<br>Someone is going to relight them.</p>
+    <p><small>Under construction — the campaign is in Wave&nbsp;0</small></p>
+  </div>
+</body>
+</html>

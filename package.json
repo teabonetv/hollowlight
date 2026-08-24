@@ -1,0 +1,10 @@
+{
+  "name": "hollowlight",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Mobile-first idle/incremental RPG. Static front end; package.json exists for the test runner only.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/"
+  }
+}
