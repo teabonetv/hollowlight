@@ -1,0 +1,156 @@
+// Modal system + the three Wave-0 dialogs: offline gains, settings
+// (export/import/reset), and confirmations.
+
+import { el, clear } from './dom.js';
+import { formatDuration, formatNumber } from '../core/format.js';
+import { OFFLINE_CAP_HOURS } from '../core/offline.js';
+import { SAVE_VERSION } from '../core/save.js';
+
+/**
+ * Opens a modal. Returns { close, panel }. Only one modal at a time; Escape
+ * and backdrop tap close it unless persistent=true.
+ */
+export function openModal(mount, { title, body, actions = [], persistent = false }) {
+  clear(mount);
+
+  const panel = el('div', { class: 'modal-panel', role: 'dialog', 'aria-modal': 'true' },
+    el('div', { class: 'modal-head' },
+      el('h2', { class: 'modal-title' }, title),
+      el('button', {
+        class: 'icon-btn', 'aria-label': 'Close',
+        onclick: () => close(),
+        html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+      })),
+    el('div', { class: 'modal-body' }, body),
+    actions.length ? el('div', { class: 'modal-actions' }, actions) : null,
+  );
+
+  const overlay = el('div', { class: 'modal-overlay' }, panel);
+  if (!persistent) {
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    document.addEventListener('keydown', onKey);
+  }
+  mount.append(overlay);
+  requestAnimationFrame(() => overlay.classList.add('open'));
+
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    overlay.classList.remove('open');
+    setTimeout(() => { overlay.remove(); if (mount.contains(overlay)) mount.removeChild(overlay); }, 180);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+
+  return { close, panel };
+}
+
+/** "While you were away…" — honest, capped, per-action breakdown. */
+export function showOfflineModal(mount, summary, { onClaim }) {
+  const { awayMs, creditedMs, capped, gains } = summary;
+  const rows = [];
+
+  for (const line of gains.actions) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, line.name),
+      el('span', { class: 'offline-detail' }, `×${formatNumber(line.completions)} · +${formatNumber(line.xp)} XP`)));
+  }
+  if (gains.lumen > 0) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, 'Lumen'),
+      el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.lumen)}`)));
+  }
+  if (gains.flame > 0) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, 'Flame units'),
+      el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.flame)}`)));
+  }
+  for (const item of gains.items) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, item.name ?? item.id),
+      el('span', { class: 'offline-detail' }, `+${formatNumber(item.qty)}`)));
+  }
+
+  const body = el('div', {},
+    el('p', { class: 'offline-away' },
+      formatDuration(awayMs), ' away.',
+      capped ? el('span', { class: 'muted' },
+        ` The lantern kept ${OFFLINE_CAP_HOURS} hours of work.`) : ''),
+    !capped && creditedMs < awayMs ? el('p', { class: 'muted small' },
+      `Credited ${formatDuration(creditedMs)}.`) : null,
+    rows.length
+      ? el('div', { class: 'offline-list' }, rows)
+      : el('p', { class: 'muted' }, 'Your actions rested with you. Nothing was gathered.'),
+  );
+
+  const m = openModal(mount, {
+    title: 'While You Were Away…',
+    body,
+    persistent: true,
+    actions: [el('button', {
+      class: 'btn btn-primary btn-wide',
+      onclick: () => { m.close(); onClaim(); },
+    }, 'Claim')],
+  });
+}
+
+/** Settings: reduced motion, export/import, reset. */
+export function showSettingsModal(mount, ctx) {
+  let confirmReset = false;
+
+  const motionToggle = el('input', { type: 'checkbox', id: 'set-motion' });
+  motionToggle.checked = ctx.isReducedMotion();
+  motionToggle.addEventListener('change', () => ctx.setReducedMotion(motionToggle.checked));
+
+  const exportArea = el('textarea', {
+    class: 'save-textarea', readonly: '', rows: 5,
+    'aria-label': 'Exported save data',
+  });
+  exportArea.value = ctx.exportSave();
+
+  const importArea = el('textarea', { class: 'save-textarea', rows: 5, placeholder: 'Paste a Hollowlight save here…', 'aria-label': 'Import save data' });
+
+  const resetBtn = el('button', { class: 'btn btn-danger' }, 'Reset all progress');
+  resetBtn.addEventListener('click', () => {
+    if (!confirmReset) {
+      confirmReset = true;
+      resetBtn.textContent = 'Tap again — this snuffs your flame';
+      setTimeout(() => { confirmReset = false; resetBtn.textContent = 'Reset all progress'; }, 4000);
+      return;
+    }
+    ctx.resetGame();
+    closeRef.close();
+  });
+
+  const body = el('div', {},
+    el('label', { class: 'settings-row', for: 'set-motion' },
+      el('span', {}, 'Reduced motion'),
+      motionToggle),
+    el('div', { class: 'settings-block' },
+      el('h3', { class: 'settings-h' }, 'Export save'),
+      exportArea,
+      el('button', {
+        class: 'btn btn-small',
+        onclick: async () => {
+          try { await navigator.clipboard.writeText(exportArea.value); ctx.toast('Save copied to clipboard.', 'success'); }
+          catch { ctx.toast('Copy failed — select the text manually.', 'warn'); }
+        },
+      }, 'Copy to clipboard')),
+    el('div', { class: 'settings-block' },
+      el('h3', { class: 'settings-h' }, 'Import save'),
+      importArea,
+      el('button', {
+        class: 'btn btn-small',
+        onclick: () => {
+          const res = ctx.importSave(importArea.value.trim());
+          if (res.ok) { ctx.toast('Save restored.', 'success'); closeRef.close(); }
+          else ctx.toast(`Could not read that save (${res.reason}).`, 'warn');
+        },
+      }, 'Load save')),
+    el('div', { class: 'settings-block' },
+      el('h3', { class: 'settings-h' }, 'Danger'),
+      resetBtn),
+    el('p', { class: 'settings-foot muted' },
+      `Hollowlight · Wave 0 · save schema v${SAVE_VERSION}`),
+  );
+
+  const closeRef = openModal(mount, { title: 'Settings', body });
+}
