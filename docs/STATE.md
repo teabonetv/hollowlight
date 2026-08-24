@@ -10,12 +10,13 @@
 
 | Field | Value |
 |---|---|
-| Wave | 0 — Foundation |
-| Active lanes | F1 (foundation) — dispatched 2026-08-24 |
-| Merged | — |
+| Wave | 1 — dispatch pending |
+| Active lanes | — (F1 merged; F1 critic next) |
+| Merged | F1 @ f1e52d6 (89/89 tests green on main; Pages deploy success) |
 | Critic verdicts | — |
-| Next | verify+merge F1 → enable Pages already on → dispatch Wave 1 (S1,S2,S4) |
+| Next | dispatch F1 hostile critic vs Melvor → verdict gates re-round or Wave 1 (S1,S2,S4) |
 
 ## Round log
 
 - 2026-08-24 Repo created; charter v1, AGENTS.md contract, placeholder live on Pages. F1 dispatched.
+- 2026-08-24 F1 verified (89/89 tests in lane incl. headless app-boot), merged --no-ff to main @ f1e52d6, pushed; Pages deploy success, live 200. F1 critic dispatch next.
