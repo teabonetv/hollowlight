@@ -55,6 +55,52 @@
   <div id="modal-root"></div>
 
 </div>
+
+<!-- F1d Fix 3: boot-resilience fallback. If a JS module fails to load (e.g.
+     a transient 503 on GitHub Pages), the page would otherwise stay blank
+     forever. This watchdog is plain inline script with inline styles — it
+     needs no external file — and reveals a styled retry screen if the app
+     hasn't signalled a successful boot within 8 seconds. -->
+<div id="boot-fallback" hidden role="alertdialog" aria-label="Hollowlight failed to load">
+  <style>
+    #boot-fallback {
+      position: fixed; inset: 0; z-index: 9999;
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 1rem; padding: 2rem;
+      text-align: center;
+      background: #07090d; color: #cfd6dd;
+      font-family: Georgia, 'Times New Roman', serif;
+    }
+    #boot-fallback .boot-flame { font-size: 2.4rem; line-height: 1; }
+    #boot-fallback h1 {
+      margin: 0; font-size: 1.25rem; font-weight: normal;
+      letter-spacing: 0.08em; color: #d9a441; text-transform: uppercase;
+    }
+    #boot-fallback p { margin: 0; max-width: 22rem; line-height: 1.5; }
+    #boot-fallback button {
+      min-width: 44px; min-height: 44px; padding: 0.75rem 2rem;
+      border: 1px solid #d9a441; border-radius: 8px;
+      background: transparent; color: #d9a441;
+      font-size: 1rem; letter-spacing: 0.05em; cursor: pointer;
+    }
+    #boot-fallback button:active { background: rgba(217, 164, 65, 0.15); }
+  </style>
+  <span class="boot-flame" aria-hidden="true">🕯️</span>
+  <h1>The lantern flickers in the wind…</h1>
+  <p>Hollowlight could not finish kindling — the road here gave out.
+     Wait a breath, then try again.</p>
+  <button type="button" id="boot-retry" onclick="location.reload()">Retry</button>
+</div>
+<script>
+(function () {
+  'use strict';
+  window.setTimeout(function () {
+    if (window.__HOLLOWLIGHT_BOOTED) return;
+    var f = document.getElementById('boot-fallback');
+    if (f) f.hidden = false;
+  }, 8000);
+})();
+</script>
 <script type="module" src="./src/ui/app.js"></script>
 </body>
 </html>
