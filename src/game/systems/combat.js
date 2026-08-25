@@ -36,7 +36,7 @@ export function createCombatState() {
     oilMs: OIL_CHECK_MS,
     fogMs: FOG_BITE_MS,
     lanternDry: false,
-    autoContinue: true,
+    autoContinue: false,
     autoEat: { unlocked: false, enabled: false, threshold: AUTO_EAT_DEFAULT_THRESHOLD },
     autoBrew: { unlocked: false, enabled: false, threshold: AUTO_BREW_DEFAULT_THRESHOLD },
     log: [],
@@ -70,6 +70,7 @@ export function ensureCombat(state) {
   }
   if (c.paused == null) c.paused = false;
   if (c.dryAnnounced == null) c.dryAnnounced = false;
+  if (c.autoContinue == null) c.autoContinue = false;
   return c;
 }
 
@@ -226,11 +227,15 @@ export function fightCockpit(state, enemy = planningEnemy(state)) {
   let chance = hitChance(off.accuracy, Math.round(enemy.avoidance));
   if (state.combat.lanternDry) chance *= FOG_HIT_MULT;
   const pMult = styleMultiplier(style, enemy.weakness, enemy.resist);
+  const foeAcc = Math.round(enemy.accuracy * (phase.accMult ?? 1));
+  const foeChance = hitChance(foeAcc, off.avoidance);
   return {
     vsId: enemy.id,
     vsName: enemy.name,
     hitChance: chance,
     hitPct: Math.round(chance * 100),
+    foeHitChance: foeChance,
+    foeHitPct: Math.round(foeChance * 100),
     playerMaxHit: Math.max(1, Math.round(off.maxDmg * pMult)),
     foeMaxHit: Math.max(1, Math.round(enemy.maxDmg * (phase.dmgMult ?? 1))),
   };
@@ -554,7 +559,7 @@ function onKill(state, rng) {
   const vigilEvents = progressVigil(state, enemy);
 
   const repeatId = enemy.id;
-  const auto = c.autoContinue && !enemy.boss && oilSipsRemaining(state) > 0;
+  const auto = c.autoContinue && !enemy.boss && lanternIsFed(state);
   c.fighting = false;
   c.foe = null;
   c.enemyId = null;

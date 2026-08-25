@@ -247,13 +247,13 @@ kept. Walk back (open that stretch) to recover.
 | Constant | Value | Why |
 |---|---|---|
 | Player HP | 36 + 4 × Combat level | First moth (16 HP) is a few exchanges; the Warden (90) is a food decision. |
-| Accuracy | 8 + 2×level + weapon | vs moth avoidance 11 ≈ 55% hit at level 1 with the wick-knife — misses matter. Live fight HUD and Hand card show that % plus your max-hit and foe max-hit. |
+| Accuracy | 8 + 2×level + weapon | vs moth avoidance 11 ≈ 61% hit at level 1 with the wick-knife — misses matter. Live cockpit shows that % **and the foe's chance to hit you** on one line (`Acc 61% / they 53% · your max 7 · foe max 3`). |
 | Avoidance | round(7 + 1.5×level) | You get hit. Eating is not optional on the Cur / Warden. |
 | Hit chance | clamp(0.20, 0.95, 0.12 + 0.88·acc/(acc+avo)) | Never a coin-flip void; never a sure thing. |
 | Weakness / resist | ×1.18 / ×0.86 | Style swap is a real DPS lever on every card (weakness listed on the hunt). |
 | Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. |
 | Unarmed Shot / Rite | slower, lower max | You *can* swap styles day one; you *want* the matching drop. |
-| Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Stall always sells wick-oil (mercy buy ✦8). Hunt starts **already dry** if flasks are empty — never paint “Lantern fed” at 0 sips. Dry lantern: first 10 s of fog-gather (no bite), then 2 fog-bite / 2 s and ×0.85 hit chance. Auto-continue stops when the flasks are empty. Hub chip is “lantern ready” only when sips remain. |
+| Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Stall always sells wick-oil (mercy buy ✦8). Hunt starts **already dry** if flasks are empty — never paint “Lantern fed” at 0 sips. Dry lantern: first 10 s of fog-gather (no bite), then 2 fog-bite / 2 s and ×0.85 hit chance. **Keep hunting defaults OFF.** Auto-continue refuses the next moth while the lantern is dry. Hub Hunt at 0 sips is “Need oil”, not a normal pull. Hub chip is “lantern ready” only when sips remain. |
 | Hand slot | Wick-knife 3–6 / 2.2 s / +4 acc | One honest weapon. Unarmed Strike is 2–4 / 2.4 s. Ash-sling and prayer-stub apply when held and the matching style is selected. |
 | Lantern-loaf | +14 HP | Eat-now-or-one-more-hit. Pale-cap +8 and fogwort +5 are forageable — gathering feeds combat. |
 | Auto-eat / auto-brew | wired, locked | Honest copy; a later camp purchase can unlock the thresholds. |

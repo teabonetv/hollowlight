@@ -63,7 +63,8 @@ export function renderSkillDetail(ctx, skillId) {
   const sk = ctx.state.skills[skillId];
   const live = skill.wave === 0;
 
-  const root = el('section', { class: 'screen' });
+  const fighting = skillId === 'combat' && !!ctx.state.combat?.fighting;
+  const root = el('section', { class: `screen${fighting ? ' fight-live' : ''}` });
 
   root.append(el('header', { class: 'detail-head' },
     el('button', {
@@ -99,6 +100,7 @@ export function renderSkillDetail(ctx, skillId) {
         xpWrap.querySelector('.xp-count').textContent = p.span === Infinity
           ? `${formatNumber(p.into)} XP` : `${formatNumber(p.into)} / ${formatNumber(p.span)} XP`;
         xpWrap.querySelector('.xp-fill').style.width = `${(p.frac * 100).toFixed(1)}%`;
+        root.classList.toggle('fight-live', !!ctx.state.combat?.fighting);
         panel.update();
       },
     };

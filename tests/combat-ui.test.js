@@ -29,6 +29,7 @@ function makeCtx(state) {
     setCombatStyle: (id) => combat.setStyle(state, id),
     equipWeapon: (id) => combat.equipWeapon(state, id),
     resumeCombat: () => combat.resumeCombat(state),
+    setCombatAutoContinue: (on) => { state.combat.autoContinue = !!on; },
   };
 }
 
@@ -61,14 +62,40 @@ test('a live fight paints HP, styles, eat, flee, weapon, cockpit, and a log', ()
   assert.match(text, /Pale Moth/);
   assert.match(text, /Strike/);
   assert.match(text, /Wick-knife/);
-  assert.match(text, /3–6/);
   assert.match(text, /Fall back/);
   assert.match(text, /Lantern-loaf/);
-  assert.match(text, /Acc \d+%/);
+  assert.match(text, /Acc \d+% \/ they \d+%/);
   assert.match(text, /your max \d+/);
   assert.match(text, /foe max \d+/);
+  assert.equal((text.match(/Acc \d+%/g) ?? []).length, 1, 'one kit line, not Hand + cockpit');
+  assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
+  assert.ok(scr.node.querySelector('.hand-chip'));
   assert.ok(scr.node.querySelector('.combat-log'));
   scr.update();
+});
+
+test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.ok(fight);
+  const classes = fight.children.map((c) => c.className);
+  const iFighter = classes.findIndex((c) => /\bfighter\b/.test(c));
+  const iKit = classes.findIndex((c) => /\bkit-line\b/.test(c));
+  const iOil = classes.findIndex((c) => /\boil-line\b/.test(c));
+  const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
+  const iHand = classes.findIndex((c) => /\bhand-chip\b/.test(c));
+  assert.ok(iFighter >= 0 && iKit > iFighter && iOil > iKit && iEat > iOil, 'HP then kit then oil then eat');
+  assert.ok(iHand > iEat, 'weapon chip sits after the cockpit');
+  assert.equal(classes.filter((c) => /\bfighter\b/.test(c)).length, 2);
+  assert.match(fight.textContent ?? '', /You/);
+  assert.match(fight.textContent ?? '', /Pale Moth/);
+  assert.match(fight.textContent ?? '', /Lantern-loaf/);
+  assert.equal(/\bHand\b/.test(fight.querySelector('.hand-chip')?.textContent ?? ''), false);
+  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Wick-knife/);
+  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Unarmed/);
+  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Knife/);
 });
 
 test('0 oil never paints Lantern fed; hub chip is dry not ready', () => {
@@ -162,4 +189,44 @@ test('mid-fight deserialize stays paused until Resume; paint does not auto-resum
   resume.click();
   assert.equal(state.combat.paused, false);
   assert.equal(state.combat.fighting, true);
+});
+
+test('Hunt at 0 lantern sips is not a normal pull', () => {
+  const state = createState({ rngSeed: 2 });
+  state.bank['wick-oil'] = 0;
+  state.bank['lamp-oil'] = 0;
+  const toasts = [];
+  const ctx = makeCtx(state);
+  ctx.toast = (m) => toasts.push(m);
+  const scr = renderSkillDetail(ctx, 'combat');
+  const hunts = scr.node.querySelectorAll('button').filter((b) => (b.textContent ?? '') === 'Hunt');
+  assert.equal(hunts.length, 0, 'no primary Hunt at 0 sips');
+  const need = scr.node.querySelectorAll('button').filter((b) => /Need oil/.test(b.textContent ?? ''));
+  assert.ok(need.length >= 1);
+  assert.equal(need[0].classList.contains('btn-primary'), false);
+  assert.equal(need[0].getAttribute('aria-disabled'), 'true');
+  need[0].click();
+  assert.equal(state.combat.fighting, false);
+  assert.ok(toasts.some((t) => /dry|oil/i.test(t)));
+});
+
+test('Keep hunting this foe defaults off', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.equal(state.combat.autoContinue, false);
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.match(scr.node.textContent ?? '', /Keep hunting this foe/);
+  const box = scr.node.querySelector('.combat-keep')?.querySelector('input');
+  assert.ok(box);
+  assert.equal(box.checked, false);
+});
+
+test('foe chance-to-hit sits on the same kit line as yours', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const kit = combat.fightCockpit(state);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const line = scr.node.querySelector('.fight-cockpit')?.textContent ?? '';
+  assert.equal(line, `Acc ${kit.hitPct}% / they ${kit.foeHitPct}% · your max ${kit.playerMaxHit} · foe max ${kit.foeMaxHit}`);
+  assert.ok(kit.foeHitPct > 0 && kit.foeHitPct < 100);
 });

@@ -11,12 +11,54 @@
   letter-spacing: 0.01em;
 }
 .fight-cockpit {
-  padding: 10px 12px;
+  padding: 6px 10px;
   border: 1px solid var(--gold-lo);
   border-radius: var(--radius-sm);
   background: rgba(217, 164, 65, 0.08);
 }
-.encounter-held { border-color: var(--gold-lo); }
+.screen.fight-live { gap: 10px; }
+.screen.fight-live .detail-title .screen-sub,
+.screen.fight-live .xp-block { display: none; }
+.encounter-held {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--gold-lo);
+  border-radius: var(--radius-sm);
+  background: rgba(217, 164, 65, 0.08);
+}
+.encounter-held-copy { margin: 0; font-size: 12.5px; color: var(--gold-hi); }
+.encounter-held .btn { min-height: 44px; flex: 0 0 auto; padding: 8px 16px; }
+.hand-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.hand-chip-name {
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 4.5em;
+}
+.hand-chip-toggles {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 8px;
+}
+.hand-chip-toggles .btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  padding: 8px 6px;
+  font-size: 13px;
+}
+.combat-fight { display: flex; flex-direction: column; gap: 6px; }
+.fighter { display: flex; flex-direction: column; gap: 4px; }
+.fighter-head { display: flex; justify-content: space-between; gap: 8px; }
+.eat-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.eat-btn { min-height: 44px; font-size: 11.5px; text-align: center; padding: 6px 4px; }
 .weapon-card { margin: 0; }
 .weapon-row {
   display: flex;
@@ -50,16 +92,11 @@
 .hunt-list { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
 .boss-card { border-color: rgba(217, 164, 65, 0.4); }
 .combat-death { border-color: rgba(192, 86, 79, 0.45); }
-.combat-fight { display: flex; flex-direction: column; gap: 12px; }
-.fighter { display: flex; flex-direction: column; gap: 6px; }
-.fighter-head { display: flex; justify-content: space-between; gap: 8px; }
 .hp-you { background: linear-gradient(90deg, #6d8a4a, var(--ok) 70%, #c5e0b0); box-shadow: 0 0 10px rgba(127, 165, 109, 0.35); }
 .hp-foe { background: linear-gradient(90deg, #8a3e3a, var(--danger) 70%, #eda49d); box-shadow: 0 0 10px rgba(192, 86, 79, 0.3); }
 .atk-fill { background: linear-gradient(90deg, var(--line), var(--gold-lo)); box-shadow: none; }
 .style-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .style-btn { min-height: 48px; padding: 8px 6px; }
-.eat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.eat-btn { min-height: 48px; font-size: 12.5px; text-align: center; }
 .oil-line { margin: 0; font-size: 13px; }
 .oil-line.danger { color: #eda49d; }
 .combat-keep { margin-left: 0; }
