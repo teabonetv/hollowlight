@@ -114,7 +114,9 @@ function renderStars(ctx) {
     el('header', { class: 'screen-head' },
       el('h1', { class: 'screen-title' }, 'Constellation'),
       el('p', { class: 'screen-sub' },
-        `${formatNumber(state.radiance ?? 0)} Radiance unspent · ${owned.size}/${PERKS.length} stars`)),
+        el('span', { id: 'almanac-radiance-unspent' },
+          `${formatNumber(state.radiance ?? 0)} Radiance unspent`),
+        ` · ${owned.size}/${PERKS.length} stars`)),
     subnav(ctx, 'stars'));
 
   for (const branch of PERK_BRANCHES) {
@@ -136,7 +138,15 @@ function renderStars(ctx) {
   root.append(el('p', { class: 'footnote muted' },
     'Stars are permanent. Respec rearranges them for Lumen — your skills, bank, and levels stay.'));
 
-  return { node: root, update: () => {} };
+  return {
+    node: root,
+    update() {
+      const unspent = root.querySelector('#almanac-radiance-unspent');
+      if (unspent) {
+        unspent.textContent = `${formatNumber(ctx.state.radiance ?? 0)} Radiance unspent`;
+      }
+    },
+  };
 }
 
 function perkCard(ctx, perk, owned) {

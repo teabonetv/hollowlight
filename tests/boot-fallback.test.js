@@ -88,6 +88,14 @@ test('hidden wins over the overlay display rule (specificity)', () => {
   );
 });
 
+test('tab bar labels the fifth tab Almanac, not Journal', () => {
+  const tabbar = html.match(/<nav class="tabbar"[\s\S]*?<\/nav>/);
+  assert.ok(tabbar, 'tab bar present');
+  assert.match(tabbar[0], /<span>Almanac<\/span>/);
+  assert.doesNotMatch(tabbar[0], /<span>Journal<\/span>/);
+  assert.match(html, /href="\.\/src\/ui\/combat\.css"/);
+});
+
 test('app.js signals a successful boot', async () => {
   const appSrc = readFileSync(join(root, 'src', 'ui', 'app.js'), 'utf8');
   assert.match(appSrc, /__HOLLOWLIGHT_BOOTED = true/,

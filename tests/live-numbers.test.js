@@ -88,10 +88,15 @@ function assertViewsMatchSave(session, { fogwortQty } = {}) {
 
   if (fogwortQty !== undefined) {
     const tile = fogwortTile(session);
-    const qtyText = tile.querySelector('.bank-qty').textContent;
-    assert.equal(qtyText, fogwortQty > 0 ? formatNumber(fogwortQty) : '—');
     assert.equal(bankCount(saved.bank, 'fogwort'), fogwortQty);
-    assert.equal(tile.classList.contains('owned'), fogwortQty > 0);
+    if (fogwortQty > 0) {
+      assert.ok(tile, 'owned Fogwort stays on the working grid');
+      const qtyText = tile.querySelector('.bank-qty').textContent;
+      assert.equal(qtyText, formatNumber(fogwortQty));
+      assert.equal(tile.classList.contains('owned'), true);
+    } else {
+      assert.equal(tile, undefined, 'sold-out Fogwort leaves the working grid');
+    }
   }
 }
 

@@ -43,6 +43,23 @@ export function costChips(tierOrCost) {
   return chips;
 }
 
+/**
+ * Button copy when a tier is unaffordable. Names the first missing cost
+ * (`Need ✦30` / `Need Fogwort ×15`) so Lumen gates are not lied about as
+ * "Need materials" while the bank already holds the goods.
+ */
+export function upgradeNeedLabel(state, tierCost) {
+  for (const c of costChips(tierCost)) {
+    const have = c.id === 'lumen' ? state.lumen : bank.bankCount(state.bank, c.id);
+    if (have < c.qty) {
+      return c.id === 'lumen'
+        ? `Need ✦${c.qty}`
+        : `Need ${c.name} ×${c.qty}`;
+    }
+  }
+  return 'Need materials';
+}
+
 export function canAffordUpgrade(state, tierCost) {
   if ((tierCost.lumen ?? 0) > state.lumen) return false;
   return bank.canAfford(
