@@ -204,6 +204,38 @@ Tier-1 goods sell 1–12, tier-2 14–32, tier-3 36–80 (`items.js`). Catalog b
 is ~2.25× so converting Lumen → goods → Lumen always loses. Emergency tinder
 is cheaper (2×) because it is a mercy faucet, not a wealth engine.
 
+## Radiance constellation (S4)
+
+S4 fields live on save schema **v4** (`from: 3` migrate). Main’s combat-era v3
+saves keep souls/beacons/combat and gain Radiance/Almanac defaults.
+
+Radiance is a **never-resets** prestige earned from every completed action
+cycle. No skill, bank, or level is wiped to gain it (charter §4.9).
+
+| Constant | Value | Why |
+|---|---|---|
+| `RADIANCE_PER_XP` | 0.025 | 40 action-XP ≈ 1 spark. Tend the Flame (14 XP / 4 s) yields ~0.35 sparks/cycle → first star (`Kindling`, cost 1) in ~12 s of tending. Slow enough to stay prestige; fast enough that the grid is playable in the first session. |
+| Perk costs | 1 → 30 | Origin 1; branch nodes 2–10; branch capstones 18; conjunctions 8–22; apex 30. Full grid ≈ 335 sparks ≈ **13.4k action-XP** — hours, not minutes. |
+| Respec | ✦25 × owned nodes | Refunds all spent Radiance; Lumen fee only. Skills/bank untouched. |
+| Effect stack | mastery → camp → radiance → achievement → mastery-hooks | Each layer is `×(1+bonus)`. Documented and unit-tested so live ticks, offline, and ETAs never disagree. |
+| Yield chance cap | 55% | Camp satchel 35% + perks/hooks; stops bonus-find from going guaranteed. |
+| Daily embers | 3 tasks, 1 reroll, UTC day | Rewards 2–4 sparks. Missing a day does nothing — no streak, no FOMO. |
+
+Achievement rewards that grant `%` bonuses enter the stack as the
+**achievement** layer (after Radiance). Mastery hooks at 25/50/75 on each
+Wave-0 action enter as **hooks** (last). Flavor-only milestones (10, titles
+at 99) do not change math.
+
+## Offline playtime (S4 honesty)
+
+`playtimeMs` (“Time by the Flame”) adds **credited** away-time on Claim
+(capped at 12 h, same cap as production). Live ticks that happen while the
+modal is open are merged on Claim so the HUD cannot jump backwards.
+
+Lumen and mastery XP use the **live per-cycle round**, then × completions
+(`Math.round(qty × multiplier)`), not a floored batch. Skill XP already
+did this; mastery XP and lumen now match `completeCycle` / `applyGains`.
+
 ## Combat (lane S1)
 
 Real-time, two independent attack timers, encounter-seeded RNG (mulberry32).

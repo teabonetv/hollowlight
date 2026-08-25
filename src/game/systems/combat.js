@@ -17,6 +17,7 @@ import { ITEMS_BY_ID } from '../data/items.js';
 import { masteryXpMultiplier } from './action-runner.js';
 import * as bank from './bank.js';
 import * as camp from './upgrades.js';
+import { recordKill, recordDeath } from './stats.js';
 
 export const COMBAT_LOG_CAP = 48;
 export const BASE_MAX_HP = 36;
@@ -398,6 +399,7 @@ function onKill(state, rng) {
   const enemy = ENEMIES_BY_ID[c.foe.id];
   c.kills[enemy.id] = (c.kills[enemy.id] ?? 0) + 1;
   if (!enemy.boss) c.stretchKills[enemy.zoneId] = (c.stretchKills[enemy.zoneId] ?? 0) + 1;
+  recordKill(state, { boss: !!enemy.boss });
 
   const drops = rollLootTable(enemy.loot, rng);
   const applied = applyCombatDrops(state, drops);
@@ -446,6 +448,7 @@ function onDeath(state) {
     c.deathSite = { zoneId, lumen: carried };
   }
   state.lumen = 0;
+  recordDeath(state);
   pushCombatLog(state, `You fall. ✦${carried} Lumen spills at ${ZONE_BY_ID[zoneId]?.settlement ?? zoneId}. Walk back to gather it.`, 'death');
   c.fighting = false;
   c.foe = null;

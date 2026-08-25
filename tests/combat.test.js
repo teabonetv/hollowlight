@@ -110,6 +110,7 @@ test('kills grant combat XP via the shared mastery × altar formula and drop loo
   assert.equal(kill.enemyId, 'pale-moth');
   assert.ok(s.skills.combat.xp > 0);
   assert.ok(s.souls >= 1);
+  assert.equal(s.stats.kills, 1);
 });
 
 test('death drops carried Lumen at the site; walking back recovers it; bank stays', () => {
@@ -126,6 +127,7 @@ test('death drops carried Lumen at the site; walking back recovers it; bank stay
     death = events.find((e) => e.type === 'combat-death') ?? death;
   }
   assert.ok(death, 'death event');
+  assert.equal(s.stats.deaths, 1);
   assert.equal(s.lumen, 0);
   assert.equal(s.combat.deathSite.lumen, 77);
   assert.equal(s.combat.deathSite.zoneId, 'hearthway');
