@@ -6,6 +6,9 @@ import { xpForLevel, levelFromXp } from '../src/core/xp.js';
 import {
   computeOfflineProgress, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
 } from '../src/core/offline.js';
+import { completeCycle } from '../src/game/systems/action-runner.js';
+import { createRng } from '../src/core/rng.js';
+import { lumenGainMultiplier, masteryXpMultiplier } from '../src/game/systems/modifiers.js';
 
 const H = 3_600_000;
 
@@ -181,4 +184,60 @@ test('D2: emberkeeping is not a dead end — tinder income outpaces its costs', 
     (xpForLevel(10) - starterFundedXp) / (tinderPerHour * xpPerTinder);
   assert.ok(Number.isFinite(hoursToEk10) && hoursToEk10 < 24,
     `Ek 10 reachable in ~${hoursToEk10.toFixed(1)}h of herb gathering`);
+});
+
+test('N-cycle offline claim with lumen + mastery XP bonuses equals N live cycles', () => {
+  // Tend lumen/flame/masteryXp are fixed (no chance, no range) so a live
+  // completeCycle draws no RNG on those outputs. 15 × 4s = offline min window.
+  const N = 15;
+  const action = ACTIONS_BY_ID['tend-flame'];
+
+  function primed() {
+    const s = createState({ nowMs: 0, rngSeed: 7 });
+    s.bank.tinderscrap = 80;
+    // Warm Coin + Shared Heat + Tithe = +10% lumen; Master’s Ash = +8% mastery XP.
+    s.perks.owned = ['flame-1', 'flame-3', 'flame-4', 'flame-6'];
+    // Hold mastery level still across N cycles so skill-XP grants stay constant.
+    s.skills.emberkeeping.mastery['tend-flame'] = { xp: xpForLevel(8), level: 8 };
+    return s;
+  }
+
+  const lumenMult = lumenGainMultiplier(primed());
+  const masteryMult = masteryXpMultiplier(primed());
+  const perLumen = Math.max(0, Math.round(1 * lumenMult));
+  const perMastery = Math.round(action.masteryXp * masteryMult);
+  assert.notEqual(
+    Math.floor(1 * lumenMult * N),
+    perLumen * N,
+    'this bonus set must expose batch-floor vs per-cycle-round',
+  );
+
+  const live = primed();
+  const rng = createRng(7);
+  for (let i = 0; i < N; i++) {
+    const r = completeCycle(live, action, rng);
+    assert.ok(!r.halted, `live cycle ${i} should complete`);
+  }
+
+  const away = primed();
+  away.actions.active['tend-flame'] = { progressMs: 0 };
+  const res = computeOfflineProgress({
+    state: away,
+    nowMs: N * action.durationMs,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(res.gains.actions[0]?.completions, N);
+  assert.equal(res.gains.lumen, perLumen * N);
+  assert.equal(res.nextState.lumen, live.lumen);
+  assert.equal(res.nextState.flame, live.flame);
+  assert.equal(
+    res.nextState.skills.emberkeeping.mastery['tend-flame'].xp,
+    live.skills.emberkeeping.mastery['tend-flame'].xp,
+  );
+  assert.equal(
+    res.nextState.skills.emberkeeping.mastery['tend-flame'].xp - xpForLevel(8),
+    perMastery * N,
+  );
+  assert.equal(res.nextState.skills.emberkeeping.xp, live.skills.emberkeeping.xp);
 });

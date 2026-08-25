@@ -232,6 +232,10 @@ at 99) do not change math.
 (capped at 12 h, same cap as production). Live ticks that happen while the
 modal is open are merged on Claim so the HUD cannot jump backwards.
 
+Lumen and mastery XP use the **live per-cycle round**, then × completions
+(`Math.round(qty × multiplier)`), not a floored batch. Skill XP already
+did this; mastery XP and lumen now match `completeCycle` / `applyGains`.
+
 ## Combat (lane S1)
 
 Real-time, two independent attack timers, encounter-seeded RNG (mulberry32).

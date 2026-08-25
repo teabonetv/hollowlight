@@ -10,7 +10,10 @@
 // so it works for any future content set without edits.
 
 import { levelFromXp } from './xp.js';
-import { xpGrantMultiplier, effectiveDurationMs, lumenGainMultiplier, radianceGainMultiplier } from '../game/systems/modifiers.js';
+import {
+  xpGrantMultiplier, effectiveDurationMs, lumenGainMultiplier,
+  radianceGainMultiplier, masteryXpMultiplier,
+} from '../game/systems/modifiers.js';
 import { grantRadianceFromXp } from '../game/systems/radiance.js';
 
 export const OFFLINE_CAP_HOURS = 12;
@@ -96,7 +99,15 @@ export function computeOfflineProgress({
           next.bank[o.id] = (next.bank[o.id] ?? 0) + qty;
           next.stats.itemsGathered = (next.stats.itemsGathered ?? 0) + qty;
         } else if (o.kind === 'lumen') {
-          const lit = clampPositive(weighted * lumenMult);
+          // Live applyGains rounds per cycle, then the runner repeats.
+          // Flooring the whole batch (clampPositive(weighted * mult)) drifts
+          // once Radiance lumen nodes push the multiplier off an integer.
+          const baseQty = o.min !== undefined ? (o.min + o.max) / 2 : o.qty;
+          const perCycle = Math.max(0, Math.round(baseQty * lumenMult));
+          const cyclesPaid = o.chance !== undefined
+            ? clampPositive(completions * o.chance)
+            : completions;
+          const lit = perCycle * cyclesPaid;
           lumenGained += lit;
           next.lumen += lit;
           next.stats.lumenEarned = (next.stats.lumenEarned ?? 0) + lit;
@@ -111,7 +122,8 @@ export function computeOfflineProgress({
       skill.xp += xpGain;
       xpGains[action.skill] = (xpGains[action.skill] ?? 0) + xpGain;
       grantRadianceFromXp(next, action.xp * completions, radianceGainMultiplier(next));
-      mastery.xp += action.masteryXp * completions;
+      const masteryPer = Math.round(action.masteryXp * masteryXpMultiplier(next));
+      mastery.xp += masteryPer * completions;
       mastery.level = levelFromXp(mastery.xp);
       next.actions.completed[actionId] = (next.actions.completed[actionId] ?? 0) + completions;
       next.stats.actionsDone = (next.stats.actionsDone ?? 0) + completions;
