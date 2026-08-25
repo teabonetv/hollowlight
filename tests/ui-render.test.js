@@ -95,12 +95,15 @@ test('camp renders stats and quick actions', () => {
   assert.match(cells[1].textContent ?? '', /42/);
 });
 
-test('bank groups items by category and marks owned stacks', () => {
+test('bank defaults to Owned — only carried stacks fill the working grid', () => {
   const state = createState({ nowMs: 0, rngSeed: 8 }); // starter: tinder, rushwick, fogwort
   const scr = tabs.renderBankScreen(makeCtx(state));
   const owned = scr.node.querySelectorAll('.bank-tile.owned');
   assert.equal(owned.length, 3, 'three starter stacks lit');
-  assert.ok(scr.node.querySelectorAll('.bank-tile').length >= 20, '~22 items visible');
+  assert.equal(scr.node.querySelectorAll('.bank-tile').length, 3, 'unowned ghosts stay out of the working pack');
+  assert.equal(scr.node.querySelectorAll('.bank-tile.unowned').length, 0);
+  const active = scr.node.querySelectorAll('.bank-tab').find((t) => /\bactive\b/.test(t.className));
+  assert.match(active?.textContent ?? '', /Owned/);
 });
 
 test('map lists twelve beacons with only the first kindled', () => {

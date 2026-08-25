@@ -1,6 +1,6 @@
-// Camp, Bank, Map, Journal screens. Camp is a warm home hub; Bank is the
-// item database teaser (owned stacks lit, undiscovered dimmed); Map shows the
-// twelve-beacon pilgrim road with only Hearthway kindled; Journal is the log.
+// Camp, Bank, Map, Journal screens. Camp is a warm home hub; Bank is an
+// owned-first pack with an opt-in Catalogue; Map shows the twelve-beacon
+// pilgrim road with only Hearthway kindled; Journal is the log.
 
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
@@ -157,7 +157,7 @@ function buildTrackCard(ctx, track) {
     const affordable = camp.canAffordUpgrade(ctx.state, next);
     buyBtn.textContent = affordable
       ? `Upgrade · ${next.name}`
-      : 'Need materials';
+      : camp.upgradeNeedLabel(ctx.state, next);
     buyBtn.className = `btn btn-wide ${affordable ? 'btn-primary' : 'btn-ghost btn-disabled'}`;
     buyBtn.setAttribute('aria-disabled', affordable ? 'false' : 'true');
   }

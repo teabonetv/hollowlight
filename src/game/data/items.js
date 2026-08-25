@@ -475,10 +475,12 @@ export const ITEM_CATEGORIES = [
 ];
 
 /** Deduped category tabs (oil shares the Candles & Oil label with candle). */
+export const DEFAULT_BANK_TAB = 'owned';
+
 export const BANK_TABS = [
-  ['all', 'All'],
   ['owned', 'Owned'],
   ['pinned', 'Pinned'],
+  ['all', 'Catalogue'],
   ['fuel', 'Fuel'],
   ['herb', 'Herbs'],
   ['fungi', 'Fungi'],

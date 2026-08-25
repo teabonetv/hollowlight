@@ -105,12 +105,21 @@ export function togglePin(state, itemId) {
   return isPinned(state, itemId);
 }
 
-export function filterItems({ items = ITEMS, bank = {}, tab = 'all', query = '', pins = [] } = {}) {
+/** Working bank hides ghosts; Catalogue (`all`) is the opt-in atlas. */
+export function isCatalogueTab(tab) {
+  return tab === 'all' || tab === 'catalogue';
+}
+
+export function filterItems({ items = ITEMS, bank = {}, tab = 'owned', query = '', pins = [] } = {}) {
   let list = items;
   if (tab === 'pinned') list = list.filter((i) => pins.includes(i.id));
   else if (tab === 'owned') list = list.filter((i) => (bank[i.id] ?? 0) > 0);
   else if (tab === 'candle') list = list.filter((i) => i.category === 'candle' || i.category === 'oil');
-  else if (tab !== 'all') list = list.filter((i) => i.category === tab);
+  else if (!isCatalogueTab(tab)) list = list.filter((i) => i.category === tab);
+  // Category / Owned grids are the working pack — unowned ghosts stay in Catalogue.
+  if (!isCatalogueTab(tab) && tab !== 'pinned') {
+    list = list.filter((i) => (bank[i.id] ?? 0) > 0);
+  }
   if (query) list = list.filter((i) => matchesQuery(i, query));
   const pinSet = new Set(pins);
   return [...list].sort((a, b) => {
