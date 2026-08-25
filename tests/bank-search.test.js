@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState } from '../src/game/state.js';
-import {
-  matchesQuery, filterItems, savePreset, applyPreset, getPreset, deletePreset,
-  captureBankSnapshot, captureGearSnapshot, togglePin, isPinned,
-} from '../src/game/systems/bank.js';
 import { ITEMS, ITEMS_BY_ID, validateItems } from '../src/game/data/items.js';
 import { serializeSave, deserializeSave, SAVE_VERSION } from '../src/core/save.js';
+import {
+  matchesQuery, filterItems, savePreset, applyPreset, getPreset, deletePreset,
+  captureBankSnapshot, captureGearSnapshot, togglePin, isPinned, visibleBankTabs,
+} from '../src/game/systems/bank.js';
 
 test('search matches name, id, category, flavor, sources, uses — and ignores case', () => {
   const fog = ITEMS_BY_ID.fogwort;
@@ -41,6 +41,17 @@ test('filterItems: owned / pinned / category / query compose', () => {
   assert.ok(ghosts.some((i) => (bank[i.id] ?? 0) === 0), 'Catalogue still lists unowned items');
   const workingHerbs = filterItems({ items: ITEMS, bank, tab: 'herb', query: '', pins: [] });
   assert.ok(workingHerbs.every((i) => (bank[i.id] ?? 0) > 0), 'category tabs are working-pack owned-only');
+});
+
+test('visibleBankTabs keep core chips and drop empty categories', () => {
+  const bank = { fogwort: 2, tinderscrap: 1 };
+  const tabs = visibleBankTabs(bank);
+  const ids = tabs.map(([id]) => id);
+  assert.deepEqual(ids.slice(0, 3), ['owned', 'pinned', 'all']);
+  assert.ok(ids.includes('herb'));
+  assert.ok(ids.includes('fuel'));
+  assert.equal(ids.includes('fish'), false);
+  assert.equal(ids.includes('gem'), false);
 });
 
 test('pins toggle and sort pinned items to the front of All', () => {

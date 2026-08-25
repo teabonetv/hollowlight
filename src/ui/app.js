@@ -47,7 +47,7 @@ import {
 import { renderAlmanacScreen } from './screens/meta.js';
 import { renderStoreScreen } from './screens/store.js';
 import { hydrateState } from '../game/hydrate.js';
-import { cascadeAchievements } from '../game/systems/achievements.js';
+import { cascadeAchievements, featToastMessage } from '../game/systems/achievements.js';
 import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
 import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
 
@@ -186,7 +186,7 @@ function boot() {
     if (!game) return 0;
     const newly = cascadeAchievements(game, {
       onUnlock(a) {
-        toaster.push(`Feat: ${a.name}.`, 'success');
+        toaster.push(featToastMessage(a), 'success');
         pushLog(game, `Feat lit: ${a.name}.`, game.stats.playtimeMs);
       },
     });
@@ -295,7 +295,7 @@ function boot() {
     buyKindlingBundle() {
       const res = storeSys.buyKindlingBundle(game);
       if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
-      toaster.push('Kindling bundle — eight handfuls of Tinderscrap.', 'success');
+      toaster.push(`Kindling bundle — eight handfuls of Tinderscrap. −✦${res.spent}.`, 'success');
       afterMutation();
       renderScreen();
       return res;
@@ -341,7 +341,7 @@ function boot() {
     buyTheme(themeId) {
       const res = storeSys.buyTheme(game, themeId);
       if (!res.ok) { toaster.push(res.error ?? 'Could not dye.', 'warn'); return res; }
-      toaster.push(res.spent ? 'Tab dye unlocked. Cosmetic only.' : 'Tab dye equipped.', 'success');
+      toaster.push(res.spent ? `Tab dye unlocked. Cosmetic only. −✦${res.spent}.` : 'Tab dye equipped.', 'success');
       afterMutation();
       renderScreen();
       return res;

@@ -83,7 +83,7 @@ function assertViewsMatchSave(session, { fogwortQty } = {}) {
   assert.equal(campCell(session, 'Cycles worked'), formatNumber(cycles), 'camp CYCLES matches save');
 
   const header = session.bank.node.querySelector('.screen-sub').textContent;
-  assert.match(header, new RegExp(`worth ✦${formatNumber(bankSellValue(saved.bank))}`));
+  assert.match(header, new RegExp(`catalog worth ✦${formatNumber(bankSellValue(saved.bank))}`));
   assert.equal(bankSellValue(session.state.bank), bankSellValue(saved.bank));
 
   if (fogwortQty !== undefined) {

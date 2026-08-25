@@ -2,9 +2,11 @@
 // game state. Payments are atomic: either every cost is affordable or nothing
 // is taken — no partial pays, ever.
 
-import { ITEMS, ITEMS_BY_ID } from '../data/items.js';
+import { ITEMS, ITEMS_BY_ID, BANK_TABS } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
 import { recordSell } from './stats.js';
+
+const CORE_TAB_IDS = new Set(['owned', 'pinned', 'all', 'catalogue']);
 
 export function bankCount(bank, itemId) {
   return bank[itemId] ?? 0;
@@ -110,6 +112,20 @@ export function togglePin(state, itemId) {
 /** Working bank hides ghosts; Catalogue (`all`) is the opt-in atlas. */
 export function isCatalogueTab(tab) {
   return tab === 'all' || tab === 'catalogue';
+}
+
+/** Category chips that currently hold at least one owned stack. */
+export function stockedCategoryTabs(bank) {
+  return BANK_TABS.filter(([id]) => {
+    if (CORE_TAB_IDS.has(id)) return false;
+    return filterItems({ items: ITEMS, bank, tab: id, query: '' }).length > 0;
+  });
+}
+
+/** Owned / Pinned / Catalogue, plus only categories with stock. */
+export function visibleBankTabs(bank) {
+  const core = BANK_TABS.filter(([id]) => id === 'owned' || id === 'pinned' || id === 'all');
+  return [...core, ...stockedCategoryTabs(bank)];
 }
 
 export function filterItems({ items = ITEMS, bank = {}, tab = 'owned', query = '', pins = [] } = {}) {
