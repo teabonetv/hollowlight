@@ -79,19 +79,49 @@ test('Embers re-render progress on update; claimed button stays disabled', () =>
   ];
   const scr = renderAlmanacScreen(almanacCtx(state, 'dailies'));
   assert.match(scr.node.textContent ?? '', /0 \/ 10/);
-  const claimedBtn = scr.node.querySelectorAll('button')
+  const claimedBtn = scr.node.querySelectorAll('.daily-claim')
     .find((b) => (b.textContent ?? '') === 'Claimed');
   assert.ok(claimedBtn, 'claimed ember still on the board');
   assert.equal(claimedBtn.getAttribute('disabled'), 'true');
   assert.equal(claimedBtn.getAttribute('aria-disabled'), 'true');
 
+  const claims = scr.node.querySelectorAll('.daily-claim');
+  const reroll = scr.node.querySelector('.daily-reroll');
+  const sitProg = scr.node.querySelectorAll('.daily-progress')[0];
   state.stats.playtimeMs = 5 * 60_000;
+  for (let i = 0; i < 12; i++) scr.update();
+  assert.equal(sitProg.textContent, '5 / 10');
+  assert.equal(scr.node.querySelectorAll('.daily-claim')[0], claims[0],
+    'Claim node identity survives ticks');
+  assert.equal(scr.node.querySelectorAll('.daily-claim')[1], claims[1]);
+  assert.equal(scr.node.querySelector('.daily-reroll'), reroll,
+    'Reroll node identity survives ticks');
+  assert.equal(claims[1].getAttribute('disabled'), 'true');
+  assert.equal(claims[1].textContent, 'Claimed');
+});
+
+test('Embers remount Claim buttons only when the task id set changes', () => {
+  const state = createState({ nowMs: 0, rngSeed: 4 });
+  const noon = Date.UTC(2026, 7, 25, 12, 0, 0);
+  ensureDailies(state, noon);
+  state.dailies.tasks = [
+    { id: 'sit-10', need: 10, reward: 2, claimed: false, baseline: 0 },
+    { id: 'tend-8', need: 8, reward: 2, claimed: true, baseline: 0 },
+    { id: 'herbs-10', need: 10, reward: 2, claimed: false, baseline: 0 },
+  ];
+  const scr = renderAlmanacScreen(almanacCtx(state, 'dailies'));
+  const before = scr.node.querySelectorAll('.daily-claim');
+  const reroll = scr.node.querySelector('.daily-reroll');
+  state.dailies.tasks = [
+    { id: 'sit-10', need: 10, reward: 2, claimed: false, baseline: 0 },
+    { id: 'any-15', need: 15, reward: 2, claimed: false, baseline: 0 },
+    { id: 'lumen-25', need: 25, reward: 2, claimed: false, baseline: 0 },
+  ];
   scr.update();
-  assert.match(scr.node.textContent ?? '', /5 \/ 10/);
-  const stillClaimed = scr.node.querySelectorAll('button')
-    .find((b) => (b.textContent ?? '') === 'Claimed');
-  assert.ok(stillClaimed);
-  assert.equal(stillClaimed.getAttribute('disabled'), 'true');
+  const after = scr.node.querySelectorAll('.daily-claim');
+  assert.notEqual(after[1], before[1], 'new task id replaces that card');
+  assert.equal(after[0], before[0], 'unchanged id keeps its Claim node');
+  assert.equal(scr.node.querySelector('.daily-reroll'), reroll);
 });
 
 test('LOG screen lists Skills / Mastery / Items / Feats rows', () => {
