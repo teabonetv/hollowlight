@@ -45,7 +45,9 @@ export class FakeNode {
   }
   append(...nodes) {
     for (const n of nodes.flat(9)) {
-      if (n === null || n === undefined || n === false) continue;
+      if (n === null) { this.children.push(Object.assign(new FakeText('null'), { parentNode: this })); continue; }
+      if (n === undefined) { this.children.push(Object.assign(new FakeText('undefined'), { parentNode: this })); continue; }
+      if (n === false) continue;
       const child = n.nodeType ? n : new FakeText(n);
       child.parentNode = this;
       this.children.push(child);

@@ -1,7 +1,15 @@
 /* S1 combat panel — linked from index.html so it is not lost in the S2/S4 union. */
 .combat-root { display: flex; flex-direction: column; gap: 14px; }
 .combat-intro { margin: 0; font-style: italic; }
-.combat-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip.chip-warn { border-color: rgba(192, 86, 79, 0.55); color: #eda49d; }
+.weapon-card { margin: 0; }
+.weapon-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.weapon-row .btn { min-height: 44px; flex: 1 1 30%; }
 .combat-h { margin-top: 8px; }
 .zone-chips {
   display: flex;

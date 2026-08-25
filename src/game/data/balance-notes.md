@@ -252,7 +252,8 @@ kept. Walk back (open that stretch) to recover.
 | Weakness / resist | ×1.18 / ×0.86 | Style swap is a real DPS lever on every card (weakness listed on the hunt). |
 | Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. |
 | Unarmed Shot / Rite | slower, lower max | You *can* swap styles day one; you *want* the matching drop. |
-| Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Dry lantern: 2 fog-bite / 2 s and ×0.85 hit chance. |
+| Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Stall always sells wick-oil (mercy buy ✦8). Dry lantern: first 10 s of fog-gather (no bite), then 2 fog-bite / 2 s and ×0.85 hit chance. Auto-continue stops when the flasks are empty. |
+| Hand slot | Wick-knife 3–6 / 2.2 s / +4 acc | One honest weapon. Unarmed Strike is 2–4 / 2.4 s. Ash-sling and prayer-stub apply when held and the matching style is selected. |
 | Lantern-loaf | +14 HP | Eat-now-or-one-more-hit. Pale-cap +8 and fogwort +5 are forageable — gathering feeds combat. |
 | Auto-eat / auto-brew | wired, locked | Honest copy; a later camp purchase can unlock the thresholds. |
 | Hearthway XP | moth 11 → crawler 24 | ~7 min to Combat 5 on mixed hunts; Warden at 5 stretch-kills. |
