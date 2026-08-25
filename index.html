@@ -8,6 +8,7 @@
 <title>Hollowlight</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307090d'/%3E%3Ccircle cx='16' cy='15' r='7' fill='%23d9a441'/%3E%3Ccircle cx='16' cy='13.5' r='3.4' fill='%23ffe9b0'/%3E%3Crect x='11' y='24' width='10' height='2.4' rx='1.2' fill='%238a6a2a'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./src/ui/styles.css">
+<link rel="stylesheet" href="./src/ui/combat.css">
 </head>
 <body>
 <div id="app">
@@ -19,6 +20,7 @@
     </div>
     <div class="wallet">
       <span class="pill gold" id="hud-lumen" title="Lumen">✦ 20</span>
+      <span class="pill radiance" id="hud-radiance" title="Radiance">✧ 0</span>
       <span class="pill flame" id="hud-flame" title="Flame units">0 flame</span>
       <button class="icon-btn" id="btn-settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h13"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="19" cy="17" r="2"/></svg>
@@ -47,7 +49,7 @@
     </button>
     <button data-tab="journal" role="tab" aria-selected="false">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6c-1.5-1.4-3.6-2-6.5-2v14c2.9 0 5 .6 6.5 2 1.5-1.4 3.6-2 6.5-2V4c-2.9 0-5 .6-6.5 2z"/><path d="M12 6v14"/></svg>
-      <span>Journal</span>
+      <span>Almanac</span>
     </button>
   </nav>
 

@@ -61,7 +61,7 @@ test('boot() persisted a versioned save envelope', () => {
   const raw = storage.getItem('hollowlight.save');
   assert.ok(raw, 'save written during boot');
   const parsed = JSON.parse(raw);
-  assert.equal(parsed.version, 2);
+  assert.equal(parsed.version, 4);
   assert.ok(parsed.state.skills.emberkeeping, 'skills state present');
 });
 

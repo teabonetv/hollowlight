@@ -6,9 +6,28 @@
 // Migration hook: append to MIGRATIONS when the schema changes.
 //   { from: 1, migrate(state) { ...; return newState } }
 // deserialize walks them in order until the save reaches SAVE_VERSION.
+//
+// v1 → v2  S2 economy (pins, stall, lantern, cosmetics)
+// v2 → v3  S1 combat (souls, beacons, combat blob) — shipped on main as v3
+// v3 → v4  S4 meta (Radiance, perks, feats, dailies) + combat defaults so
+//          S4-only v3 PR saves also pick up the S1 blob
+
+import { hydrateState } from '../game/hydrate.js';
+import { createCombatState } from '../game/systems/combat.js';
 
 export const SAVE_KEY = 'hollowlight.save';
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 4;
+
+function unionCosmetics(state) {
+  return {
+    bankTheme: state.cosmetics?.bankTheme ?? 'default',
+    unlocked: state.cosmetics?.unlocked ?? ['default'],
+    titles: state.cosmetics?.titles ?? [],
+    frames: state.cosmetics?.frames ?? ['plain'],
+    lanternFrame: state.cosmetics?.lanternFrame ?? 'plain',
+    activeTitle: state.cosmetics?.activeTitle ?? null,
+  };
+}
 
 /** @type {Array<{from:number, migrate:(s:any)=>any}>} */
 export const MIGRATIONS = [
@@ -21,7 +40,36 @@ export const MIGRATIONS = [
         bankPresets: state.bankPresets ?? [],
         store: state.store ?? { pressure: {}, pressureAt: {} },
         lanternIntegrity: Number.isFinite(state.lanternIntegrity) ? state.lanternIntegrity : 100,
-        cosmetics: state.cosmetics ?? { bankTheme: 'default', unlocked: ['default'] },
+        cosmetics: unionCosmetics(state),
+      };
+    },
+  },
+  {
+    from: 2,
+    migrate(state) {
+      return {
+        ...state,
+        souls: state.souls ?? 0,
+        beacons: state.beacons ?? { kindled: ['hearthway'] },
+        combat: state.combat ?? createCombatState(),
+      };
+    },
+  },
+  {
+    from: 3,
+    migrate(state) {
+      return {
+        ...state,
+        radiance: state.radiance ?? 0,
+        radianceFrac: state.radianceFrac ?? 0,
+        radianceEarned: state.radianceEarned ?? 0,
+        perks: state.perks ?? { owned: [], respecs: 0 },
+        achievements: state.achievements ?? { unlocked: {} },
+        dailies: state.dailies ?? null,
+        cosmetics: unionCosmetics(state),
+        souls: state.souls ?? 0,
+        beacons: state.beacons ?? { kindled: ['hearthway'] },
+        combat: state.combat ?? createCombatState(),
       };
     },
   },
@@ -69,6 +117,8 @@ export function deserializeSave(json, { currentVersion = SAVE_VERSION, migration
     v += 1;
   }
   if (v !== currentVersion) throw new SaveError('unmigratable', `${parsed.version}→${v}`);
+
+  state = hydrateState(state);
 
   return { state, savedAt: Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0 };
 }

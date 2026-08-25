@@ -13,7 +13,7 @@
 import { createEventBus } from '../core/event-bus.js';
 import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
-import { formatNumber, formatDuration } from '../core/format.js';
+import { formatDuration } from '../core/format.js';
 import {
   SAVE_KEY, serializeSave, deserializeSave, SaveError,
   storageGet, storageSet,
@@ -25,6 +25,7 @@ import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
+import * as combat from '../game/systems/combat.js';
 import { sellItems, togglePin as pinItem, savePreset as writePreset, applyPreset as usePreset,
   deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot } from '../game/systems/bank.js';
 import * as storeSys from '../game/systems/store.js';
@@ -38,9 +39,14 @@ import { createToaster } from './toast.js';
 import { openModal, showOfflineModal, showSettingsModal, showSellSheet } from './modals.js';
 import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
 import {
-  renderCampScreen, renderBankScreen, renderMapScreen, renderJournalScreen,
+  renderCampScreen, renderBankScreen, renderMapScreen,
 } from './screens/tabs.js';
+import { renderAlmanacScreen } from './screens/meta.js';
 import { renderStoreScreen } from './screens/store.js';
+import { hydrateState } from '../game/hydrate.js';
+import { evaluateAchievements } from '../game/systems/achievements.js';
+import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
+import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
 
 const AUTOSAVE_MS = 30_000;
 
@@ -53,10 +59,11 @@ function boot() {
 
   const hudLumen = document.getElementById('hud-lumen');
   const hudFlame = document.getElementById('hud-flame');
+  const hudRadiance = document.getElementById('hud-radiance');
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
-  const ui = { tab: 'camp', skillId: null, campView: null };
+  const ui = { tab: 'camp', skillId: null, almanac: 'overview', campView: null };
   let liveUpdate = () => {};
   let sheetRepaint = null;
   let rng = createRng(1);
@@ -76,8 +83,10 @@ function boot() {
   }
 
   function adopt(stateObj) {
-    game = stateObj;
+    game = hydrateState(stateObj);
+    combat.ensureCombat(game);
     rng = createRng(game.rngState ?? 1);
+    ensureDailies(game, Date.now());
     applyMotionClass();
     renderScreen();
     updateHud();
@@ -150,12 +159,39 @@ function boot() {
     pushLog(game, `${a.name} finished its work.`, game.stats.playtimeMs);
     renderScreen();
   });
+  bus.on('combat-kill', ({ enemyId, xp, souls }) => {
+    toaster.push(`Fell a foe · +${xp} Combat XP, ${souls} souls.`, 'success');
+    pushLog(game, `Combat: a foe (${enemyId}) fell.`, game.stats.playtimeMs);
+  });
+  bus.on('combat-death', ({ zoneId, lumen }) => {
+    toaster.push(`You fall. ✦${lumen} spilled — walk back to recover it.`, 'warn');
+    pushLog(game, `Fell on the ${zoneId} stretch. ✦${lumen} waits at the death-site.`, game.stats.playtimeMs);
+    renderScreen();
+  });
+  bus.on('vigil-complete', ({ category, lumen }) => {
+    toaster.push(`Vigil complete. ✦${lumen} for the lantern.`, 'success');
+    pushLog(game, `A Vigil against ${category} is fulfilled.`, game.stats.playtimeMs);
+  });
+
+  function flushAchievementsQuiet() {
+    if (!game) return;
+    const newly = evaluateAchievements(game);
+    for (const a of newly) {
+      toaster.push(`Feat: ${a.name}.`, 'success');
+      pushLog(game, `Feat lit: ${a.name}.`, game.stats.playtimeMs);
+    }
+    return newly.length;
+  }
+  function flushAchievements() {
+    const n = flushAchievementsQuiet();
+    if (n) { updateHud(); renderScreen(); }
+  }
 
   // ── HUD ────────────────────────────────────────────────────────
   // Snap to the live save. A rAF count-up used to restart on every tick and
   // leave the pills mid-lerp while hollowlight.save was already correct.
   function updateHud() {
-    paintHud(hudLumen, hudFlame, game);
+    paintHud(hudLumen, hudFlame, game, hudRadiance);
   }
 
   function afterMutation() {
@@ -163,6 +199,7 @@ function boot() {
     updateHud();
     liveUpdate();
     sheetRepaint?.();
+    flushAchievementsQuiet();
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -172,7 +209,7 @@ function boot() {
     }
     if (ui.tab === 'bank') return renderBankScreen(ctx);
     if (ui.tab === 'map') return renderMapScreen(ctx);
-    if (ui.tab === 'journal') return renderJournalScreen(ctx);
+    if (ui.tab === 'journal') return renderAlmanacScreen(ctx);
     if (ui.campView === 'store') return renderStoreScreen(ctx);
     return renderCampScreen(ctx);
   }
@@ -188,12 +225,18 @@ function boot() {
     ui.tab = tab;
     ui.skillId = null;
     ui.campView = null;
+    if (tab === 'journal') {
+      ui.almanac = ui.almanac && ui.almanac !== 'overview' ? ui.almanac : 'overview';
+      game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
+    }
+    if (tab === 'map') game.stats.mapOpens = (game.stats.mapOpens ?? 0) + 1;
     for (const b of document.querySelectorAll('.tabbar button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
       b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
     }
     renderScreen();
     screenRoot.scrollTop = 0;
+    flushAchievements();
   }
 
   // ── ctx handed to screens & modals ─────────────────────────────
@@ -303,10 +346,106 @@ function boot() {
       pushLog(game, `Upgraded ${track.name}: ${res.tier.name} (${camp.upgradeLevel(game, trackId)}/${track.tiers.length}).`, game.stats.playtimeMs);
       afterMutation();
       renderScreen();
+      flushAchievements();
       return res;
     },
     openSkill(id) { ui.tab = 'skills'; ui.skillId = id; renderScreen(); },
     openSkillsList() { ui.skillId = null; renderScreen(); },
+    almanacView: () => ui.almanac,
+    openAlmanac(view = 'overview') {
+      ui.tab = 'journal';
+      ui.almanac = view;
+      if (view === 'stars') game.stats.starsOpens = (game.stats.starsOpens ?? 0) + 1;
+      game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
+      for (const b of document.querySelectorAll('.tabbar button')) {
+        b.classList.toggle('active', b.dataset.tab === 'journal');
+        b.setAttribute('aria-selected', b.dataset.tab === 'journal' ? 'true' : 'false');
+      }
+      renderScreen();
+      flushAchievements();
+    },
+    ensureDailies() { ensureDailies(game, Date.now()); },
+    rerollDailies() {
+      const res = rerollDailies(game, Date.now());
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push('The embers shift.', 'info');
+      persist();
+      renderScreen();
+      flushAchievements();
+    },
+    claimDaily(id) {
+      const res = claimDaily(game, id);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push(`+${res.sparks} Radiance from a daily ember.`, 'success');
+      persist();
+      updateHud();
+      renderScreen();
+      flushAchievements();
+    },
+    unlockPerk(id) {
+      const res = unlockPerk(game, id);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push(`Star kindled: ${res.perk.name}.`, 'success');
+      pushLog(game, `Kindled the star “${res.perk.name}”.`, game.stats.playtimeMs);
+      persist();
+      updateHud();
+      renderScreen();
+      flushAchievements();
+    },
+    respecPerks() {
+      const res = respecPerks(game);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push(`Stars rearranged. ✦${res.cost} paid, ${res.refund} Radiance returned.`, 'success');
+      persist();
+      updateHud();
+      renderScreen();
+      flushAchievements();
+    },
+    equipTitle(title) {
+      game.cosmetics ??= { titles: [], frames: ['plain'], lanternFrame: 'plain', activeTitle: null };
+      game.cosmetics.activeTitle = title;
+      persist();
+      renderScreen();
+      flushAchievements();
+    },
+    startFight(enemyId) {
+      const res = combat.startFight(game, enemyId);
+      if (!res.ok) return res;
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    fleeFight() {
+      const res = combat.fleeFight(game);
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    eatFood(itemId) {
+      const res = combat.eatFood(game, itemId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    recoverLumen(zoneId) {
+      const res = combat.recoverLumen(game, zoneId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    assignVigil() {
+      const res = combat.assignVigil(game);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    setCombatStyle(styleId) {
+      const res = combat.setStyle(game, styleId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    equipWeapon(itemId) {
+      const res = combat.equipWeapon(game, itemId);
+      if (res.ok) afterMutation();
+      return res;
+    },
     isReducedMotion: () => !!game.settings.reducedMotion,
     setReducedMotion(on) { game.settings.reducedMotion = !!on; persist(); applyMotionClass(); },
     exportSave() { game.rngState = rng.getState(); return serializeSave(game, game.savedAt); },
@@ -338,18 +477,22 @@ function boot() {
       lastSavedAt: game.savedAt,
       actionsById: ACTIONS_BY_ID,
     });
-    console.error('[probe] offerOffline ran; away=', res.awayMs, 'hasGains=', res.hasGains, 'savedAt=', game.savedAt, 'now=', Date.now());
     if (!res.hasGains) return;
 
     const levels = [...res.levelUps];
     showOfflineModal(modalRoot, res, {
       onClaim: () => {
+        const livePlay = game.stats.playtimeMs;
         adopt(res.nextState);
-        game.stats.offlineClaims++;
+        const extraLive = Math.max(0, livePlay - (res.originalPlaytimeMs ?? livePlay));
+        game.stats.playtimeMs += extraLive;
+        game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
+        persist();
         pushLog(game,
           `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
           game.stats.playtimeMs);
         for (const lu of levels) bus.emit('levelup', lu);
+        flushAchievements();
         persist();
         updateHud();
         renderScreen();
@@ -362,8 +505,10 @@ function boot() {
     stepMs: TICK_MS,
     onTick(dtMs) {
       const events = runner.tickActions(game, dtMs, rng);
+      events.push(...combat.tickCombat(game, dtMs));
       game.stats.playtimeMs += dtMs;
       for (const ev of events) bus.emit(ev.type, ev);
+      flushAchievementsQuiet();
       updateHud();
       liveUpdate();
       sheetRepaint?.();
@@ -379,7 +524,9 @@ function boot() {
     b.addEventListener('click', () => setTab(b.dataset.tab));
   });
   document.getElementById('btn-settings').addEventListener('click', () => {
+    game.stats.settingsOpens = (game.stats.settingsOpens ?? 0) + 1;
     showSettingsModal(modalRoot, ctx);
+    flushAchievements();
   });
 
   document.addEventListener('visibilitychange', () => {
@@ -408,7 +555,19 @@ function boot() {
     applyMotionClass();
     persist();
   }
-  setTab('camp');
+  if (combat.fightWouldResume(game)) {
+    ui.tab = 'skills';
+    ui.skillId = 'combat';
+    ui.campView = null;
+    for (const b of document.querySelectorAll('.tabbar button')) {
+      b.classList.toggle('active', b.dataset.tab === 'skills');
+      b.setAttribute('aria-selected', b.dataset.tab === 'skills' ? 'true' : 'false');
+    }
+    renderScreen();
+    screenRoot.scrollTop = 0;
+  } else {
+    setTab('camp');
+  }
   // Boot guard for index.html's fallback screen (F1d Fix 3): the inline boot
   // watchdog reveals a retry screen if this flag isn't set within 8s.
   window.__HOLLOWLIGHT_BOOTED = true;

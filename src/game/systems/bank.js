@@ -4,6 +4,7 @@
 
 import { ITEMS, ITEMS_BY_ID } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
+import { recordSell } from './stats.js';
 
 export function bankCount(bank, itemId) {
   return bank[itemId] ?? 0;
@@ -71,6 +72,7 @@ export function sellItems(state, itemId, qty) {
   const gained = n * unit;
   state.lumen += gained;
   addSellPressure(state, itemId, n);
+  recordSell(state, n, gained);
   return { ok: true, sold: n, gained, unit };
 }
 

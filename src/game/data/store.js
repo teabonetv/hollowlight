@@ -38,6 +38,7 @@ export const ALWAYS_STOCK = [
   'graveresin',
   'peatbrick',
   'tallow-candle',
+  'wick-oil',
   'lamp-oil',
   'flint-striker',
   'warm-broth',

@@ -203,3 +203,62 @@ and the fog-line keep the first session moving.
 Tier-1 goods sell 1–12, tier-2 14–32, tier-3 36–80 (`items.js`). Catalog buy
 is ~2.25× so converting Lumen → goods → Lumen always loses. Emergency tinder
 is cheaper (2×) because it is a mercy faucet, not a wealth engine.
+
+## Radiance constellation (S4)
+
+S4 fields live on save schema **v4** (`from: 3` migrate). Main’s combat-era v3
+saves keep souls/beacons/combat and gain Radiance/Almanac defaults.
+
+Radiance is a **never-resets** prestige earned from every completed action
+cycle. No skill, bank, or level is wiped to gain it (charter §4.9).
+
+| Constant | Value | Why |
+|---|---|---|
+| `RADIANCE_PER_XP` | 0.025 | 40 action-XP ≈ 1 spark. Tend the Flame (14 XP / 4 s) yields ~0.35 sparks/cycle → first star (`Kindling`, cost 1) in ~12 s of tending. Slow enough to stay prestige; fast enough that the grid is playable in the first session. |
+| Perk costs | 1 → 30 | Origin 1; branch nodes 2–10; branch capstones 18; conjunctions 8–22; apex 30. Full grid ≈ 335 sparks ≈ **13.4k action-XP** — hours, not minutes. |
+| Respec | ✦25 × owned nodes | Refunds all spent Radiance; Lumen fee only. Skills/bank untouched. |
+| Effect stack | mastery → camp → radiance → achievement → mastery-hooks | Each layer is `×(1+bonus)`. Documented and unit-tested so live ticks, offline, and ETAs never disagree. |
+| Yield chance cap | 55% | Camp satchel 35% + perks/hooks; stops bonus-find from going guaranteed. |
+| Daily embers | 3 tasks, 1 reroll, UTC day | Rewards 2–4 sparks. Missing a day does nothing — no streak, no FOMO. |
+
+Achievement rewards that grant `%` bonuses enter the stack as the
+**achievement** layer (after Radiance). Mastery hooks at 25/50/75 on each
+Wave-0 action enter as **hooks** (last). Flavor-only milestones (10, titles
+at 99) do not change math.
+
+## Offline playtime (S4 honesty)
+
+`playtimeMs` (“Time by the Flame”) adds **credited** away-time on Claim
+(capped at 12 h, same cap as production). Live ticks that happen while the
+modal is open are merged on Claim so the HUD cannot jump backwards.
+
+Lumen and mastery XP use the **live per-cycle round**, then × completions
+(`Math.round(qty × multiplier)`), not a floored batch. Skill XP already
+did this; mastery XP and lumen now match `completeCycle` / `applyGains`.
+
+## Combat (lane S1)
+
+Real-time, two independent attack timers, encounter-seeded RNG (mulberry32).
+Fighting pauses while the tab is hidden — offline calc still only runs gathering
+actions, honestly. Death drops *carried Lumen* at the stretch; bank, XP, souls
+kept. Walk back (open that stretch) to recover.
+
+| Constant | Value | Why |
+|---|---|---|
+| Player HP | 36 + 4 × Combat level | First moth (16 HP) is a few exchanges; the Warden (90) is a food decision. |
+| Accuracy | 8 + 2×level + weapon | vs moth avoidance 11 ≈ 55% hit at level 1 with the wick-knife — misses matter. |
+| Avoidance | round(7 + 1.5×level) | You get hit. Eating is not optional on the Cur / Warden. |
+| Hit chance | clamp(0.20, 0.95, 0.12 + 0.88·acc/(acc+avo)) | Never a coin-flip void; never a sure thing. |
+| Weakness / resist | ×1.18 / ×0.86 | Style swap is a real DPS lever on every card (weakness listed on the hunt). |
+| Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. |
+| Unarmed Shot / Rite | slower, lower max | You *can* swap styles day one; you *want* the matching drop. |
+| Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Stall always sells wick-oil (mercy buy ✦8). Dry lantern: first 10 s of fog-gather (no bite), then 2 fog-bite / 2 s and ×0.85 hit chance. Auto-continue stops when the flasks are empty. |
+| Hand slot | Wick-knife 3–6 / 2.2 s / +4 acc | One honest weapon. Unarmed Strike is 2–4 / 2.4 s. Ash-sling and prayer-stub apply when held and the matching style is selected. |
+| Lantern-loaf | +14 HP | Eat-now-or-one-more-hit. Pale-cap +8 and fogwort +5 are forageable — gathering feeds combat. |
+| Auto-eat / auto-brew | wired, locked | Honest copy; a later camp purchase can unlock the thresholds. |
+| Hearthway XP | moth 11 → crawler 24 | ~7 min to Combat 5 on mixed hunts; Warden at 5 stretch-kills. |
+| Vigil T1 | 8 pale-things, ✦28 + 4 souls + 48 XP | Minutes, not hours; later tiers 14 / 22 / 32 / 44 / 60. |
+| Guardian stir | 5 kills on the stretch (Hearthway) | The Warden is fightable in the first session without fake-unlocking the map. |
+| Later zones | beacon + Combat level (8…80) | Listed on the stretch. Unkindled copy is the lock, not a greyed mystery. |
+
+Starter combat kit (on top of F1/S2 bank): 8 lantern-loaf, 6 wick-oil, 1 wick-knife. Lumen still 20 — dying on the fog-line is a walk-back, not a wipe.

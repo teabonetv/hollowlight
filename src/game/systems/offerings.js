@@ -20,5 +20,7 @@ export function offerItems(state, itemId, qty) {
   state.bank[itemId] -= n;
   if (state.bank[itemId] === 0) delete state.bank[itemId];
   state.radiance = (state.radiance ?? 0) + gained;
+  state.radianceEarned = (state.radianceEarned ?? 0) + gained;
+  if (state.stats) state.stats.radianceEarned = (state.stats.radianceEarned ?? 0) + gained;
   return { ok: true, offered: n, sparks: gained, per };
 }

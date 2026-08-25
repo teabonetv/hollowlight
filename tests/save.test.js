@@ -82,6 +82,26 @@ test('a gap in the migration path is reported as unmigratable', () => {
   );
 });
 
+test('S2 v2 saves migrate combat fields onto schema v3', () => {
+  const json = JSON.stringify({
+    version: 2,
+    savedAt: 1,
+    state: {
+      lumen: 9,
+      bankPins: [],
+      bankPresets: [],
+      store: { pressure: {}, pressureAt: {} },
+      lanternIntegrity: 80,
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(state.souls, 0);
+  assert.ok(state.combat && typeof state.combat === 'object');
+  assert.deepEqual(state.beacons.kindled, ['hearthway']);
+  assert.equal(state.lumen, 9);
+  assert.equal(state.lanternIntegrity, 80);
+});
+
 test('storage helpers tolerate throwing backends (private mode / quota)', () => {
   const evil = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('full'); } };
   assert.equal(storageGet(evil), null);

@@ -38,8 +38,8 @@ test('skills list renders all eight registry rows', () => {
   const scr = renderSkillsScreen(makeCtx(state));
   const rows = scr.node.querySelectorAll('.skill-row');
   assert.equal(rows.length, 8, 'one row per charter skill');
-  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 6,
-    'six skills marked future in wave 0');
+  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 5,
+    'five skills marked future once combat is live');
 });
 
 test('playable skill detail renders action cards with live controls', () => {
@@ -91,16 +91,20 @@ test('camp renders stats and quick actions', () => {
   state.flame = 42;
   const scr = tabs.renderCampScreen(makeCtx(state));
   const cells = scr.node.querySelectorAll('.stat-cell');
-  assert.equal(cells.length, 4);
-  assert.match(cells[1].textContent ?? '', /42/);
+  assert.equal(cells.length, 6);
+  assert.match(scr.node.textContent ?? '', /42/);
+  assert.match(scr.node.textContent ?? '', /Waiting for you/);
+  assert.match(scr.node.textContent ?? '', /The General Store/);
+  assert.match(scr.node.textContent ?? '', /Face the pale-things/);
+  assert.match(scr.node.textContent ?? '', /Open the constellation/);
 });
 
 test('bank defaults to Owned — only carried stacks fill the working grid', () => {
-  const state = createState({ nowMs: 0, rngSeed: 8 }); // starter: tinder, rushwick, fogwort
+  const state = createState({ nowMs: 0, rngSeed: 8 }); // starter gathering + combat provisions
   const scr = tabs.renderBankScreen(makeCtx(state));
   const owned = scr.node.querySelectorAll('.bank-tile.owned');
-  assert.equal(owned.length, 3, 'three starter stacks lit');
-  assert.equal(scr.node.querySelectorAll('.bank-tile').length, 3, 'unowned ghosts stay out of the working pack');
+  assert.equal(owned.length, 6, 'starter stacks lit (gathering + combat provisions)');
+  assert.equal(scr.node.querySelectorAll('.bank-tile').length, 6, 'unowned ghosts stay out of the working pack');
   assert.equal(scr.node.querySelectorAll('.bank-tile.unowned').length, 0);
   const active = scr.node.querySelectorAll('.bank-tab').find((t) => /\bactive\b/.test(t.className));
   assert.match(active?.textContent ?? '', /Owned/);
