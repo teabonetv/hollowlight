@@ -202,7 +202,7 @@ function resolveAttack(state, rng, { attacker, defenderHpKey, defenderMax, accur
   if (attacker === 'player' && c.lanternDry) chance *= FOG_HIT_MULT;
   const hit = rng.next() < chance;
   if (!hit) {
-    pushCombatLog(state, `${label} ${verb} — and misses.`, 'miss');
+    pushCombatLog(state, `${label === 'You' ? 'You miss.' : `${label} misses.`}`, 'miss');
     return { hit: false, dmg: 0, killed: false };
   }
   const mult = styleMultiplier(style, weakness, resist);
@@ -236,7 +236,7 @@ function playerAct(state, rng) {
     weakness: enemy.weakness,
     resist: enemy.resist,
     label: 'You',
-    verb: style?.verb ?? 'strike',
+    verb: style?.youVerb ?? 'strike',
   });
 }
 
@@ -320,7 +320,7 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
     nextActMs: foeSpeedMs(enemy, phase0),
     phaseIndex: 0,
   };
-  pushCombatLog(state, `You meet ${enemy.name} on the ${ZONE_BY_ID[enemy.zoneId]?.stretch ?? 'road'}.`, 'start');
+  pushCombatLog(state, `You meet ${enemy.name} on ${ZONE_BY_ID[enemy.zoneId]?.stretch ?? 'the road'}.`, 'start');
   return { ok: true, seed: state.combat.encounterSeed };
 }
 

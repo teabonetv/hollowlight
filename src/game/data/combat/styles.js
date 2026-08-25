@@ -7,18 +7,21 @@ export const STYLES = [
     id: 'strike',
     name: 'Strike',
     verb: 'strikes',
+    youVerb: 'strike',
     tagline: 'Close work. Lantern-iron and a steady wrist.',
   },
   {
     id: 'shot',
     name: 'Shot',
-    verb: 'looses',
+    verb: 'looses a shot',
+    youVerb: 'loose a shot',
     tagline: 'Distance. Ash-slings, thrown wicks, quiet aim.',
   },
   {
     id: 'rite',
     name: 'Rite',
     verb: 'intones',
+    youVerb: 'intone',
     tagline: 'Old pilgrim words. Light as a blade.',
   },
 ];

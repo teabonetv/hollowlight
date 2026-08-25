@@ -218,6 +218,22 @@ test('emberkeeping still ticks while a fight is running', () => {
   assert.equal(s.combat.fighting, true);
 });
 
+test('player log lines use first-person verbs', () => {
+  const s = createState({ rngSeed: 21 });
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  assert.match(s.combat.log[0].text, /on The fog-line/);
+  s.combat.player.nextActMs = 0;
+  s.combat.foe.hp = 1;
+  for (let i = 0; i < 30 && s.combat.fighting; i++) {
+    s.combat.player.nextActMs = 0;
+    combat.tickCombat(s, 100);
+  }
+  const you = s.combat.log.filter((l) => l.text.startsWith('You '));
+  assert.ok(you.some((l) => /You strike |You miss|You loose|You intone/.test(l.text) || /You meet/.test(l.text)));
+  assert.equal(you.some((l) => /You strikes/.test(l.text)), false);
+});
+
 test('grantCombatXp uses the same rounding as live kills', () => {
   const s = createState({ rngSeed: 13 });
   const { xp } = combat.grantCombatXp(s, 11);
