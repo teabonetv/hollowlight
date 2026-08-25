@@ -1,7 +1,7 @@
 // Item inspector — sources, uses, sell, pin, offerings.
 // Mounted as a mobile sheet (modals.showSellSheet) or a persistent desktop pane.
 
-import { el } from './dom.js';
+import { el, clear } from './dom.js';
 import { formatNumber } from '../core/format.js';
 import { ITEMS_BY_ID } from '../game/data/items.js';
 import { ACTIONS } from '../game/data/actions.js';
@@ -55,30 +55,21 @@ export function createItemInspector(ctx, itemId, {
     qtyLabel.textContent = `${formatNumber(qty)} in the bank`;
     worthLabel.textContent = `stack worth ✦${formatNumber(qty * unit)} at today’s stall`;
 
-    for (const b of [sell1Btn, sell10Btn, sell100Btn]) {
-      b.style.display = '';
-      b.disabled = false;
-      b.setAttribute('aria-disabled', 'false');
-    }
     sell1Btn.textContent = 'Sell 1';
     sell10Btn.textContent = 'Sell 10';
     sell100Btn.textContent = 'Sell 100';
-    if (qty < 100) {
-      sell100Btn.disabled = true;
-      sell100Btn.textContent = `Sell 100 (${qty})`;
-      sell100Btn.setAttribute('aria-disabled', 'true');
-    }
-    if (qty < 10) {
-      sell10Btn.disabled = true;
-      sell10Btn.textContent = `Sell 10 (${qty})`;
-      sell10Btn.setAttribute('aria-disabled', 'true');
-    }
-    if (qty < 1) {
-      sell1Btn.disabled = true;
-      sell1Btn.setAttribute('aria-disabled', 'true');
-      sell100Btn.disabled = true;
-      sell100Btn.setAttribute('aria-disabled', 'true');
-    }
+    clear(sellActions);
+    if (qty >= 1) sellActions.append(sell1Btn);
+    if (qty >= 10) sellActions.append(sell10Btn);
+    if (qty >= 100) sellActions.append(sell100Btn);
+
+    sellQtyInput.setAttribute('max', String(Math.max(1, qty)));
+    const typed = Math.floor(Number(sellQtyInput.value));
+    if (!Number.isFinite(typed) || typed < 1) sellQtyInput.value = qty >= 1 ? '1' : '0';
+    else if (typed > qty) sellQtyInput.value = String(qty);
+    sellQtyInput.disabled = qty < 1;
+    sellCustomBtn.disabled = qty < 1;
+    sellCustomRow.style.display = qty >= 1 ? '' : 'none';
 
     if (qty <= 0) {
       clearSellConfirm(itemId);
@@ -112,6 +103,22 @@ export function createItemInspector(ctx, itemId, {
   const sell1Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(1) }, '');
   const sell10Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(10) }, '');
   const sell100Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(100) }, '');
+  const sellQtyInput = el('input', {
+    type: 'number',
+    class: 'sell-qty-input',
+    min: '1',
+    step: '1',
+    inputmode: 'numeric',
+    'aria-label': 'Sell quantity',
+    value: '1',
+  });
+  const sellCustomBtn = el('button', {
+    class: 'btn btn-primary',
+    onclick: () => doSell(Math.floor(Number(sellQtyInput.value))),
+  }, 'Sell');
+  const sellCustomRow = el('div', { class: 'sell-custom' },
+    sellQtyInput, sellCustomBtn);
+  const sellActions = el('div', { class: 'sell-actions' });
 
   let expiryTimer = 0;
   function armConfirm() {
@@ -177,7 +184,8 @@ export function createItemInspector(ctx, itemId, {
       qtyLabel,
       el('br'),
       worthLabel),
-    el('div', { class: 'sell-actions' }, sell1Btn, sell10Btn, sell100Btn),
+    sellActions,
+    sellCustomRow,
     confirmBtn,
     offerBtn);
 

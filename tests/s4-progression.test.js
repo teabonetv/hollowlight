@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createState, pushLog } from '../src/game/state.js';
 import { createRng } from '../src/core/rng.js';
-import { ACHIEVEMENTS } from '../src/game/data/achievements.js';
+import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '../src/game/data/achievements.js';
 import { PERKS } from '../src/game/data/perks.js';
 import { RADIANCE_PER_XP } from '../src/game/data/perks.js';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../src/game/systems/radiance.js';
 import {
   evaluateAchievements, triggerMet, isUnlocked, cascadeAchievements,
+  featToastMessage,
 } from '../src/game/systems/achievements.js';
 import {
   ensureDailies, rerollDailies, canReroll, claimDaily, taskProgress, utcDayKey,
@@ -293,6 +294,12 @@ test('boot feat cascade grants Cataloguer, Wear a Name, and Write It Down in one
   assert.ok(ids.includes('x-journal'), 'journal lines from earlier feats');
   assert.equal(s.lumen, 35, '20 starter +10 Wear a Name +5 Write It Down');
   assert.equal(s.cosmetics.activeTitle, 'Cataloguer');
+});
+
+test('feat toasts name the Lumen the wallet just gained', () => {
+  assert.equal(featToastMessage(ACHIEVEMENTS_BY_ID['s-title']), 'Feat: Wear a Name. +✦10.');
+  assert.equal(featToastMessage(ACHIEVEMENTS_BY_ID['x-journal']), 'Feat: Write It Down. +✦5.');
+  assert.equal(featToastMessage(ACHIEVEMENTS_BY_ID['g-known-6']), 'Feat: Six Known Things.');
 });
 
 test('Kindling changes Tend the Flame from a 14 XP chip to a 15 XP grant', () => {

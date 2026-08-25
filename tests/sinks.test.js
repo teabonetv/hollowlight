@@ -53,5 +53,6 @@ test('tab dyes spend Lumen and never grant bank slots or power', () => {
   assert.equal(dusk.ok, true);
   assert.equal(s.cosmetics.bankTheme, 'dusk');
   assert.equal(s.lumen, 0);
+  assert.equal(s.stats.lumenSpent, BANK_THEMES.find((t) => t.id === 'dusk').cost);
   assert.ok(!('bankSlots' in s), 'no slot field — bank stays weightless');
 });
