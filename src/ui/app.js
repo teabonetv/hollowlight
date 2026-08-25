@@ -581,6 +581,8 @@ function boot() {
     }
     renderScreen();
     screenRoot.scrollTop = 0;
+    // Remount unpauses the fight; persist that plus any boot feats so HUD==save.
+    afterMutation({ stamp: false });
   } else {
     setTab('camp');
   }
