@@ -7,8 +7,9 @@ import { icon } from '../icons.js';
 import { formatNumber, formatSeconds } from '../../core/format.js';
 import { ZONES, ZONE_BY_ID } from '../../game/data/combat/zones.js';
 import { STYLES, STYLE_BY_ID } from '../../game/data/combat/styles.js';
-import { FOOD, FOOD_ORDER, OILS } from '../../game/data/combat/consumables.js';
+import { FOOD, FOOD_ORDER } from '../../game/data/combat/consumables.js';
 import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vigils.js';
+import { ITEMS_BY_ID } from '../../game/data/items.js';
 import { enemiesInZone, bossOfZone } from '../../game/data/enemies/index.js';
 import { bankCount } from '../../game/systems/bank.js';
 import * as combat from '../../game/systems/combat.js';
@@ -20,6 +21,7 @@ export function renderCombatPanel(ctx) {
 
   function paint() {
     clear(root);
+    combat.resumeCombat(ctx.state);
     const st = combat.combatStatus(ctx.state);
     if (st.fighting) root.append(buildFight(ctx, st, paint));
     else root.append(buildHub(ctx, st, paint));
@@ -44,9 +46,11 @@ function buildHub(ctx, st, paint) {
   wrap.append(el('p', { class: 'combat-intro muted' },
     'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
 
-  wrap.append(soulsLine(st));
-  wrap.append(deathBanner(ctx, st, paint));
+  wrap.append(soulsLine(ctx, st));
+  const spilled = deathBanner(ctx, st, paint);
+  if (spilled) wrap.append(spilled);
   wrap.append(vigilCard(ctx, st, paint));
+  wrap.append(handSlot(ctx, st, paint));
 
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
   wrap.append(zonePicker(ctx, zoneId, paint));
@@ -54,17 +58,77 @@ function buildHub(ctx, st, paint) {
   return wrap;
 }
 
-function soulsLine(st) {
+function weaponSubline(st) {
+  const off = st.offense;
+  const w = off?.weapon;
+  const styleName = STYLE_BY_ID[st.style]?.name ?? st.style;
+  const name = w?.id && w.id !== 'unarmed'
+    ? (ITEMS_BY_ID[w.id]?.name ?? w.id)
+    : 'Unarmed';
+  return `${name} · ${styleName} ${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow`;
+}
+
+function handSlot(ctx, st, paint) {
+  const held = combat.heldWeapon(ctx.state);
+  const off = combat.playerOffense(ctx.state, st.style ?? ctx.state.combat.player.style);
+  const owned = combat.ownedWeapons(ctx.state);
+  const card = el('article', { class: 'card weapon-card' },
+    el('div', { class: 'action-head' },
+      el('h2', { class: 'action-name' }, 'Hand'),
+      el('span', { class: 'mastery-badge' }, held ? (ITEMS_BY_ID[held.id]?.name ?? held.id) : 'Unarmed')));
+
+  card.append(el('p', { class: 'action-desc' },
+    held
+      ? `${ITEMS_BY_ID[held.id]?.name ?? held.id} — ${STYLE_BY_ID[held.style]?.name ?? held.style} ${held.minDmg}–${held.maxDmg} · ${formatSeconds(held.speedMs)} / blow · +${held.accuracy} acc.`
+      : `Unarmed ${STYLE_BY_ID[st.style]?.name ?? st.style} ${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow.`));
+
+  if (held && held.style !== st.style) {
+    card.append(el('p', { class: 'muted small' },
+      `The ${ITEMS_BY_ID[held.id]?.name ?? 'weapon'} is a ${STYLE_BY_ID[held.style]?.name ?? held.style} tool. Shift style to use it, or you strike unarmed.`));
+  }
+
+  const row = el('div', { class: 'weapon-row' });
+  const unarmedBtn = el('button', {
+    class: `btn ${held ? 'btn-ghost' : 'btn-primary on'}`,
+    onclick: () => {
+      ctx.equipWeapon?.('unarmed');
+      paint();
+    },
+  }, 'Unarmed');
+  row.append(unarmedBtn);
+  for (const w of owned) {
+    const on = held?.id === w.id;
+    row.append(el('button', {
+      class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
+      onclick: () => {
+        ctx.equipWeapon?.(w.id);
+        paint();
+      },
+    }, ITEMS_BY_ID[w.id]?.name ?? w.id));
+  }
+  if (!owned.length) {
+    card.append(el('p', { class: 'muted small' }, 'No weapon in the bank. The wick-knife is a Strike, if you still hold it.'));
+  }
+  card.append(row);
+  return card;
+}
+
+function soulsLine(ctx, st) {
+  const sips = combat.oilSipsRemaining(ctx.state);
   return el('div', { class: 'combat-meta' },
     el('span', { class: 'chip chip-gold' }, `${formatNumber(st.souls)} souls`),
-    el('span', { class: 'chip' }, st.lanternDry ? 'lantern dry' : 'lantern ready'));
+    el('span', { class: 'chip' }, st.lanternDry ? 'lantern dry' : 'lantern ready'),
+    el('span', { class: `chip ${sips > 0 ? '' : 'chip-warn'}` },
+      sips > 0 ? `${sips} lantern sip${sips === 1 ? '' : 's'}` : '0 lantern sips'));
 }
 
 function deathBanner(ctx, st, paint) {
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
   const here = combat.deathPileAt(ctx.state, zoneId);
   const site = st.deathSite;
-  if (!here && !site) return null;
+  const spilledHere = here > 0;
+  const spilledElsewhere = !!(site && site.lumen > 0 && !spilledHere);
+  if (!spilledHere && !spilledElsewhere) return null;
 
   const box = el('div', { class: 'card combat-death' });
   if (here > 0) {
@@ -106,7 +170,7 @@ function vigilCard(ctx, st, paint) {
     const spec = VIGIL_TIER_BY_N[v.tier];
     card.append(
       el('p', { class: 'action-desc' },
-        `Sworn against ${cat?.name ?? v.category}. ${v.kills} / ${v.required} fallen.`),
+        `Sworn against ${cat?.name ?? v.category} on ${ZONE_BY_ID[v.zoneId]?.stretch ?? ZONE_BY_ID[ctx.state.combat.zoneId]?.stretch ?? 'this stretch'}. ${v.kills} / ${v.required} fallen.`),
       el('div', { class: 'bar bar-lg', role: 'progressbar' },
         el('span', { class: 'bar-fill', style: `width:${Math.min(100, (v.kills / v.required) * 100).toFixed(1)}%` })),
       spec ? el('p', { class: 'muted small' },
@@ -191,6 +255,7 @@ function zoneBody(ctx, zoneId, paint) {
 function huntCard(ctx, enemy, paint) {
   const lockedBoss = enemy.boss && !combat.guardianStirred(ctx.state, enemy.zoneId);
   const kills = ctx.state.combat.kills[enemy.id] ?? 0;
+  const sips = combat.oilSipsRemaining(ctx.state);
   const btnLabel = lockedBoss
     ? `Locked · ${enemy.stirKills} kills`
     : enemy.boss ? 'Challenge' : 'Hunt';
@@ -217,7 +282,8 @@ function huntCard(ctx, enemy, paint) {
       el('span', { class: 'chip chip-gold' }, `${enemy.souls} souls`),
       el('span', { class: 'chip' }, `weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? enemy.weakness}`),
       el('span', { class: 'chip' }, `resists ${STYLE_BY_ID[enemy.resist]?.name ?? enemy.resist}`),
-      kills ? el('span', { class: 'chip' }, `${kills} slain`) : null),
+      kills ? el('span', { class: 'chip' }, `${kills} slain`) : null,
+      el('span', { class: 'chip' }, `${sips} sip${sips === 1 ? '' : 's'} before Hunt`)),
     el('button', {
       class: `btn btn-wide ${lockedBoss ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
       onclick: start,
@@ -233,9 +299,11 @@ function buildFight(ctx, st, paint) {
   wrap.append(el('p', { class: 'muted small' },
     `${ZONE_BY_ID[st.zoneId]?.settlement ?? ''} · seed ${ctx.state.combat.encounterSeed}`));
 
+  wrap.append(handSlot(ctx, st, paint));
+
   wrap.append(fighterBlock({
     title: 'You',
-    sub: `${STYLE_BY_ID[st.style]?.name ?? st.style} · ${formatSeconds(st.playerSpeedMs)} / blow`,
+    sub: weaponSubline(st),
     hp: st.playerHp,
     max: st.playerMaxHp,
     next: st.playerNextMs,
@@ -257,8 +325,8 @@ function buildFight(ctx, st, paint) {
 
   wrap.append(el('p', { class: `oil-line ${st.lanternDry ? 'danger' : 'muted'}` },
     st.lanternDry
-      ? 'Lantern dry — the fog bites. Drink oil or fall back.'
-      : `Lantern fed · next sip in ${formatSeconds(st.oilMs)}`));
+      ? 'Lantern dry — the fog gathers. Drink oil or fall back.'
+      : `Lantern fed · ${st.oilSips ?? combat.oilSipsRemaining(ctx.state)} sip${(st.oilSips ?? 0) === 1 ? '' : 's'} · next in ${formatSeconds(st.oilMs)}`));
 
   const styles = el('div', { class: 'style-row' });
   for (const s of STYLES) {
@@ -316,24 +384,19 @@ function eatRow(ctx, st, paint) {
   for (const id of FOOD_ORDER) {
     const n = bankCount(ctx.state.bank, id);
     const food = FOOD[id];
+    const pending = n > 0 ? combat.eatHealAmount(ctx.state, id) : 0;
     row.append(el('button', {
-      class: `btn ${n > 0 && st.playerHp < st.playerMaxHp ? 'btn-primary' : 'btn-ghost'} eat-btn`,
+      class: `btn ${n > 0 && pending > 0 ? 'btn-primary' : 'btn-ghost'} eat-btn`,
       onclick: () => {
         const res = ctx.eatFood(id);
         if (!res.ok) ctx.toast(res.error, 'warn');
         paint();
       },
-    }, `${food.name} +${food.heal} · ${n}`));
+    }, `${food.name} +${pending} · ${n}`));
   }
-  const oilN = OIL_ORDER_COUNT(ctx.state);
+  const oilN = combat.oilSipsRemaining(ctx.state);
   row.append(el('span', { class: 'chip' }, `oil ×${oilN}`));
   return row;
-}
-
-function OIL_ORDER_COUNT(state) {
-  let n = 0;
-  for (const id of Object.keys(OILS)) n += bankCount(state.bank, id);
-  return n;
 }
 
 function logPanel(log) {

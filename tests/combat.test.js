@@ -8,6 +8,9 @@ import { REGULARS } from '../src/game/data/enemies/regulars.js';
 import { ZONES } from '../src/game/data/combat/zones.js';
 import * as combat from '../src/game/systems/combat.js';
 import * as runner from '../src/game/systems/action-runner.js';
+import { ALWAYS_STOCK } from '../src/game/data/store.js';
+import { isOnShelf, buyFromStore } from '../src/game/systems/store.js';
+import { serializeSave, deserializeSave } from '../src/core/save.js';
 
 test('roster meets charter scope: ≥40 regulars, 12 bosses, 12 zones', () => {
   assert.ok(REGULARS.length >= 40, `regulars ${REGULARS.length}`);
@@ -158,6 +161,51 @@ test('eating heals and consumes food; oil sips drain wick-oil during the fight',
   assert.ok((s.bank['wick-oil'] ?? 0) < oilBefore, 'a sip was taken');
 });
 
+test('eat heal, log line, and HP delta are the same integer', () => {
+  const s = createState({ rngSeed: 5 });
+  s.combat.player.hp = 32;
+  const pending = combat.eatHealAmount(s, 'lantern-loaf');
+  assert.equal(pending, 8);
+  const hp0 = s.combat.player.hp;
+  const ate = combat.eatFood(s, 'lantern-loaf');
+  assert.equal(ate.ok, true);
+  assert.equal(ate.healed, pending);
+  assert.equal(s.combat.player.hp - hp0, pending);
+  const line = s.combat.log.find((l) => l.kind === 'eat');
+  assert.match(line.text, new RegExp(`\\+${pending} vitality`));
+});
+
+test('equipped wick-knife changes strike damage and speed vs unarmed', () => {
+  const armed = createState({ rngSeed: 1 });
+  const knife = combat.playerOffense(armed, 'strike');
+  assert.equal(combat.heldWeapon(armed)?.id, 'wick-knife');
+  assert.equal(knife.minDmg, 3);
+  assert.equal(knife.maxDmg, 6);
+  assert.equal(knife.speedMs, 2200);
+  assert.equal(knife.accuracy, 8 + 2 + 4);
+
+  const bare = createState({ rngSeed: 1 });
+  combat.equipWeapon(bare, 'unarmed');
+  const un = combat.playerOffense(bare, 'strike');
+  assert.equal(un.minDmg, 2);
+  assert.equal(un.maxDmg, 4);
+  assert.equal(un.speedMs, 2400);
+  assert.ok(knife.maxDmg > un.maxDmg);
+  assert.ok(knife.speedMs < un.speedMs);
+  assert.ok(knife.accuracy > un.accuracy);
+});
+
+test('the stall always sells wick-oil', () => {
+  assert.ok(ALWAYS_STOCK.includes('wick-oil'));
+  const s = createState({ rngSeed: 2 });
+  s.lumen = 80;
+  assert.equal(isOnShelf(s, 'wick-oil'), true);
+  const before = s.bank['wick-oil'] ?? 0;
+  const buy = buyFromStore(s, 'wick-oil', 2);
+  assert.equal(buy.ok, true);
+  assert.equal(s.bank['wick-oil'], before + 2);
+});
+
 test('swapping style mid-fight is allowed and recorded', () => {
   const s = createState({ rngSeed: 6 });
   combat.startFight(s, 'pale-moth', { encounterSeed: 4 });
@@ -208,6 +256,58 @@ test('a Vigil against pale-things completes with the tier-1 payout', () => {
   assert.equal(s.combat.vigils.completed, 1);
   assert.ok(s.lumen > lumen0);
   assert.ok(need >= 1);
+});
+
+test('first Vigil sworn on Hearthway is pale-things, never marsh horrors', () => {
+  for (let seed = 0; seed < 16; seed++) {
+    const s = createState({ rngSeed: seed });
+    const res = combat.assignVigil(s, { seed });
+    assert.equal(res.ok, true);
+    assert.equal(res.vigil.category, 'pale');
+    assert.equal(res.vigil.zoneId, 'hearthway');
+  }
+});
+
+test('vigil increments on matching-category kills on the sworn stretch', () => {
+  const s = createState({ rngSeed: 9 });
+  combat.assignVigil(s, { categoryId: 'pale', seed: 1 });
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'lantern-shade', { encounterSeed: 2 });
+  let n = 0;
+  while (s.combat.fighting && n++ < 40) {
+    s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    combat.tickCombat(s, 100);
+  }
+  assert.equal(s.combat.vigils.current.kills, 0, 'wight kill does not count as pale');
+
+  combat.startFight(s, 'pale-moth', { encounterSeed: 3 });
+  n = 0;
+  while (s.combat.fighting && n++ < 40) {
+    s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    combat.tickCombat(s, 100);
+  }
+  assert.equal(s.combat.vigils.current.kills, 1);
+});
+
+test('mid-fight serialize then deserialize keeps fighting and pauses until the HUD mounts', () => {
+  const s = createState({ rngSeed: 4 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  s.combat.player.hp = 22;
+  const json = serializeSave(s, 1);
+  const { state } = deserializeSave(json);
+  assert.equal(state.combat.fighting, true);
+  assert.equal(combat.fightWouldResume(state), true);
+  assert.equal(state.combat.paused, true);
+  const hp = state.combat.player.hp;
+  const foeHp = state.combat.foe.hp;
+  combat.tickCombat(state, 8000);
+  assert.equal(state.combat.player.hp, hp);
+  assert.equal(state.combat.foe.hp, foeHp);
+  combat.resumeCombat(state);
+  assert.equal(state.combat.paused, false);
+  assert.equal(state.combat.fighting, true);
 });
 
 test('emberkeeping still ticks while a fight is running', () => {

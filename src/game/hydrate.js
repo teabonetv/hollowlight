@@ -34,6 +34,10 @@ export function hydrateState(state) {
   state.beacons.kindled ??= ['hearthway'];
   state.skills ??= {};
   ensureCombat(state);
+  // Reload must not keep swinging on Camp: freeze until the fight HUD mounts.
+  if (state.combat?.fighting && state.combat?.foe) {
+    state.combat.paused = true;
+  }
   state.actions ??= { active: {}, autoRestart: {}, completed: {} };
   state.actions.autoRestart ??= {};
   for (const a of ACTIONS) {
