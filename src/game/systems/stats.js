@@ -101,6 +101,17 @@ export function recordLumenSpend(state, qty) {
   state.stats.lumenSpent = (state.stats.lumenSpent ?? 0) + qty;
 }
 
+export function recordKill(state, { boss = false } = {}) {
+  state.stats ??= {};
+  state.stats.kills = (state.stats.kills ?? 0) + 1;
+  if (boss) state.stats.guardians = (state.stats.guardians ?? 0) + 1;
+}
+
+export function recordDeath(state) {
+  state.stats ??= {};
+  state.stats.deaths = (state.stats.deaths ?? 0) + 1;
+}
+
 /** Rows for the Statistics page — labels stay player-facing and honest. */
 export function statsRows(state) {
   const st = state.stats ?? {};

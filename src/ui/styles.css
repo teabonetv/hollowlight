@@ -899,3 +899,5 @@ html.reduced-motion *::after {
 .theme-choir .bank-tab.active { border-color: #c4a574; color: #f0e0c0; }
 .theme-ash .bank-tab.active { border-color: #888; color: #ddd; }
 .theme-gilt .bank-tab.active { border-color: var(--gold-hi); color: var(--gold-hi); }
+
+/* Combat panel rules: src/ui/combat.css */

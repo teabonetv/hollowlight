@@ -14,6 +14,8 @@ import { formatNumber, formatDuration } from '../../core/format.js';
 import { nextWants, totalCompletion } from '../../game/systems/completion.js';
 import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
 import { taskProgress } from '../../game/systems/dailies.js';
+import { ZONES } from '../../game/data/combat/zones.js';
+import { isBeaconKindled } from '../../game/systems/combat.js';
 import { renderBankScreen } from './bank.js';
 
 export { renderBankScreen };
@@ -80,6 +82,8 @@ export function renderCampScreen(ctx) {
         'Walk the fog-line'),
       el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openStore?.() },
         'The General Store'),
+      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openSkill('combat') },
+        'Face the pale-things'),
       el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openAlmanac?.('stars') },
         'Open the constellation')),
 
@@ -270,26 +274,25 @@ function buildRepairCard(ctx) {
   };
 }
 
-const SETTLEMENTS = [
-  'Hearthway Hollow', 'Vesper’s Rest', 'Tallowmere', 'The Sunken Shrift',
-  'Emberfall Stacks', 'Choirgreen', 'Mourning Bridge', 'Lantern-Wake',
-  'The Pale Steps', 'Starfell Abbey', 'Duskmere', 'The First Beacon',
-];
-
 export function renderMapScreen(ctx) {
   const road = el('ol', { class: 'map-road', role: 'list' });
-  SETTLEMENTS.forEach((name, i) => {
-    const lit = i === 0;
+  ZONES.forEach((z) => {
+    const lit = isBeaconKindled(ctx.state, z.beaconId);
     road.append(el('li', {},
       el('button', {
         class: `map-node ${lit ? 'lit' : ''}`,
-        'aria-label': `${name}${lit ? ', kindled' : ', dark'}`,
-        onclick: () => ctx.toast(lit
-          ? `${name} — your campfire burns here.`
-          : `${name} waits in the dark. Relight it in a later wave.`, lit ? 'success' : 'info'),
+        'aria-label': `${z.settlement}${lit ? ', kindled' : ', dark'}`,
+        onclick: () => {
+          if (lit) {
+            ctx.openSkill?.('combat');
+            ctx.toast(`${z.settlement} — the fog-line is walkable from here.`, 'success');
+          } else {
+            ctx.toast(`${z.settlement} waits in the dark. Relight it in a later wave.`, 'info');
+          }
+        },
       },
         el('span', { class: 'map-dot', html: lit ? icon('flame') : null }),
-        el('span', { class: 'map-name' }, name))));
+        el('span', { class: 'map-name' }, z.settlement))));
   });
 
   return {

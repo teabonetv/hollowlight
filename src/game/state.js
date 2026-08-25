@@ -7,11 +7,15 @@ import { SKILLS } from './data/skills.js';
 import { ACTIONS } from './data/actions.js';
 import { emptyStats } from './systems/stats.js';
 import { hydrateState } from './hydrate.js';
+import { createCombatState } from './systems/combat.js';
 
 export const STARTER_BANK = {
   tinderscrap: 30,
   rushwick: 5,
   fogwort: 4,
+  'lantern-loaf': 8,
+  'wick-oil': 6,
+  'wick-knife': 1,
 };
 
 /**
@@ -75,6 +79,11 @@ export function createState({ nowMs = 0, rngSeed = 1 } = {}) {
     perks: { owned: [], respecs: 0 },
     achievements: { unlocked: {} },
     dailies: null,
+
+    // Combat (lane S1). Missing on pre-S1 saves; ensureCombat() fills defaults.
+    souls: 0,
+    beacons: { kindled: ['hearthway'] },
+    combat: createCombatState(),
 
     settings: {
       reducedMotion: false, // app boot syncs this with the media query once

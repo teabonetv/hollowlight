@@ -186,7 +186,7 @@ test('nextWants always offers three concrete pulls; camp completion is defined',
   assert.ok(totalCompletion(s).pct >= 0);
 });
 
-test('old saves migrate v1→v3 and hydrate S4 fields', () => {
+test('old saves migrate v1→v4 and hydrate S2+S1+S4 fields', () => {
   const json = JSON.stringify({
     version: 1,
     savedAt: 1,
@@ -198,11 +198,13 @@ test('old saves migrate v1→v3 and hydrate S4 fields', () => {
   assert.deepEqual(state.bankPins, []);
   assert.ok(state.store.pressure);
   assert.equal(state.lanternIntegrity, 100);
+  assert.ok(state.combat);
+  assert.equal(state.souls, 0);
   assert.equal(state.actions.autoRestart['tend-flame'], true);
   assert.equal(state.stats.beaconsKindled, 1);
 });
 
-test('schema v2 saves keep the stall and gain S4 fields (v2→v3)', () => {
+test('schema v2 saves keep the stall and gain combat + S4 fields', () => {
   const json = JSON.stringify({
     version: 2,
     savedAt: 1,
@@ -217,11 +219,49 @@ test('schema v2 saves keep the stall and gain S4 fields (v2→v3)', () => {
   const { state } = deserializeSave(json);
   assert.equal(state.radiance, 0);
   assert.ok(state.perks);
+  assert.ok(state.combat);
   assert.deepEqual(state.bankPins, ['fogwort']);
   assert.equal(state.store.pressure.fogwort, 3);
   assert.equal(state.lanternIntegrity, 88);
   assert.equal(state.cosmetics.bankTheme, 'dusk');
   assert.equal(state.cosmetics.lanternFrame, 'plain');
+});
+
+test('main v3 combat saves keep the hunt and gain S4 fields (v3→v4)', () => {
+  const json = JSON.stringify({
+    version: 3,
+    savedAt: 1,
+    state: {
+      lumen: 40,
+      souls: 3,
+      beacons: { kindled: ['hearthway'] },
+      combat: { fighting: false, zoneId: 'hearthway', kills: { 'pale-moth': 2 } },
+      store: { pressure: {}, pressureAt: {} },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(state.souls, 3);
+  assert.equal(state.combat.kills['pale-moth'], 2);
+  assert.equal(state.radiance, 0);
+  assert.ok(state.perks);
+});
+
+test('S4-only v3 saves keep Radiance and gain a combat blob (v3→v4)', () => {
+  const json = JSON.stringify({
+    version: 3,
+    savedAt: 1,
+    state: {
+      lumen: 22,
+      radiance: 7,
+      perks: { owned: ['kindling'], respecs: 0 },
+      achievements: { unlocked: {} },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(state.radiance, 7);
+  assert.deepEqual(state.perks.owned, ['kindling']);
+  assert.ok(state.combat);
+  assert.equal(state.souls, 0);
 });
 
 test('fresh save still round-trips through serialize/deserialize', () => {

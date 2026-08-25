@@ -71,7 +71,7 @@ test('gear snapshot only captures category:gear', () => {
 
 test('every registry row has a source, a use, unique ids, and integer sell', () => {
   assert.deepEqual(validateItems(), []);
-  assert.ok(ITEMS.length >= 110 && ITEMS.length <= 130, `got ${ITEMS.length} items (aim ~120)`);
+  assert.ok(ITEMS.length >= 110 && ITEMS.length <= 150, `got ${ITEMS.length} items (S2 ~120 + S1 combat ids)`);
   for (const it of ITEMS) {
     assert.ok(it.sources.length >= 1, it.id);
     assert.ok(it.uses.length >= 1, it.id);

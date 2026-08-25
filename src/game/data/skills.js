@@ -1,7 +1,7 @@
 // Skill registry — the eight crafts of the lantern trade (charter §3).
 // `glyph` keys into src/ui/icons.js. Wave 0 ships playable actions for
-// emberkeeping + foraging; the rest are visible, tappable, and honest about
-// arriving in later waves (designed "coming soon" states — never dead clicks).
+// emberkeeping + foraging + combat; the rest are visible, tappable, and honest
+// about arriving in later waves (designed "coming soon" states — never dead clicks).
 
 export const SKILLS = [
   {
@@ -74,7 +74,7 @@ export const SKILLS = [
     kind: 'combat',
     tagline: 'Fight the pale-things and their lords.',
     produces: 'Loot, souls, settlement keys',
-    wave: 2,
+    wave: 0,
   },
 ];
 

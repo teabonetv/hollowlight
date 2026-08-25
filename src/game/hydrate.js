@@ -3,6 +3,7 @@
 
 import { ACTIONS } from './data/actions.js';
 import { hydrateStats } from './systems/stats.js';
+import { ensureCombat } from './systems/combat.js';
 
 export function hydrateState(state) {
   if (!state || typeof state !== 'object') return state;
@@ -28,6 +29,11 @@ export function hydrateState(state) {
   state.store ??= { pressure: {}, pressureAt: {} };
   if (!Number.isFinite(state.lanternIntegrity)) state.lanternIntegrity = 100;
   state.dailies ??= null;
+  state.souls ??= 0;
+  state.beacons ??= { kindled: ['hearthway'] };
+  state.beacons.kindled ??= ['hearthway'];
+  state.skills ??= {};
+  ensureCombat(state);
   state.actions ??= { active: {}, autoRestart: {}, completed: {} };
   state.actions.autoRestart ??= {};
   for (const a of ACTIONS) {
