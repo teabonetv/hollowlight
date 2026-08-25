@@ -474,7 +474,7 @@ body {
 .camp-hint { font-size: 12px; max-width: 36ch; }
 
 /* ── bank ──────────────────────────────────────────────────── */
-.bank-workspace { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.bank-workspace { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
 .bank-cat { display: flex; flex-direction: column; gap: 8px; }
 .bank-cat-name {
   margin: 4px 0 0;
@@ -594,12 +594,20 @@ body {
 .bank-tile-dense .bank-glyph { width: 26px; height: 26px; }
 .bank-tile-dense .bank-glyph svg { width: 22px; height: 22px; }
 
-.bank-sell-bar {
+.bank-head-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
 }
-.bank-sell-toggle { min-height: 44px; width: 100%; }
+.bank-head-row .screen-title { margin: 0; }
+.bank-sell-toggle {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+}
 .bank-sell-qty {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -810,18 +818,20 @@ body {
   align-items: flex-end;
   justify-content: stretch;
   padding: 0;
-  padding-top: 38vh;
-  padding-top: 38dvh;
-  background: rgba(4, 6, 10, 0.42);
-  backdrop-filter: blur(1px);
+  /* Leave the owned glyph row in the top half of a 360×640 pack. */
+  padding-top: 64vh;
+  padding-top: 64dvh;
+  background: rgba(4, 6, 10, 0.38);
+  backdrop-filter: none;
 }
 .sheet-panel {
   max-width: none;
   width: 100%;
-  max-height: 62vh;
-  max-height: 62dvh;
+  max-height: 36vh;
+  max-height: 36dvh;
   border-radius: var(--radius) var(--radius) 0 0;
   transform: translateY(16px);
+  overflow: hidden;
 }
 .sheet-overlay.open .sheet-panel { transform: translateY(0); }
 .sheet-handle {
@@ -832,7 +842,12 @@ body {
   background: var(--line);
   flex: 0 0 auto;
 }
-.sheet-panel .modal-body { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.sheet-panel .modal-body {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
 .modal-head {
   display: flex;
   align-items: center;
@@ -1166,7 +1181,7 @@ html.reduced-motion *::after {
   .bank-grid-owned { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
   .bank-tile-dense { min-height: 72px; }
   .bank-tile-catalogue { min-height: 72px; }
-  .bank-sell-toggle { width: auto; align-self: start; min-width: 140px; }
+  .bank-sell-toggle { min-width: 132px; }
   .sheet-overlay { display: none; }
 
   .store-board {

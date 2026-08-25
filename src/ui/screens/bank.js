@@ -109,7 +109,6 @@ export function renderBankScreen(ctx) {
   const sellHint = el('p', { class: 'bank-sell-hint muted small' });
   const sellQtyRow = el('div', { class: 'bank-sell-qty', role: 'group', 'aria-label': 'Sell quantity' },
     qty1Btn, qty10Btn, dumpBtn);
-  const sellBar = el('div', { class: 'bank-sell-bar' }, sellToggle, sellQtyRow, sellHint);
 
   function requestedQty(itemId) {
     const owned = bankCount(ctx.state.bank, itemId);
@@ -124,17 +123,18 @@ export function renderBankScreen(ctx) {
     sellToggle.setAttribute('aria-pressed', sellMode ? 'true' : 'false');
     sellToggle.textContent = sellMode ? 'Selling' : 'Sell Mode';
     sellQtyRow.style.display = sellMode ? '' : 'none';
+    sellHint.style.display = sellMode ? '' : 'none';
     for (const [btn, mode] of [[qty1Btn, '1'], [qty10Btn, '10'], [dumpBtn, 'dump']]) {
       const on = sellQtyMode === mode;
       btn.className = `bank-sell-qty-btn${on ? ' active' : ''}`;
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     }
     if (!sellMode) {
-      sellHint.textContent = 'Tap a stack for lore, pin, or offer. Sell Mode sells from the grid.';
+      sellHint.textContent = '';
       return;
     }
     const verb = sellQtyMode === 'dump' ? 'dump' : `sell ×${sellQtyMode}`;
-    sellHint.textContent = `Tap a stack to ${verb}. Catalog ✦ on the tile; the inspector stays for lore.`;
+    sellHint.textContent = `Tap a stack to ${verb}. Catalog ✦ on the tile; inspector stays for lore.`;
   }
 
   sellToggle.addEventListener('click', () => {
@@ -350,9 +350,11 @@ export function renderBankScreen(ctx) {
 
   workspace.append(
     el('header', { class: 'screen-head' },
-      el('h1', { class: 'screen-title' }, 'Bank'),
+      el('div', { class: 'bank-head-row' },
+        el('h1', { class: 'screen-title' }, 'Bank'),
+        sellToggle),
       headerSub),
-    search, tabBar, sellBar, emptyState, gridHost,
+    search, tabBar, sellQtyRow, sellHint, emptyState, gridHost,
     el('h2', { class: 'section-title' }, 'Loadouts'),
     el('p', { class: 'section-sub muted' }, 'Checklists only — applying a loadout never conjures items.'),
     el('div', { class: 'preset-actions' },
