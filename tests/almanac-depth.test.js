@@ -2,7 +2,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FakeNode } from './helpers/fake-node.mjs';
+import { FakeNode, FakeText } from './helpers/fake-node.mjs';
 
 globalThis.document = {
   createElement: (t) => new FakeNode(t),
