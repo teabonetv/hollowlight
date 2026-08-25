@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState } from '../src/game/state.js';
+import { createState, pushLog } from '../src/game/state.js';
 import { createRng } from '../src/core/rng.js';
 import { ACHIEVEMENTS } from '../src/game/data/achievements.js';
 import { PERKS } from '../src/game/data/perks.js';
@@ -12,14 +12,14 @@ import {
   unlockPerk, grantRadianceFromXp, respecPerks, canUnlock, perkBonus,
 } from '../src/game/systems/radiance.js';
 import {
-  evaluateAchievements, triggerMet, isUnlocked,
+  evaluateAchievements, triggerMet, isUnlocked, cascadeAchievements,
 } from '../src/game/systems/achievements.js';
 import {
   ensureDailies, rerollDailies, canReroll, claimDaily, taskProgress, utcDayKey,
 } from '../src/game/systems/dailies.js';
 import { DAILY_TASK_COUNT, DAILY_POOL } from '../src/game/data/dailies.js';
 import { statsRows, totalCycles, recordCycle } from '../src/game/systems/stats.js';
-import { completeCycle, startAction, tickActions } from '../src/game/systems/action-runner.js';
+import { completeCycle, startAction, tickActions, actionStatus } from '../src/game/systems/action-runner.js';
 import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { computeOfflineProgress } from '../src/core/offline.js';
 import { nextWants, totalCompletion } from '../src/game/systems/completion.js';
@@ -46,11 +46,11 @@ test('xpGrantMultiplier uses that order against a real save', () => {
   const s = createState({ nowMs: 0, rngSeed: 1 });
   s.skills.foraging.mastery['gather-herbs'] = { xp: 0, level: 20 };
   s.campUpgrades = { 'ember-altar': 1 }; // +3% XP
-  s.perks.owned = ['kindling']; // +1% XP
+  s.perks.owned = ['kindling']; // +5% XP
   s.achievements.unlocked = { 'ek-25': { atMs: 0 } }; // +1% XP perk reward
   const m = xpGrantMultiplier(s, 20);
-  // mastery 20%, camp 3%, radiance 1%, achievement 1%, hooks 0
-  const expect = 1.20 * 1.03 * 1.01 * 1.01 * 1;
+  // mastery 20%, camp 3%, radiance 5%, achievement 1%, hooks 0
+  const expect = 1.20 * 1.03 * 1.05 * 1.01 * 1;
   assert.ok(Math.abs(m - expect) < 1e-12, `got ${m}`);
 });
 
@@ -150,7 +150,7 @@ test('Radiance accrues from XP and can buy Kindling without wiping progress', ()
   assert.equal(gate.ok, true);
   assert.equal(unlockPerk(s, 'kindling').ok, true);
   assert.ok(s.perks.owned.includes('kindling'));
-  assert.equal(perkBonus(s, 'xp'), 0.01);
+  assert.equal(perkBonus(s, 'xp'), 0.05);
   assert.deepEqual(s.bank, bankBefore, 'no progress wipe');
   assert.equal(s.skills.emberkeeping.xp, xpBefore);
   s.lumen = 100;
@@ -280,4 +280,29 @@ test('tick loop grants radiance sparks from live cycles', () => {
   // Push enough XP to overflow a whole spark.
   grantRadianceFromXp(s, 40, 1); // +1 spark
   assert.ok(s.radiance >= 1);
+});
+
+test('boot feat cascade grants Cataloguer, Wear a Name, and Write It Down in one eval', () => {
+  const s = createState({ nowMs: 0, rngSeed: 1 });
+  const newly = cascadeAchievements(s, {
+    onUnlock(a) { pushLog(s, `Feat lit: ${a.name}.`, 0); },
+  });
+  const ids = newly.map((a) => a.id);
+  assert.ok(ids.includes('g-known-6'), 'six starter items');
+  assert.ok(ids.includes('s-title'), 'auto-equipped title');
+  assert.ok(ids.includes('x-journal'), 'journal lines from earlier feats');
+  assert.equal(s.lumen, 35, '20 starter +10 Wear a Name +5 Write It Down');
+  assert.equal(s.cosmetics.activeTitle, 'Cataloguer');
+});
+
+test('Kindling changes Tend the Flame from a 14 XP chip to a 15 XP grant', () => {
+  const s = createState({ nowMs: 0, rngSeed: 7 });
+  const before = actionStatus(s, 'tend-flame');
+  assert.equal(before.xpBase, 14);
+  assert.equal(before.xpGrant, Math.round(14 * 1.01));
+  s.radiance = 1;
+  assert.equal(unlockPerk(s, 'kindling').ok, true);
+  const after = actionStatus(s, 'tend-flame');
+  assert.equal(after.xpGrant, 15);
+  assert.ok(after.xpGrant !== after.xpBase);
 });

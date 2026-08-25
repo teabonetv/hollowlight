@@ -3,9 +3,12 @@
 // every 30s and on hide/unload, computes honest offline gains on load, and
 // routes engine events into toasts + journal.
 //
-// Mutations (cycle complete, start/stop, sell, buy, claim) flush
-// hollowlight.save in the same frame. The 30s interval only covers playtime
-// ticking. Hide still persists; return still computes offline before restamp.
+// Mutations (cycle complete, start/stop, sell, buy, claim, feats) flush
+// hollowlight.save in the same frame AFTER evaluateAchievements, then the
+// HUD snaps. Boot persists feat grants before the first paint (without
+// restamping savedAt, so offline windows survive). The 30s interval only
+// covers playtime ticking. Hide still persists; return still computes
+// offline before restamp.
 //
 // Everything DOM-facing lives behind boot(); importing this module from node
 // stays side-effect free.
@@ -44,7 +47,7 @@ import {
 import { renderAlmanacScreen } from './screens/meta.js';
 import { renderStoreScreen } from './screens/store.js';
 import { hydrateState } from '../game/hydrate.js';
-import { evaluateAchievements } from '../game/systems/achievements.js';
+import { cascadeAchievements } from '../game/systems/achievements.js';
 import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
 import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
 
@@ -69,9 +72,9 @@ function boot() {
   let rng = createRng(1);
 
   // ── save / load / adopt ────────────────────────────────────────
-  function persist() {
+  function persist({ stamp = true } = {}) {
     game.rngState = rng.getState();
-    game.savedAt = Date.now();
+    if (stamp) game.savedAt = Date.now();
     storageSet(window.localStorage, serializeSave(game, game.savedAt));
   }
 
@@ -82,14 +85,20 @@ function boot() {
     });
   }
 
-  function adopt(stateObj) {
+  function adopt(stateObj, { paint = true } = {}) {
     game = hydrateState(stateObj);
     combat.ensureCombat(game);
     rng = createRng(game.rngState ?? 1);
     ensureDailies(game, Date.now());
     applyMotionClass();
-    renderScreen();
-    updateHud();
+    // Boot feats (and any hydrate-time unlocks) must land in hollowlight.save
+    // before the first HUD paint — same eval, no later 30s flush.
+    flushAchievementsQuiet();
+    persist({ stamp: false });
+    if (paint) {
+      renderScreen();
+      updateHud();
+    }
   }
 
   /** @returns true when this boot created a brand-new save */
@@ -174,32 +183,33 @@ function boot() {
   });
 
   function flushAchievementsQuiet() {
-    if (!game) return;
-    const newly = evaluateAchievements(game);
-    for (const a of newly) {
-      toaster.push(`Feat: ${a.name}.`, 'success');
-      pushLog(game, `Feat lit: ${a.name}.`, game.stats.playtimeMs);
-    }
+    if (!game) return 0;
+    const newly = cascadeAchievements(game, {
+      onUnlock(a) {
+        toaster.push(`Feat: ${a.name}.`, 'success');
+        pushLog(game, `Feat lit: ${a.name}.`, game.stats.playtimeMs);
+      },
+    });
     return newly.length;
   }
-  function flushAchievements() {
-    const n = flushAchievementsQuiet();
-    if (n) { updateHud(); renderScreen(); }
-  }
 
-  // ── HUD ────────────────────────────────────────────────────────
-  // Snap to the live save. A rAF count-up used to restart on every tick and
-  // leave the pills mid-lerp while hollowlight.save was already correct.
   function updateHud() {
-    paintHud(hudLumen, hudFlame, game, hudRadiance);
+    const unspent = document.getElementById('almanac-radiance-unspent');
+    paintHud(hudLumen, hudFlame, game, hudRadiance, { unspentRadiance: unspent });
   }
 
-  function afterMutation() {
-    persist();
+  // Evaluate feats, write hollowlight.save, then snap the HUD — never paint
+  // from live state while the envelope still holds the pre-feat snapshot.
+  function afterMutation({ redraw = false, stamp = true } = {}) {
+    const n = flushAchievementsQuiet();
+    persist({ stamp });
     updateHud();
-    liveUpdate();
-    sheetRepaint?.();
-    flushAchievementsQuiet();
+    if (redraw || n) renderScreen();
+    else {
+      liveUpdate();
+      sheetRepaint?.();
+    }
+    return n;
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -236,7 +246,7 @@ function boot() {
     }
     renderScreen();
     screenRoot.scrollTop = 0;
-    flushAchievements();
+    afterMutation({ stamp: false });
   }
 
   // ── ctx handed to screens & modals ─────────────────────────────
@@ -247,16 +257,14 @@ function boot() {
     toggleAction(actionId) {
       if (game.actions.active[actionId]) {
         runner.stopAction(game, actionId);
-        persist();
-        renderScreen();
+        afterMutation({ redraw: true });
         return;
       }
       const res = runner.startAction(game, actionId);
       if (!res.ok) { toaster.push(res.error, 'warn'); return; }
-      persist();
-      renderScreen();
+      afterMutation({ redraw: true });
     },
-    setAutoRestart(id, on) { runner.setAutoRestart(game, id, on); persist(); },
+    setAutoRestart(id, on) { runner.setAutoRestart(game, id, on); afterMutation(); },
     // ── F1c economy: selling + Keeper's Camp upgrades ──────────────
     sell(itemId, qty) {
       const res = sellItems(game, itemId, qty);
@@ -344,9 +352,7 @@ function boot() {
       const track = TRACKS_BY_ID[trackId];
       toaster.push(`${track.name} — ${res.tier.name}. The camp brightens.`, 'success');
       pushLog(game, `Upgraded ${track.name}: ${res.tier.name} (${camp.upgradeLevel(game, trackId)}/${track.tiers.length}).`, game.stats.playtimeMs);
-      afterMutation();
-      renderScreen();
-      flushAchievements();
+      afterMutation({ redraw: true });
       return res;
     },
     openSkill(id) { ui.tab = 'skills'; ui.skillId = id; renderScreen(); },
@@ -362,51 +368,38 @@ function boot() {
         b.setAttribute('aria-selected', b.dataset.tab === 'journal' ? 'true' : 'false');
       }
       renderScreen();
-      flushAchievements();
+      afterMutation({ stamp: false });
     },
     ensureDailies() { ensureDailies(game, Date.now()); },
     rerollDailies() {
       const res = rerollDailies(game, Date.now());
       if (!res.ok) { toaster.push(res.error, 'warn'); return; }
       toaster.push('The embers shift.', 'info');
-      persist();
-      renderScreen();
-      flushAchievements();
+      afterMutation({ redraw: true });
     },
     claimDaily(id) {
       const res = claimDaily(game, id);
       if (!res.ok) { toaster.push(res.error, 'warn'); return; }
       toaster.push(`+${res.sparks} Radiance from a daily ember.`, 'success');
-      persist();
-      updateHud();
-      renderScreen();
-      flushAchievements();
+      afterMutation({ redraw: true });
     },
     unlockPerk(id) {
       const res = unlockPerk(game, id);
       if (!res.ok) { toaster.push(res.error, 'warn'); return; }
       toaster.push(`Star kindled: ${res.perk.name}.`, 'success');
       pushLog(game, `Kindled the star “${res.perk.name}”.`, game.stats.playtimeMs);
-      persist();
-      updateHud();
-      renderScreen();
-      flushAchievements();
+      afterMutation({ redraw: true });
     },
     respecPerks() {
       const res = respecPerks(game);
       if (!res.ok) { toaster.push(res.error, 'warn'); return; }
       toaster.push(`Stars rearranged. ✦${res.cost} paid, ${res.refund} Radiance returned.`, 'success');
-      persist();
-      updateHud();
-      renderScreen();
-      flushAchievements();
+      afterMutation({ redraw: true });
     },
     equipTitle(title) {
       game.cosmetics ??= { titles: [], frames: ['plain'], lanternFrame: 'plain', activeTitle: null };
       game.cosmetics.activeTitle = title;
-      persist();
-      renderScreen();
-      flushAchievements();
+      afterMutation({ redraw: true });
     },
     startFight(enemyId) {
       const res = combat.startFight(game, enemyId);
@@ -463,6 +456,24 @@ function boot() {
   };
 
   // ── offline progress (boot + tab-hidden returns) ───────────────
+  function previewOfflineClaim(res) {
+    const preview = structuredClone(res.nextState);
+    preview.stats ??= {};
+    preview.stats.offlineClaims = (preview.stats.offlineClaims ?? 0) + 1;
+    const beforeL = preview.lumen;
+    const beforeR = preview.radiance ?? 0;
+    const newly = cascadeAchievements(preview, {
+      onUnlock(a) {
+        pushLog(preview, `Feat lit: ${a.name}.`, preview.stats.playtimeMs ?? 0);
+      },
+    });
+    return {
+      feats: newly,
+      lumen: preview.lumen - beforeL,
+      radiance: (preview.radiance ?? 0) - beforeR,
+    };
+  }
+
   function offerOffline() {
     const res = computeOfflineProgress({
       state: game,
@@ -470,25 +481,30 @@ function boot() {
       lastSavedAt: game.savedAt,
       actionsById: ACTIONS_BY_ID,
     });
-    if (!res.hasGains) return;
+    const featPreview = previewOfflineClaim(res);
+    if (!res.hasReport && featPreview.feats.length === 0) return;
+    // Don't pop a recap solely for the "claimed once" feat when nothing ran.
+    if (!res.hasReport && featPreview.feats.length === 1 && featPreview.feats[0].id === 't-off-1') {
+      return;
+    }
 
     const levels = [...res.levelUps];
-    showOfflineModal(modalRoot, res, {
+    showOfflineModal(modalRoot, { ...res, featPreview }, {
       onClaim: () => {
         const livePlay = game.stats.playtimeMs;
-        adopt(res.nextState);
+        game = hydrateState(res.nextState);
+        combat.ensureCombat(game);
+        rng = createRng(game.rngState ?? 1);
+        ensureDailies(game, Date.now());
+        applyMotionClass();
         const extraLive = Math.max(0, livePlay - (res.originalPlaytimeMs ?? livePlay));
         game.stats.playtimeMs += extraLive;
         game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
-        persist();
         pushLog(game,
           `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
           game.stats.playtimeMs);
         for (const lu of levels) bus.emit('levelup', lu);
-        flushAchievements();
-        persist();
-        updateHud();
-        renderScreen();
+        afterMutation({ redraw: true });
       },
     });
   }
@@ -501,14 +517,14 @@ function boot() {
       events.push(...combat.tickCombat(game, dtMs));
       game.stats.playtimeMs += dtMs;
       for (const ev of events) bus.emit(ev.type, ev);
-      flushAchievementsQuiet();
+      const newly = flushAchievementsQuiet();
+      if (events.length > 0 || newly > 0) persist({ stamp: true });
       updateHud();
       liveUpdate();
       sheetRepaint?.();
-      // Cycle / halt / stop mutate bank, lumen, xp — flush now so a reload
-      // cannot drop HUD-visible completions. Playtime-only ticks wait for
+      // Cycle / halt / stop / feat grants mutate wallet — flush now so a
+      // reload cannot drop HUD-visible work. Playtime-only ticks wait for
       // the 30s interval (or hide/pagehide).
-      if (events.length > 0) persist();
     },
   });
 
@@ -519,7 +535,7 @@ function boot() {
   document.getElementById('btn-settings').addEventListener('click', () => {
     game.stats.settingsOpens = (game.stats.settingsOpens ?? 0) + 1;
     showSettingsModal(modalRoot, ctx);
-    flushAchievements();
+    afterMutation({ stamp: false });
   });
 
   document.addEventListener('visibilitychange', () => {

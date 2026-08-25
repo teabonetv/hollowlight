@@ -136,6 +136,22 @@ export function evaluateAchievements(state) {
   return newly;
 }
 
+/**
+ * Keep evaluating until a pass unlocks nothing. Feats that grant titles/logs/lumen
+ * can trip later feats in the same player action (boot Cataloguer → Wear a Name
+ * → journal line → Write It Down).
+ */
+export function cascadeAchievements(state, { onUnlock, maxPasses = 12 } = {}) {
+  const all = [];
+  for (let i = 0; i < maxPasses; i++) {
+    const newly = evaluateAchievements(state);
+    if (!newly.length) break;
+    for (const a of newly) onUnlock?.(a);
+    all.push(...newly);
+  }
+  return all;
+}
+
 export function unlockAchievement(state, a) {
   state.achievements ??= { unlocked: {} };
   if (state.achievements.unlocked[a.id]) return;

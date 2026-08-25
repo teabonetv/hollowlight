@@ -48,6 +48,7 @@ export function computeOfflineProgress({
   /** @type {Record<string,{id,name,qty}>} */ const itemGains = {};
   const xpGains = {};
   const actionLines = [];
+  const idleNotes = [];
   let lumenGained = 0;
   let flameGained = 0;
   const levelsBefore = {};
@@ -62,13 +63,26 @@ export function computeOfflineProgress({
 
       // Whole cycles the window allows — at the camp-upgrade-adjusted
       // duration (same helper live play uses, so speeds apply offline too)…
-      let completions = Math.floor(creditedMs / effectiveDurationMs(next, action));
+      const timeCompletions = Math.floor(creditedMs / effectiveDurationMs(next, action));
+      let completions = timeCompletions;
       // …bounded by materials for every cycle cost.
+      let missingId = null;
       for (const c of action.costs ?? []) {
         const have = next.bank[c.id] ?? 0;
-        completions = Math.min(completions, Math.floor(have / c.qty));
+        const byMat = Math.floor(have / c.qty);
+        if (byMat < completions) {
+          completions = byMat;
+          missingId = c.id;
+        }
       }
-      if (completions <= 0) continue;
+      if (completions <= 0) {
+        if (timeCompletions > 0 && missingId) {
+          idleNotes.push({
+            actionId, name: action.name, completions: 0, missingId, timeCompletions,
+          });
+        }
+        continue;
+      }
 
       // settle costs
       for (const c of action.costs ?? []) {
@@ -129,6 +143,11 @@ export function computeOfflineProgress({
       next.stats.actionsDone = (next.stats.actionsDone ?? 0) + completions;
 
       actionLines.push({ actionId, name: action.name, completions, xp: xpGain });
+      if (missingId && completions < timeCompletions) {
+        idleNotes.push({
+          actionId, name: action.name, completions, missingId, timeCompletions,
+        });
+      }
     }
   }
 
@@ -161,6 +180,8 @@ export function computeOfflineProgress({
     },
     levelUps,
     nextState: next,
+    idleNotes,
     hasGains: actionLines.length > 0,
+    hasReport: actionLines.length > 0 || idleNotes.length > 0,
   };
 }
