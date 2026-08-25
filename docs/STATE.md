@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 1 GATE — critic v5 attempt 3 RUNNING |
-| Active lanes | F1 critic v5 attempt 3 in flight (fresh, blind; subagent sa-0-804a9d9e, dispatched 12:41 after attempts 1-2 died to provider 429s) |
+| Wave | 1 GATE — critic v5 PENDING (PAUSED by Luke 13:25) |
+| Active lanes | none in flight — v5 attempts 1-3 ALL died to provider daily-cap 429s (22:33, 12:38, ~13:21); partial evidence quarantined; resume = re-dispatch F1 critic v5 fresh/blind, same brief as attempt 3 |
 | Merged | F1 · F1b · F1c · **F1d @ 8aff8c8** (136/136 green; offline persistence hardened, sell-all confirm re-render-proof, boot watchdog live) |
-| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline/sell/boot) → F1d fixed. v5 attempts 1-2 died pre-verdict |
-| Next | v5 attempt-3 verdict → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ next gap lane |
+| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline/sell/boot) → F1d fixed. v5 attempts 1-3 died pre-verdict |
+| Next | EVENING RESUME (on Luke's ping): re-dispatch critic v5 → verdict gates Wave 1. NOTE: Hermes gateway reported DOWN as of 13:25 — heartbeat cron won't fire until `hermes gateway start`; drive resume manually from chat or start the gateway |
 
 ## Round log
 
