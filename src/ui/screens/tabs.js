@@ -4,23 +4,21 @@
 
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
-import { ITEMS, ITEM_CATEGORIES, ITEMS_BY_ID } from '../../game/data/items.js';
-import { ACTIONS } from '../../game/data/actions.js';
-import { TRACKS, TRACKS_BY_ID } from '../../game/data/upgrades.js';
+import { ITEMS, ITEM_CATEGORIES } from '../../game/data/items.js';
+import { TRACKS } from '../../game/data/upgrades.js';
 import { bankCount, bankSellValue } from '../../game/systems/bank.js';
 import * as camp from '../../game/systems/upgrades.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
 
-export function renderCampScreen(ctx) {
-  const { state } = ctx;
-  const totalCycles = Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
+function campCycles(state) {
+  return Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
+}
 
-  const stats = [
-    ['Lumen', formatNumber(state.lumen)],
-    ['Flame units', formatNumber(state.flame)],
-    ['Cycles worked', formatNumber(totalCycles)],
-    ['Time by the flame', formatDuration(state.stats.playtimeMs)],
-  ];
+export function renderCampScreen(ctx) {
+  const lumenVal = el('span', { class: 'stat-value' });
+  const flameVal = el('span', { class: 'stat-value' });
+  const cyclesVal = el('span', { class: 'stat-value' });
+  const timeVal = el('span', { class: 'stat-value' });
 
   const trackRefs = TRACKS.map((t) => buildTrackCard(ctx, t));
   const emptyBanner = el('div', { class: 'empty-state camp-empty' },
@@ -33,9 +31,10 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'camp-flavor' },
       'The last ember of the Hollow sleeps in your lantern. Feed it, and carry its light down the pilgrim road.'),
     el('div', { class: 'stat-grid' },
-      stats.map(([k, v]) => el('div', { class: 'stat-cell' },
-        el('span', { class: 'stat-value' }, v),
-        el('span', { class: 'stat-label' }, k)))),
+      el('div', { class: 'stat-cell' }, lumenVal, el('span', { class: 'stat-label' }, 'Lumen')),
+      el('div', { class: 'stat-cell' }, flameVal, el('span', { class: 'stat-label' }, 'Flame units')),
+      el('div', { class: 'stat-cell' }, cyclesVal, el('span', { class: 'stat-label' }, 'Cycles worked')),
+      el('div', { class: 'stat-cell' }, timeVal, el('span', { class: 'stat-label' }, 'Time by the flame'))),
     el('div', { class: 'camp-actions' },
       el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openSkill('emberkeeping') },
         'Tend the Flame'),
@@ -50,7 +49,16 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'footnote muted' },
       'Sell what you gather at the Bank; spend it here. Offline progress keeps working while you rest — up to 12 hours, honestly counted.'));
 
+  function paintStats() {
+    const s = ctx.state;
+    lumenVal.textContent = formatNumber(s.lumen);
+    flameVal.textContent = formatNumber(s.flame);
+    cyclesVal.textContent = formatNumber(campCycles(s));
+    timeVal.textContent = formatDuration(s.stats.playtimeMs);
+  }
+
   function update() {
+    paintStats();
     const anyOwned = TRACKS.some((t) => camp.upgradeLevel(ctx.state, t.id) > 0);
     emptyBanner.style.display = anyOwned ? 'none' : '';
     for (const r of trackRefs) r.update();
@@ -142,43 +150,59 @@ function buildTrackCard(ctx, track) {
 }
 
 export function renderBankScreen(ctx) {
-  const { state } = ctx;
-  let discovered = 0;
-  for (const it of ITEMS) if (bankCount(state.bank, it.id) > 0) discovered++;
+  const headerSub = el('p', { class: 'screen-sub' });
+  const tilePainters = [];
 
   const root = el('section', { class: 'screen' },
     el('header', { class: 'screen-head' },
       el('h1', { class: 'screen-title' }, 'Bank'),
-      el('p', { class: 'screen-sub' },
-        `${discovered} of ${ITEMS.length} items known · worth ✦${formatNumber(bankSellValue(state.bank))}`)));
+      headerSub));
 
   for (const [catId, catName] of ITEM_CATEGORIES) {
     const items = ITEMS.filter((i) => i.category === catId);
     if (!items.length) continue;
+    const tilesHost = el('div', { class: 'bank-grid' });
     const grid = el('div', { class: 'bank-cat' },
       el('h2', { class: 'bank-cat-name' }, catName),
-      el('div', { class: 'bank-grid' }));
+      tilesHost);
 
     for (const it of items) {
-      const qty = bankCount(state.bank, it.id);
-      grid.children[1].append(el('button', {
-        class: `bank-tile ${qty > 0 ? 'owned' : 'unowned'}`,
-        title: qty > 0 ? `Sell ${it.name}` : it.flavor,
-        onclick: () => qty > 0
-          ? ctx.openSellSheet(it.id)
-          : ctx.toast(`${it.name}: not yet found. ${it.flavor}`, 'info'),
-        'aria-label': `${it.name}, ${qty} owned${qty > 0 ? `, sells for ✦${it.sell} each` : ''}`,
-      },
-        el('span', { class: 'bank-qty' }, qty > 0 ? formatNumber(qty) : '—'),
-        el('span', { class: 'bank-name' }, it.name),
-        el('span', { class: 'bank-sell muted' }, `✦${it.sell}${it.tier > 1 ? ` · T${it.tier}` : ''}`)));
+      const qtyEl = el('span', { class: 'bank-qty' });
+      const sellEl = el('span', { class: 'bank-sell muted' });
+      const tile = el('button', {
+        onclick: () => {
+          const q = bankCount(ctx.state.bank, it.id);
+          if (q > 0) ctx.openSellSheet(it.id);
+          else ctx.toast(`${it.name}: not yet found. ${it.flavor}`, 'info');
+        },
+      }, qtyEl, el('span', { class: 'bank-name' }, it.name), sellEl);
+      tilesHost.append(tile);
+
+      tilePainters.push(() => {
+        const qty = bankCount(ctx.state.bank, it.id);
+        tile.className = `bank-tile ${qty > 0 ? 'owned' : 'unowned'}`;
+        tile.title = qty > 0 ? `Sell ${it.name}` : it.flavor;
+        tile.setAttribute('aria-label',
+          `${it.name}, ${qty} owned${qty > 0 ? `, sells for ✦${it.sell} each` : ''}`);
+        qtyEl.textContent = qty > 0 ? formatNumber(qty) : '—';
+        sellEl.textContent = `✦${it.sell}${it.tier > 1 ? ` · T${it.tier}` : ''}`;
+      });
     }
     root.append(grid);
   }
 
   root.append(el('p', { class: 'footnote muted' },
     'Tap a lit stack to sell it — every coin goes back into the camp.'));
-  return { node: root, update: () => {} };
+
+  function update() {
+    let discovered = 0;
+    for (const it of ITEMS) if (bankCount(ctx.state.bank, it.id) > 0) discovered++;
+    headerSub.textContent =
+      `${discovered} of ${ITEMS.length} items known · worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
+    for (const paint of tilePainters) paint();
+  }
+  update();
+  return { node: root, update };
 }
 
 const SETTLEMENTS = [

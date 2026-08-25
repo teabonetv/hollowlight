@@ -24,6 +24,7 @@ import { sellItems } from '../game/systems/bank.js';
 
 import { el, clear } from './dom.js';
 import { icon } from './icons.js';
+import { paintHud } from './hud.js';
 import { createToaster } from './toast.js';
 import { openModal, showOfflineModal, showSettingsModal, showSellSheet } from './modals.js';
 import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
@@ -140,34 +141,16 @@ function boot() {
   });
 
   // ── HUD ────────────────────────────────────────────────────────
-  // Lumen counts UP to its new value after sells/purchases (F1c feedback);
-  // reduced motion skips straight to the number.
-  let shownLumen = null;
-  let lumenAnimId = 0;
-  function paintLumen(v) {
-    hudLumen.textContent = `✦ ${formatNumber(v)}`;
-  }
+  // Snap to the live save. A rAF count-up used to restart on every tick and
+  // leave the pills mid-lerp while hollowlight.save was already correct.
   function updateHud() {
-    const target = game.lumen;
-    if (shownLumen === null || shownLumen === target || game.settings.reducedMotion) {
-      shownLumen = target;
-      paintLumen(target);
-    } else {
-      startLumenCountUp(shownLumen, target);
-    }
-    hudFlame.textContent = `${formatNumber(game.flame)} flame`;
+    paintHud(hudLumen, hudFlame, game);
   }
-  function startLumenCountUp(from, to) {
-    cancelAnimationFrame?.(lumenAnimId);
-    const t0 = performance.now();
-    const DUR_MS = 450;
-    const frame = (t) => {
-      const p = Math.min(1, (t - t0) / DUR_MS);
-      shownLumen = Math.round(from + (to - from) * p);
-      paintLumen(shownLumen);
-      if (p < 1) lumenAnimId = requestAnimationFrame(frame);
-    };
-    lumenAnimId = requestAnimationFrame(frame);
+
+  function afterMutation() {
+    persist();
+    updateHud();
+    liveUpdate();
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -220,7 +203,7 @@ function boot() {
     // ── F1c economy: selling + Keeper's Camp upgrades ──────────────
     sell(itemId, qty) {
       const res = sellItems(game, itemId, qty);
-      if (res.ok) { persist(); updateHud(); }
+      if (res.ok) afterMutation();
       return res;
     },
     openSellSheet(itemId) {
@@ -232,8 +215,7 @@ function boot() {
       const track = TRACKS_BY_ID[trackId];
       toaster.push(`${track.name} — ${res.tier.name}. The camp brightens.`, 'success');
       pushLog(game, `Upgraded ${track.name}: ${res.tier.name} (${camp.upgradeLevel(game, trackId)}/${track.tiers.length}).`, game.stats.playtimeMs);
-      persist();
-      updateHud();
+      afterMutation();
       renderScreen();
       return res;
     },
