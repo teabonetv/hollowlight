@@ -150,3 +150,29 @@ Satchel 3,760 ✦, Altar 6,440 ✦ — **14,180 ✦ all-in**.
 - Speed cap note: +30 % speed multiplies income AND sink affordability alike,
   so late-track players re-earn the next tier ~30 % faster — self-balancing,
   no death spiral in either direction.
+
+## Combat (lane S1)
+
+Real-time, two independent attack timers, encounter-seeded RNG (mulberry32).
+Fighting pauses while the tab is hidden — offline calc still only runs gathering
+actions, honestly. Death drops *carried Lumen* at the stretch; bank, XP, souls
+kept. Walk back (open that stretch) to recover.
+
+| Constant | Value | Why |
+|---|---|---|
+| Player HP | 36 + 4 × Combat level | First moth (16 HP) is a few exchanges; the Warden (90) is a food decision. |
+| Accuracy | 8 + 2×level + weapon | vs moth avoidance 11 ≈ 55% hit at level 1 with the wick-knife — misses matter. |
+| Avoidance | round(7 + 1.5×level) | You get hit. Eating is not optional on the Cur / Warden. |
+| Hit chance | clamp(0.20, 0.95, 0.12 + 0.88·acc/(acc+avo)) | Never a coin-flip void; never a sure thing. |
+| Weakness / resist | ×1.18 / ×0.86 | Style swap is a real DPS lever on every card (weakness listed on the hunt). |
+| Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. |
+| Unarmed Shot / Rite | slower, lower max | You *can* swap styles day one; you *want* the matching drop. |
+| Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Dry lantern: 2 fog-bite / 2 s and ×0.85 hit chance. |
+| Lantern-loaf | +14 HP | Eat-now-or-one-more-hit. Pale-cap +8 and fogwort +5 are forageable — gathering feeds combat. |
+| Auto-eat / auto-brew | wired, locked | Honest copy; a later camp purchase (S2) will unlock the thresholds. |
+| Hearthway XP | moth 11 → crawler 24 | ~7 min to Combat 5 on mixed hunts; Warden at 5 stretch-kills. |
+| Vigil T1 | 8 pale-things, ✦28 + 4 souls + 48 XP | Minutes, not hours; later tiers 14 / 22 / 32 / 44 / 60. |
+| Guardian stir | 5 kills on the stretch (Hearthway) | The Warden is fightable in the first session without fake-unlocking the map. |
+| Later zones | beacon + Combat level (8…80) | Listed on the stretch. Unkindled copy is the lock, not a greyed mystery. |
+
+Starter combat kit (on top of F1 bank): 8 lantern-loaf, 6 wick-oil, 1 wick-knife. Lumen still 20 — dying on the fog-line is a walk-back, not a wipe.

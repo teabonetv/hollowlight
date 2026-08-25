@@ -738,4 +738,70 @@ html.reduced-motion *::after {
 .gold { color: var(--gold-hi); }
 .sell-actions { display: flex; gap: 8px; margin-bottom: 8px; }
 .sell-actions .btn { flex: 1; min-height: 46px; }
-.sell-actions + .btn { min-height: 46px; }
+/* ── Combat (S1) ───────────────────────────────────────────── */
+.combat-root { display: flex; flex-direction: column; gap: 14px; }
+.combat-intro { margin: 0; font-style: italic; }
+.combat-meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.combat-h { margin-top: 8px; }
+.zone-chips {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.chip-btn {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.chip-btn.on { border-color: var(--gold-lo); color: var(--gold-hi); background: rgba(217, 164, 65, 0.12); }
+.chip-btn.locked { opacity: 0.55; }
+.hunt-list { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.boss-card { border-color: rgba(217, 164, 65, 0.4); }
+.combat-death { border-color: rgba(192, 86, 79, 0.45); }
+.combat-fight { display: flex; flex-direction: column; gap: 12px; }
+.fighter { display: flex; flex-direction: column; gap: 6px; }
+.fighter-head { display: flex; justify-content: space-between; gap: 8px; }
+.hp-you { background: linear-gradient(90deg, #6d8a4a, var(--ok) 70%, #c5e0b0); box-shadow: 0 0 10px rgba(127, 165, 109, 0.35); }
+.hp-foe { background: linear-gradient(90deg, #8a3e3a, var(--danger) 70%, #eda49d); box-shadow: 0 0 10px rgba(192, 86, 79, 0.3); }
+.atk-fill { background: linear-gradient(90deg, var(--line), var(--gold-lo)); box-shadow: none; }
+.style-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.style-btn { min-height: 48px; padding: 8px 6px; }
+.eat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.eat-btn { min-height: 48px; font-size: 12.5px; text-align: center; }
+.oil-line { margin: 0; font-size: 13px; }
+.oil-line.danger { color: #eda49d; }
+.combat-keep { margin-left: 0; }
+.combat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+.log-h {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.log-line { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--muted); }
+.log-line.log-hit { color: var(--gold-hi); }
+.log-line.log-hurt, .log-line.log-death, .log-line.log-fog { color: #eda49d; }
+.log-line.log-kill, .log-line.log-vigil { color: var(--ok); }
+.log-line.log-telegraph { color: var(--gold); font-style: italic; }
+.log-line.log-eat, .log-line.log-oil { color: #c5d4e8; }
+

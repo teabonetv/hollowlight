@@ -4,11 +4,15 @@
 
 import { SAVE_VERSION } from '../core/save.js';
 import { SKILLS } from './data/skills.js';
+import { createCombatState } from './systems/combat.js';
 
 export const STARTER_BANK = {
   tinderscrap: 30,
   rushwick: 5,
   fogwort: 4,
+  'lantern-loaf': 8,
+  'wick-oil': 6,
+  'wick-knife': 1,
 };
 
 /**
@@ -46,6 +50,11 @@ export function createState({ nowMs = 0, rngSeed = 1 } = {}) {
     // Keeper's Camp upgrade levels, keyed by track id (systems/upgrades.js).
     // Missing on pre-F1c saves; every read defaults to level 0.
     campUpgrades: {},
+
+    // Combat (lane S1). Missing on pre-S1 saves; ensureCombat() fills defaults.
+    souls: 0,
+    beacons: { kindled: ['hearthway'] },
+    combat: createCombatState(),
 
     settings: {
       reducedMotion: false, // app boot syncs this with the media query once
