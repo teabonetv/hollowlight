@@ -23,7 +23,8 @@ export const PERKS = [
     branch: 'origin',
     cost: 1,
     requires: [],
-    effects: [{ stat: 'xp', value: 0.01 }],
+    // +5% so Tend the Flame's rounded grant moves (14 → 15). +1% stayed 14 XP.
+    effects: [{ stat: 'xp', value: 0.05 }],
   },
 
   // ── Wick: action speed ────────────────────────────────────────

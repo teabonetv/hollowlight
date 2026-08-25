@@ -240,8 +240,11 @@ export function actionStatus(state, actionId) {
   const active = state.actions.active[actionId];
   const locked = !action || !skill || skill.level < action.unlockLevel;
   const affordable = bank.canAfford(state.bank, action?.costs ?? []);
+  const mastery = skill?.mastery[actionId] ?? { xp: 0, level: 1 };
   // Duration reflects Lantern & Wick speed so bars/ETAs match real ticks.
   const durationMs = action ? mods.effectiveDurationMs(state, action) : 0;
+  const xpMult = action ? mods.xpGrantMultiplier(state, mastery.level) : 1;
+  const xpRaw = action ? action.xp * xpMult : 0;
   return {
     action,
     running: !!active,
@@ -254,6 +257,9 @@ export function actionStatus(state, actionId) {
     affordable,
     autoRestart: state.actions.autoRestart[actionId] ?? true,
     completed: state.actions.completed[actionId] ?? 0,
-    mastery: skill?.mastery[actionId] ?? { xp: 0, level: 1 },
+    mastery,
+    xpBase: action?.xp ?? 0,
+    xpRaw,
+    xpGrant: Math.round(xpRaw),
   };
 }

@@ -45,15 +45,25 @@ test('analytic match: 1h away tending the flame with ample tinder', () => {
   assert.equal(res.gains.xp.emberkeeping, Math.round(14 * 1.01) * 900);
 });
 
-test('offline respects materials: stops when the bank cannot pay', () => {
-  const s = stateTending(30);
-  const res = computeOfflineProgress({
-    state: s, nowMs: 12 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', () => {
+  const empty = stateTending(0);
+  const none = computeOfflineProgress({
+    state: empty, nowMs: H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
   });
-  const line = res.gains.actions.find((a) => a.actionId === 'tend-flame');
-  assert.equal(line.completions, 30, 'only 30 cycles affordable');
-  assert.ok(!(res.nextState.bank.tinderscrap < 0));
+  assert.equal(none.hasGains, false);
+  assert.equal(none.hasReport, true);
+  assert.equal(none.idleNotes[0].missingId, 'tinderscrap');
+  assert.equal(none.idleNotes[0].completions, 0);
+
+  const one = stateTending(1);
+  const res = computeOfflineProgress({
+    state: one, nowMs: H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(res.gains.actions[0].completions, 1);
+  assert.equal(res.idleNotes[0].missingId, 'tinderscrap');
+  assert.equal(res.idleNotes[0].completions, 1);
 });
+
 
 test('offline respects the explicit cap and flags it honestly', () => {
   const s = stateTending(1_000_000);

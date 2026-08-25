@@ -52,13 +52,22 @@ export function openModal(mount, { title, body, actions = [], persistent = false
 
 /** "While you were away…" — honest, capped, per-action breakdown. */
 export function showOfflineModal(mount, summary, { onClaim }) {
-  const { awayMs, creditedMs, capped, gains } = summary;
+  const { awayMs, creditedMs, capped, gains, idleNotes = [], featPreview } = summary;
   const rows = [];
 
   for (const line of gains.actions) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, line.name),
       el('span', { class: 'offline-detail' }, `×${formatNumber(line.completions)} · +${formatNumber(line.xp)} XP`)));
+  }
+  for (const note of idleNotes) {
+    const need = itemName(note.missingId) ?? note.missingId;
+    const why = note.completions > 0
+      ? `Stopped after ×${formatNumber(note.completions)} — out of ${need}.`
+      : `No cycles — out of ${need}.`;
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, note.name),
+      el('span', { class: 'offline-detail muted' }, why)));
   }
   if (gains.lumen > 0) {
     rows.push(el('div', { class: 'offline-line' },
@@ -74,6 +83,20 @@ export function showOfflineModal(mount, summary, { onClaim }) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, itemName(item.id) ?? item.name ?? item.id),
       el('span', { class: 'offline-detail' }, `+${formatNumber(item.qty)}`)));
+  }
+  if (featPreview?.lumen > 0 || featPreview?.radiance > 0 || (featPreview?.feats?.length ?? 0) > 0) {
+    const bits = [];
+    if (featPreview.lumen > 0) bits.push(`+${formatNumber(featPreview.lumen)} Lumen`);
+    if (featPreview.radiance > 0) bits.push(`+${formatNumber(featPreview.radiance)} Radiance`);
+    const names = (featPreview.feats ?? []).map((a) => a.name).slice(0, 4).join(', ');
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, 'Feats on Claim'),
+      el('span', { class: 'offline-detail gold' },
+        bits.length ? bits.join(' · ') : 'titles'),
+    ));
+    if (names) {
+      rows.push(el('p', { class: 'muted small' }, names));
+    }
   }
 
   const body = el('div', {},
