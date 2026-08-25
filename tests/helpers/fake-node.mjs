@@ -63,6 +63,7 @@ export class FakeNode {
   contains(n) { return n !== null && this._walk((m) => m === n); }
   setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'value') this.value = v; }
   getAttribute(k) { return this.attrs[k] ?? null; }
+  removeAttribute(k) { delete this.attrs[k]; }
   addEventListener(type, fn) { (this._listeners[type] ??= []).push(fn); }
   removeEventListener(type, fn) {
     this._listeners[type] = (this._listeners[type] ?? []).filter((f) => f !== fn);

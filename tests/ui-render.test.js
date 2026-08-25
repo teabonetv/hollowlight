@@ -61,7 +61,8 @@ test('playable skill detail renders action cards with live controls', () => {
   const fill = cards[0].querySelector('.bar-fill');
   assert.ok(fill, 'progress bar fill present');
   const time = cards[0].querySelector('.bar-time');
-  assert.match(time.textContent ?? '', /\/ cycle/, 'running action shows cycle length, not remaining ETA');
+  assert.match(time.textContent ?? '', /left/, 'running action ticks remaining time');
+  assert.match(time.textContent ?? '', /\/ cycle/, 'and still names cycle length');
 });
 
 test('locked action card communicates its level gate', () => {

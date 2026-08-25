@@ -3,7 +3,7 @@
 
 import { el, clear } from './dom.js';
 import { formatDuration, formatNumber } from '../core/format.js';
-import { OFFLINE_CAP_HOURS } from '../core/offline.js';
+import { OFFLINE_CAP_HOURS, formatRecapLine } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
 import { createItemInspector } from './item-inspector.js';
@@ -52,22 +52,16 @@ export function openModal(mount, { title, body, actions = [], persistent = false
 
 /** "While you were away…" — honest, capped, per-action breakdown. */
 export function showOfflineModal(mount, summary, { onClaim }) {
-  const { awayMs, creditedMs, capped, gains, idleNotes = [], featPreview } = summary;
+  const { awayMs, creditedMs, capped, gains, idleNotes = [], recapLines, featPreview } = summary;
   const rows = [];
-
-  for (const line of gains.actions) {
+  const actionRecap = recapLines ?? [
+    ...gains.actions,
+    ...idleNotes,
+  ];
+  for (const line of actionRecap) {
+    const text = formatRecapLine(line, (id) => itemName(id) ?? id);
     rows.push(el('div', { class: 'offline-line' },
-      el('span', { class: 'offline-name' }, line.name),
-      el('span', { class: 'offline-detail' }, `×${formatNumber(line.completions)} · +${formatNumber(line.xp)} XP`)));
-  }
-  for (const note of idleNotes) {
-    const need = itemName(note.missingId) ?? note.missingId;
-    const why = note.completions > 0
-      ? `Stopped after ×${formatNumber(note.completions)} — out of ${need}.`
-      : `No cycles — out of ${need}.`;
-    rows.push(el('div', { class: 'offline-line' },
-      el('span', { class: 'offline-name' }, note.name),
-      el('span', { class: 'offline-detail muted' }, why)));
+      el('span', { class: 'offline-name' }, text)));
   }
   if (gains.lumen > 0) {
     rows.push(el('div', { class: 'offline-line' },

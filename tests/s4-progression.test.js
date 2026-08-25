@@ -22,7 +22,8 @@ import { statsRows, totalCycles, recordCycle } from '../src/game/systems/stats.j
 import { completeCycle, startAction, tickActions, actionStatus } from '../src/game/systems/action-runner.js';
 import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { computeOfflineProgress } from '../src/core/offline.js';
-import { nextWants, totalCompletion } from '../src/game/systems/completion.js';
+import { nextWants, totalCompletion, logCategoryStats } from '../src/game/systems/completion.js';
+import { TAB_OPEN_FEAT_IDS } from '../src/game/data/achievements.js';
 import { serializeSave, deserializeSave } from '../src/core/save.js';
 
 test('S4 content volume: ≥60 achievements and 40 constellation perks', () => {
@@ -89,6 +90,16 @@ test('daily embers: 3 tasks, one reroll, second reroll refused, new UTC day refr
 
   const again = rerollDailies(s, noon);
   assert.equal(again.ok, false);
+
+  // New day restores the reroll; claimed ids must survive a same-day reroll.
+  const claimedSave = createState({ nowMs: 0, rngSeed: 3 });
+  ensureDailies(claimedSave, noon);
+  const keepId = claimedSave.dailies.tasks[0].id;
+  claimedSave.dailies.tasks[0].claimed = true;
+  const kept = rerollDailies(claimedSave, noon);
+  assert.equal(kept.ok, true);
+  assert.ok(claimedSave.dailies.tasks.some((t) => t.id === keepId && t.claimed),
+    'reroll must not wipe a claimed ember off today’s board');
 
   const nextDay = Date.UTC(2026, 7, 26, 12, 0, 0);
   ensureDailies(s, nextDay);
@@ -305,4 +316,30 @@ test('Kindling changes Tend the Flame from a 14 XP chip to a 15 XP grant', () =>
   const after = actionStatus(s, 'tend-flame');
   assert.equal(after.xpGrant, 15);
   assert.ok(after.xpGrant !== after.xpBase);
+});
+
+test('Drawn Wick rewrites Tend duration in the same eval (4.0s → 3.9s / cycle)', () => {
+  const s = createState({ nowMs: 0, rngSeed: 7 });
+  s.radiance = 10;
+  const before = actionStatus(s, 'tend-flame');
+  assert.equal(before.durationMs, 4000);
+  assert.equal(unlockPerk(s, 'kindling').ok, true);
+  assert.equal(unlockPerk(s, 'wick-1').ok, true);
+  const after = actionStatus(s, 'tend-flame');
+  assert.equal(after.durationMs, Math.round(4000 / 1.02));
+  assert.equal(after.durationMs, 3922);
+});
+
+test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats stay a small %', () => {
+  const s = createState({ nowMs: 0, rngSeed: 9 });
+  s.achievements.unlocked = Object.fromEntries(
+    TAB_OPEN_FEAT_IDS.map((id) => [id, { atMs: 0 }]),
+  );
+  const rows = logCategoryStats(s);
+  assert.deepEqual(rows.map((r) => r.name), ['Skills', 'Mastery', 'Items', 'Feats']);
+  const feats = rows.find((r) => r.id === 'feats');
+  assert.ok(feats.pct < 0.12, `tab-open feats must not be ~15% of Feats, got ${feats.pct}`);
+  const tot = totalCompletion(s);
+  assert.ok(tot.pct < 0.08, `headline must stay a small early %, got ${tot.pct}`);
+  assert.ok(Math.abs(tot.pct - 0.15) > 0.04);
 });

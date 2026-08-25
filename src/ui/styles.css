@@ -260,6 +260,7 @@ body {
 .btn-danger { border-color: rgba(192, 86, 79, 0.6); color: #eda49d; background: rgba(192, 86, 79, 0.08); }
 .btn-ghost { background: none; }
 .btn-disabled { color: var(--faint); cursor: default; }
+.btn[disabled], .btn[aria-disabled="true"] { color: var(--faint); cursor: default; }
 .btn-small { min-height: 44px; padding: 6px 14px; font-size: 13px; width: fit-content; }
 .btn-wide { width: 100%; }
 

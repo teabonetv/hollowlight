@@ -215,7 +215,7 @@ cycle. No skill, bank, or level is wiped to gain it (charter §4.9).
 | Constant | Value | Why |
 |---|---|---|
 | `RADIANCE_PER_XP` | 0.025 | 40 action-XP ≈ 1 spark. Tend the Flame (14 XP / 4 s) yields ~0.35 sparks/cycle → first star (`Kindling`, cost 1) in ~12 s of tending. Slow enough to stay prestige; fast enough that the grid is playable in the first session. |
-| Origin Kindling | +5% skill XP | +1% left Tend at `round(14 × 1.01 × 1.01) = 14`. +5% makes the live grant **14 → 15 XP**. Action cards show that grant; running actions show speed-adjusted `4.0s / cycle`, not remaining ETA. |
+| Origin Kindling | +5% skill XP | +1% left Tend at `round(14 × 1.01 × 1.01) = 14`. +5% makes the live grant **14 → 15 XP**. Action cards show that grant. Running actions show remaining time AND cycle length (`2.1s left · 4.0s / cycle`). Drawn Wick (+2% speed) rewrites the duration chip to **3.9s / cycle**. |
 | Perk costs | 1 → 30 | Origin 1; branch nodes 2–10; branch capstones 18; conjunctions 8–22; apex 30. Full grid ≈ 335 sparks ≈ **13.4k action-XP** — hours, not minutes. |
 | Respec | ✦25 × owned nodes | Refunds all spent Radiance; Lumen fee only. Skills/bank untouched. |
 | Effect stack | mastery → camp → radiance → achievement → mastery-hooks | Each layer is `×(1+bonus)`. Documented and unit-tested so live ticks, offline, and ETAs never disagree. |

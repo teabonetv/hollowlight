@@ -177,6 +177,7 @@ function buildActionCard(ctx, action) {
       xpText = `${(st.xpRaw).toFixed(1)} XP`;
     }
     yieldChips.append(el('span', { class: 'chip chip-xp' }, xpText));
+    yieldChips.append(el('span', { class: 'chip chip-time' }, `${formatSeconds(st.durationMs)} / cycle`));
   }
 
   function paintToggle() {
@@ -205,7 +206,10 @@ function buildActionCard(ctx, action) {
   function update() {
     const st = status();
     fill.style.width = st.running ? `${(st.frac * 100).toFixed(1)}%` : '0%';
-    timeLabel.textContent = `${formatSeconds(st.durationMs)} / cycle`;
+    const cycle = `${formatSeconds(st.durationMs)} / cycle`;
+    timeLabel.textContent = st.running
+      ? `${formatSeconds(st.etaMs)} left · ${cycle}`
+      : cycle;
     paintChips();
     masteryBadge.textContent = `Mastery ${st.mastery.level}`;
     const hook = nextMasteryHook(action.id, st.mastery.level);

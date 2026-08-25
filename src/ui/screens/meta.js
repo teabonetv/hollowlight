@@ -11,8 +11,8 @@ import { canUnlock, respecCostLumen, cheapestAvailable } from '../../game/system
 import { isUnlocked } from '../../game/systems/achievements.js';
 import { canReroll, taskProgress } from '../../game/systems/dailies.js';
 import {
-  categoryStats, totalCompletion, achievementCompletion, perkCompletion,
-  closestAchievement,
+  totalCompletion, achievementCompletion,
+  closestAchievement, logCategoryStats,
 } from '../../game/systems/completion.js';
 import { statsRows } from '../../game/systems/stats.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
@@ -47,9 +47,7 @@ function subnav(ctx, current) {
 function renderOverview(ctx) {
   const { state } = ctx;
   const tot = totalCompletion(state);
-  const ach = achievementCompletion(state);
-  const perks = perkCompletion(state);
-  const cats = categoryStats(state);
+  const logCats = logCategoryStats(state);
   const next = closestAchievement(state);
   const perk = cheapestAvailable(state);
 
@@ -76,19 +74,19 @@ function renderOverview(ctx) {
       el('div', { class: 'complete-bar bar bar-lg' },
         el('span', { class: 'bar-fill', style: `width:${(tot.pct * 100).toFixed(1)}%` })),
       el('p', { class: 'muted small' },
-        `Feats ${ach.done}/${ach.total} · Stars ${perks.done}/${perks.total}`)),
+        logCats.map((c) => `${c.name} ${Math.floor(c.pct * 100)}%`).join(' · '))),
     el('div', { class: 'want-list' },
       perk ? wantRow('Next star', perk.name, `${perk.cost} Radiance`, () => ctx.openAlmanac('stars')) : null,
       next ? wantRow('Next feat', next.name, next.desc, () => ctx.openAlmanac('achievements')) : null,
       wantRow('Daily embers', 'Three tasks, one reroll', 'No streak. No punishment.', () => ctx.openAlmanac('dailies'))),
-    el('h2', { class: 'section-title' }, 'By category'),
+    el('h2', { class: 'section-title' }, 'Completion log'),
     el('div', { class: 'cat-list' },
-      cats.map((c) => el('button', {
+      logCats.map((c) => el('button', {
         class: 'cat-row',
-        onclick: () => ctx.openAlmanac('achievements'),
+        onclick: () => ctx.openAlmanac(c.id === 'feats' ? 'achievements' : 'overview'),
       },
         el('span', { class: 'cat-name' }, c.name),
-        el('span', { class: 'cat-pct' }, `${Math.floor(c.pct * 100)}%`),
+        el('span', { class: 'cat-pct' }, `${Math.floor(c.pct * 100)}% · ${c.done}/${c.total}`),
         el('span', { class: 'bar bar-mini cat-bar' },
           el('span', { class: 'bar-fill', style: `width:${(c.pct * 100).toFixed(1)}%` }))))),
     el('h2', { class: 'section-title' }, 'Journal'),
@@ -246,7 +244,11 @@ function renderDailies(ctx) {
   ctx.ensureDailies?.();
   const { state } = ctx;
   const pack = state.dailies;
-  const cards = (pack?.tasks ?? []).map((t) => dailyCard(ctx, t));
+  const list = el('div', { class: 'daily-list' });
+  const rerollBtn = el('button', {
+    class: 'btn btn-wide btn-ghost',
+    onclick: () => ctx.rerollDailies(),
+  }, '');
 
   const root = el('section', { class: 'screen almanac' },
     el('header', { class: 'screen-head' },
@@ -255,19 +257,39 @@ function renderDailies(ctx) {
     subnav(ctx, 'dailies'),
     el('p', { class: 'muted' },
       'Miss a day and nothing breaks. Tomorrow’s stars are simply different.'),
-    el('div', { class: 'daily-list' }, cards),
-    el('button', {
-      class: `btn btn-wide ${canReroll(state) ? 'btn-ghost' : 'btn-ghost btn-disabled'}`,
-      onclick: () => ctx.rerollDailies(),
-    }, canReroll(state) ? 'Reroll once' : 'Already rerolled today'));
+    list,
+    rerollBtn);
 
-  return { node: root, update: () => {} };
+  function paint() {
+    ctx.ensureDailies?.();
+    const live = ctx.state.dailies;
+    clear(list);
+    for (const t of live?.tasks ?? []) list.append(dailyCard(ctx, t));
+    const ok = canReroll(ctx.state);
+    rerollBtn.className = `btn btn-wide ${ok ? 'btn-ghost' : 'btn-ghost btn-disabled'}`;
+    rerollBtn.textContent = ok ? 'Reroll once' : 'Already rerolled today';
+    if (ok) rerollBtn.removeAttribute?.('disabled');
+    else rerollBtn.setAttribute('disabled', 'true');
+  }
+  paint();
+
+  return { node: root, update: paint };
 }
 
 function dailyCard(ctx, task) {
   const def = DAILY_POOL_BY_ID[task.id];
   const p = taskProgress(ctx.state, task);
-  return el('article', { class: `card daily-card ${task.claimed ? 'daily-claimed' : p.done ? 'daily-ready' : ''}` },
+  const claimed = !!task.claimed;
+  const ready = !claimed && p.done;
+  const idle = !claimed && !p.done;
+  const btn = el('button', {
+    class: `btn btn-wide ${claimed ? 'btn-ghost btn-disabled' : ready ? 'btn-primary' : 'btn-ghost btn-disabled'}`,
+    disabled: (claimed || idle) ? 'true' : undefined,
+    'aria-disabled': claimed || idle ? 'true' : 'false',
+    onclick: () => { if (!claimed && ready) ctx.claimDaily(task.id); },
+  }, claimed ? 'Claimed' : ready ? 'Claim sparks' : 'In progress');
+
+  return el('article', { class: `card daily-card ${claimed ? 'daily-claimed' : ready ? 'daily-ready' : ''}` },
     el('h3', { class: 'perk-name' }, def?.label ?? task.id),
     el('p', { class: 'muted' }, def?.hint ?? ''),
     el('div', { class: 'xp-block' },
@@ -276,10 +298,7 @@ function dailyCard(ctx, task) {
         el('span', { class: 'chip chip-gold' }, `${task.reward} Radiance`)),
       el('div', { class: 'bar' },
         el('span', { class: 'bar-fill', style: `width:${((p.need ? p.current / p.need : 0) * 100).toFixed(1)}%` }))),
-    el('button', {
-      class: `btn btn-wide ${task.claimed ? 'btn-ghost' : p.done ? 'btn-primary' : 'btn-ghost btn-disabled'}`,
-      onclick: () => ctx.claimDaily(task.id),
-    }, task.claimed ? 'Claimed' : p.done ? 'Claim sparks' : 'In progress'));
+    btn);
 }
 
 function renderLog(ctx) {

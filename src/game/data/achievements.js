@@ -3,6 +3,11 @@
 // in systems/achievements.js evaluates them. Combat/kills exist as honest
 // 0% rows until the combat lane ships.
 
+/** Opening a tab is a feat; it must not be a sixth of the log book. */
+export const TAB_OPEN_FEAT_IDS = Object.freeze([
+  'x-camp', 'x-map', 'x-journal', 'x-almanac', 'x-stars', 'x-settings',
+]);
+
 export const ACHIEVEMENT_CATEGORIES = [
   { id: 'skill', name: 'Craft' },
   { id: 'mastery', name: 'Mastery' },
