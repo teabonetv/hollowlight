@@ -1,6 +1,11 @@
 // App bootstrap and glue: loads/creates the save, runs the tick loop, wires
-// the tab bar + HUD, autosaves every 30s and on hide/unload, computes honest
-// offline gains on load, and routes engine events into toasts + journal.
+// the tab bar + HUD, flushes the save on gameplay mutations, autosaves playtime
+// every 30s and on hide/unload, computes honest offline gains on load, and
+// routes engine events into toasts + journal.
+//
+// Mutations (cycle complete, start/stop, sell, buy, claim) flush
+// hollowlight.save in the same frame. The 30s interval only covers playtime
+// ticking. Hide still persists; return still computes offline before restamp.
 //
 // Everything DOM-facing lives behind boot(); importing this module from node
 // stays side-effect free.
@@ -259,12 +264,12 @@ function boot() {
     showOfflineModal(modalRoot, res, {
       onClaim: () => {
         adopt(res.nextState);
-        persist();
         game.stats.offlineClaims++;
         pushLog(game,
           `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
           game.stats.playtimeMs);
         for (const lu of levels) bus.emit('levelup', lu);
+        persist();
         updateHud();
         renderScreen();
       },
@@ -280,6 +285,10 @@ function boot() {
       for (const ev of events) bus.emit(ev.type, ev);
       updateHud();
       liveUpdate();
+      // Cycle / halt / stop mutate bank, lumen, xp — flush now so a reload
+      // cannot drop HUD-visible completions. Playtime-only ticks wait for
+      // the 30s interval (or hide/pagehide).
+      if (events.length > 0) persist();
     },
   });
 

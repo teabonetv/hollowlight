@@ -111,6 +111,34 @@ test('starting an action through the UI puts it in the save immediately', () => 
   assert.equal(rawSave().state.actions.autoRestart['tend-flame'], true);
 });
 
+test('one Tend cycle flushes lumen/flame/completed to storage without waiting for autosave', () => {
+  const writesBefore = storageWrites;
+  // 5s of frames: first processFrame after start has elapsed 0, then 4.9s of
+  // ticks — enough for one 4s Tend cycle, not two. Do NOT fire the 30s interval.
+  pump(5_000);
+
+  const liveLumen = elements['hud-lumen'].textContent;
+  const liveFlame = elements['hud-flame'].textContent;
+  const s = rawSave().state;
+
+  assert.ok(storageWrites > writesBefore, 'cycle complete wrote the save backend');
+  assert.equal(s.lumen, 21);
+  assert.equal(s.flame, 2);
+  assert.equal(s.actions.completed['tend-flame'], 1);
+  assert.equal(liveLumen, '✦ 21', 'HUD lumen matches flushed save');
+  assert.equal(liveFlame, '2 flame', 'HUD flame matches flushed save');
+});
+
+test('reload-equivalent deserialize keeps the flushed Tend cycle', async () => {
+  const envelope = rawSave();
+  const { deserializeSave } = await import('../src/core/save.js');
+  const { state } = deserializeSave(JSON.stringify(envelope));
+  assert.equal(state.lumen, 21);
+  assert.equal(state.flame, 2);
+  assert.equal(state.actions.completed['tend-flame'], 1);
+  assert.ok(state.actions.active['tend-flame'], 'auto-restart still running after load');
+});
+
 test('ticks + autosave keep advancing the running action inside the save', () => {
   pump(5_000); // > one tend-flame cycle (4s)
   fireAutosaves();
