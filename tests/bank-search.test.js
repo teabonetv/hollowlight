@@ -33,8 +33,14 @@ test('filterItems: owned / pinned / category / query compose', () => {
   assert.ok(herbs.every((i) => i.category === 'herb'));
   assert.ok(herbs.some((i) => i.id === 'fogwort'));
 
-  const light = filterItems({ items: ITEMS, bank, tab: 'candle', query: '', pins: [] });
+  const light = filterItems({ items: ITEMS, bank: { 'tallow-candle': 1 }, tab: 'candle', query: '', pins: [] });
   assert.ok(light.every((i) => i.category === 'candle' || i.category === 'oil'));
+  assert.ok(light.length >= 1);
+
+  const ghosts = filterItems({ items: ITEMS, bank, tab: 'all', query: '', pins: [] });
+  assert.ok(ghosts.some((i) => (bank[i.id] ?? 0) === 0), 'Catalogue still lists unowned items');
+  const workingHerbs = filterItems({ items: ITEMS, bank, tab: 'herb', query: '', pins: [] });
+  assert.ok(workingHerbs.every((i) => (bank[i.id] ?? 0) > 0), 'category tabs are working-pack owned-only');
 });
 
 test('pins toggle and sort pinned items to the front of All', () => {

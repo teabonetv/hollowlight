@@ -12,7 +12,7 @@ import {
   TRACKS, TRACKS_BY_ID, validateTracks, trackLumenTotal,
 } from '../src/game/data/upgrades.js';
 import {
-  upgradeLevel, nextTier, costChips, canAffordUpgrade, buyUpgrade,
+  upgradeLevel, nextTier, costChips, canAffordUpgrade, buyUpgrade, upgradeNeedLabel,
   trackEffectFraction, speedMultiplier, yieldChance, xpMultiplier,
   effectiveDurationMs,
 } from '../src/game/systems/upgrades.js';
@@ -96,6 +96,17 @@ test('failed buys leave state untouched — no partial payments ever', () => {
   assert.equal(upgradeLevel(s, 'lantern-wick'), 0);
 
   function tinderKey(t) { return Object.keys(t.items)[0]; }
+});
+
+test('upgradeNeedLabel names Lumen or the missing stack — never a generic lie', () => {
+  const s = createState({ rngSeed: 21 });
+  const satchel = TRACKS_BY_ID['foraging-satchel'].tiers[0]; // ✦30 + Fogwort ×15
+  s.bank.fogwort = 15;
+  s.lumen = 20;
+  assert.equal(upgradeNeedLabel(s, satchel), 'Need ✦30');
+  s.lumen = 5000;
+  s.bank.fogwort = 4;
+  assert.equal(upgradeNeedLabel(s, satchel), 'Need Fogwort ×15');
 });
 
 test('tiers gate strictly in order and completed tracks refuse more buys', () => {

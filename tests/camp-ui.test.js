@@ -64,17 +64,28 @@ test('affordable tiers render an active Upgrade button wired to ctx.buyUpgrade',
   assert.equal(called, 'lantern-wick');
 });
 
-test('unaffordable tiers show "Need materials" and short chips flag what is missing', () => {
+test('unaffordable tiers name the missing resource — not a generic "Need materials"', () => {
   const s = createState({ rngSeed: 4 }); // starter bank: no palecap
   s.campUpgrades = {}; // fresh
   s.lumen += 5000;
   const scr = tabs.renderCampScreen(makeCtx(s));
   const cards = scr.node.querySelectorAll('.track-card');
-  // Satchel tier 1 costs fogwort ×15 — starter has none (fresh save).
+  // Satchel tier 1 costs fogwort ×15 — starter has 4.
   const satchelBtn = [...cards[1].querySelectorAll('button')][0];
-  assert.match(satchelBtn.textContent ?? '', /Need materials/);
+  assert.match(satchelBtn.textContent ?? '', /Need Fogwort ×15/);
+  assert.doesNotMatch(satchelBtn.textContent ?? '', /Need materials/);
   assert.ok(cards[1].querySelectorAll('.chip-short').length >= 1,
     'short chips highlighted');
+});
+
+test('upgrade button names Lumen when the bank already holds the goods', () => {
+  const s = createState({ rngSeed: 41 });
+  s.bank.fogwort = 15;
+  // starter lumen 20 < satchel's ✦30
+  const scr = tabs.renderCampScreen(makeCtx(s));
+  const satchelBtn = scr.node.querySelectorAll('.track-card')[1].querySelector('button');
+  assert.match(satchelBtn.textContent ?? '', /Need ✦30/);
+  assert.doesNotMatch(satchelBtn.textContent ?? '', /Need materials/);
 });
 
 test('empty banner hides once any track is upgraded', () => {
@@ -90,7 +101,7 @@ test('empty banner hides once any track is upgraded', () => {
 
 // ── bank tab + sell sheet ────────────────────────────────────────
 
-test('bank search hides non-matching tiles without dropping them from the DOM', () => {
+test('bank search keeps matching owned tiles and omits the rest', () => {
   const s = createState({ rngSeed: 11 });
   const scr = tabs.renderBankScreen(makeCtx(s));
   const search = scr.node.querySelector('.bank-search');
@@ -99,8 +110,10 @@ test('bank search hides non-matching tiles without dropping them from the DOM', 
   for (const fn of search._listeners.input ?? []) fn({ target: search });
   const fog = scr.node.querySelectorAll('.bank-tile').find((t) => /Fogwort/.test(t.textContent ?? ''));
   const ember = scr.node.querySelectorAll('.bank-tile').find((t) => /Emberstone/.test(t.textContent ?? ''));
-  assert.equal(fog.style.display, '');
-  assert.equal(ember.style.display, 'none');
+  const tinder = scr.node.querySelectorAll('.bank-tile').find((t) => /Tinderscrap/.test(t.textContent ?? ''));
+  assert.ok(fog, 'Fogwort remains when the query matches');
+  assert.equal(tinder, undefined, 'non-matching owned stacks leave the working grid');
+  assert.equal(ember, undefined, 'unowned Emberstone is not on the Owned grid');
 });
 
 test('tapping an owned bank stack opens the sell sheet; unowned still toasts', () => {
@@ -116,7 +129,9 @@ test('tapping an owned bank stack opens the sell sheet; unowned still toasts', (
   tinderTile.click();
   assert.deepEqual(opened, ['tinderscrap']);
 
-  const emberstone = tiles.find((t) => /Emberstone/.test(t.textContent ?? ''));
+  const catTab = scr.node.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
+  catTab.click();
+  const emberstone = scr.node.querySelectorAll('.bank-tile').find((t) => /Emberstone/.test(t.textContent ?? ''));
   emberstone.click();
   assert.equal(opened.length, 1, 'unowned item did not open sheet');
   assert.equal(toasts.length, 1, 'unowned item toasted instead');
