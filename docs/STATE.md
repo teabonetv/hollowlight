@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 1 GATE — critic v5 judging |
-| Active lanes | F1 critic v5 attempt 2 (fresh, blind) — attempt 1 died to provider rate-limit 2026-08-24 ~22:33, no verdict, nothing else affected |
+| Wave | 1 GATE — critic v5 attempt 3 PENDING |
+| Active lanes | none in flight — v5 attempts 1-2 both died to provider 429s (22:33, 12:38); partial evidence exists but is quarantined (critics must not read each other's work) |
 | Merged | F1 · F1b · F1c · **F1d @ 8aff8c8** (136/136 green; offline persistence hardened, sell-all confirm re-render-proof, boot watchdog live) |
-| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline never computes / sell-all feels dead / blank boot) → F1d fixed. F1d's honest finding: single-tab persistence was already correct; real killers were one-shot-completion clearing runner state with no event + fragile hide/return ordering + multi-tab clobber (structural, noted) |
-| Next | v5 verdict → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ next gap lane |
+| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline/sell/boot) → F1d fixed. v5: not yet delivered |
+| Next | NEXT TICK: re-dispatch F1 critic v5 (fresh, blind, same corrected-methodology brief as attempt 2) → verdict gates Wave 1 |
 
 ## Round log
 
