@@ -11,6 +11,7 @@ import * as runner from '../src/game/systems/action-runner.js';
 import { ALWAYS_STOCK } from '../src/game/data/store.js';
 import { isOnShelf, buyFromStore } from '../src/game/systems/store.js';
 import { serializeSave, deserializeSave } from '../src/core/save.js';
+import { FOG_GRACE_MS, OIL_CHECK_MS } from '../src/game/data/combat/consumables.js';
 
 test('roster meets charter scope: ≥40 regulars, 12 bosses, 12 zones', () => {
   assert.ok(REGULARS.length >= 40, `regulars ${REGULARS.length}`);
@@ -308,6 +309,35 @@ test('mid-fight serialize then deserialize keeps fighting and pauses until the H
   combat.resumeCombat(state);
   assert.equal(state.combat.paused, false);
   assert.equal(state.combat.fighting, true);
+});
+
+test('hydrate-pause is paired with a HUD route so import is not a freeze', () => {
+  const live = createState({ rngSeed: 4 });
+  combat.startFight(live, 'pale-moth', { encounterSeed: 1 });
+  const { state } = deserializeSave(serializeSave(live, 9));
+  assert.equal(state.combat.paused, true);
+  const ui = { tab: 'bank', skillId: null, campView: null };
+  assert.equal(combat.applyFightHudRoute(ui, state), true);
+  assert.equal(ui.tab, 'skills');
+  assert.equal(ui.skillId, 'combat');
+});
+
+test('fog hit penalty waits until the gather grace ends', () => {
+  const s = createState({ rngSeed: 5 });
+  s.bank['wick-oil'] = 0;
+  s.bank['lamp-oil'] = 0;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 3 });
+  s.combat.autoContinue = false;
+  s.combat.player.nextActMs = 60_000;
+  s.combat.foe.nextActMs = 60_000;
+  combat.tickCombat(s, OIL_CHECK_MS);
+  assert.equal(s.combat.lanternDry, true);
+  assert.equal(s.combat.fogGrace, true);
+  assert.equal(combat.fogHitPenaltyActive(s), false);
+  combat.tickCombat(s, FOG_GRACE_MS);
+  assert.equal(combat.fogHitPenaltyActive(s), true);
+  assert.equal(s.combat.fogGrace, false);
+  assert.ok(s.combat.log.some((l) => /fog bites/.test(l.text)));
 });
 
 test('emberkeeping still ticks while a fight is running', () => {

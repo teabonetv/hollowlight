@@ -82,12 +82,23 @@ function boot() {
     });
   }
 
+  function syncTabbar() {
+    for (const b of document.querySelectorAll('.tabbar button')) {
+      b.classList.toggle('active', b.dataset.tab === ui.tab);
+      b.setAttribute('aria-selected', b.dataset.tab === ui.tab ? 'true' : 'false');
+    }
+  }
+
   function adopt(stateObj) {
     game = hydrateState(stateObj);
     combat.ensureCombat(game);
     rng = createRng(game.rngState ?? 1);
     ensureDailies(game, Date.now());
     applyMotionClass();
+    // Import, boot, and Claim all hydrate-pause live fights — remount the HUD
+    // so the encounter does not stay frozen on Camp/Bank.
+    combat.applyFightHudRoute(ui, game);
+    syncTabbar();
     renderScreen();
     updateHud();
   }
@@ -556,13 +567,8 @@ function boot() {
     persist();
   }
   if (combat.fightWouldResume(game)) {
-    ui.tab = 'skills';
-    ui.skillId = 'combat';
-    ui.campView = null;
-    for (const b of document.querySelectorAll('.tabbar button')) {
-      b.classList.toggle('active', b.dataset.tab === 'skills');
-      b.setAttribute('aria-selected', b.dataset.tab === 'skills' ? 'true' : 'false');
-    }
+    combat.applyFightHudRoute(ui, game);
+    syncTabbar();
     renderScreen();
     screenRoot.scrollTop = 0;
   } else {

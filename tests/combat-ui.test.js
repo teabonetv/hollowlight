@@ -94,7 +94,9 @@ test('mid-fight deserialize re-enters the fight screen', () => {
   combat.startFight(live, 'pale-moth', { encounterSeed: 1 });
   const { state } = deserializeSave(serializeSave(live, 9));
   assert.equal(combat.fightWouldResume(state), true);
-  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const ui = { tab: 'bank', skillId: null, campView: null };
+  assert.equal(combat.applyFightHudRoute(ui, state), true);
+  const scr = renderSkillDetail(makeCtx(state), ui.skillId);
   assert.match(scr.node.textContent ?? '', /Pale Moth/);
   assert.match(scr.node.textContent ?? '', /Fall back/);
   assert.equal(state.combat.paused, false);

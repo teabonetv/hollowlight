@@ -46,6 +46,7 @@ export function createCombatState() {
     equipment: {}, // { weapon: itemId | null } — unset weapon auto-wields starter steel
     paused: false,
     dryAnnounced: false,
+    fogGrace: false,
   };
 }
 
@@ -69,6 +70,7 @@ export function ensureCombat(state) {
   }
   if (c.paused == null) c.paused = false;
   if (c.dryAnnounced == null) c.dryAnnounced = false;
+  if (c.fogGrace == null) c.fogGrace = false;
   return c;
 }
 
@@ -96,6 +98,20 @@ export function oilSipsRemaining(state) {
 export function fightWouldResume(state) {
   ensureCombat(state);
   return !!(state.combat.fighting && state.combat.foe);
+}
+
+/** Point any shell UI at Combat so import/boot remount the fight HUD (and unpause). */
+export function applyFightHudRoute(ui, state) {
+  if (!fightWouldResume(state) || !ui) return false;
+  ui.tab = 'skills';
+  ui.skillId = 'combat';
+  ui.campView = null;
+  return true;
+}
+
+export function fogHitPenaltyActive(state) {
+  ensureCombat(state);
+  return !!(state.combat.lanternDry && !state.combat.fogGrace);
 }
 
 export function resumeCombat(state) {
@@ -274,7 +290,7 @@ export function foeSpeedMs(enemy, phase) {
 function resolveAttack(state, rng, { attacker, defenderHpKey, defenderMax, accuracy, avoidance, minDmg, maxDmg, style, weakness, resist, label, verb }) {
   const c = state.combat;
   let chance = hitChance(accuracy, avoidance);
-  if (attacker === 'player' && c.lanternDry) chance *= FOG_HIT_MULT;
+  if (attacker === 'player' && fogHitPenaltyActive(state)) chance *= FOG_HIT_MULT;
   const hit = rng.next() < chance;
   if (!hit) {
     pushCombatLog(state, `${label === 'You' ? 'You miss.' : `${label} misses.`}`, 'miss');
@@ -385,6 +401,7 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
   state.combat.rngState = seed >>> 0;
   state.combat.lanternDry = false;
   state.combat.dryAnnounced = false;
+  state.combat.fogGrace = false;
   state.combat.oilMs = OIL_CHECK_MS;
   state.combat.fogMs = FOG_BITE_MS;
   state.combat.player.nextActMs = off.speedMs;
@@ -417,6 +434,7 @@ function consumeOilSip(state) {
     if (bank.bankCount(state.bank, id) > 0) {
       bank.bankPay(state.bank, [{ id, qty: 1 }]);
       state.combat.lanternDry = false;
+      state.combat.fogGrace = false;
       const interval = OILS[id].intervalMs;
       pushCombatLog(state, `The lantern drinks ${OILS[id].name}.`, 'oil');
       return interval;
@@ -425,6 +443,7 @@ function consumeOilSip(state) {
   state.combat.lanternDry = true;
   if (!state.combat.dryAnnounced) {
     state.combat.dryAnnounced = true;
+    state.combat.fogGrace = true;
     state.combat.fogMs = FOG_GRACE_MS;
     pushCombatLog(state, 'The lantern goes dry. The fog gathers — a few breaths before it bites.', 'fog');
   }
@@ -646,6 +665,7 @@ function tickOilAndFog(state, step, rng) {
   if (c.lanternDry) {
     c.fogMs -= step;
     if (c.fogMs <= 0) {
+      c.fogGrace = false;
       c.fogMs += FOG_BITE_MS;
       c.player.hp = Math.max(0, c.player.hp - FOG_BITE_DMG);
       pushCombatLog(state, `The dry lantern fails — fog bites for ${FOG_BITE_DMG}.`, 'fog');
