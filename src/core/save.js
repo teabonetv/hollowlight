@@ -8,10 +8,24 @@
 // deserialize walks them in order until the save reaches SAVE_VERSION.
 
 export const SAVE_KEY = 'hollowlight.save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 /** @type {Array<{from:number, migrate:(s:any)=>any}>} */
-export const MIGRATIONS = [];
+export const MIGRATIONS = [
+  {
+    from: 1,
+    migrate(state) {
+      return {
+        ...state,
+        bankPins: state.bankPins ?? [],
+        bankPresets: state.bankPresets ?? [],
+        store: state.store ?? { pressure: {}, pressureAt: {} },
+        lanternIntegrity: Number.isFinite(state.lanternIntegrity) ? state.lanternIntegrity : 100,
+        cosmetics: state.cosmetics ?? { bankTheme: 'default', unlocked: ['default'] },
+      };
+    },
+  },
+];
 
 export class SaveError extends Error {
   constructor(reason, detail) {

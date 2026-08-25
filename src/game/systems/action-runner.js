@@ -18,6 +18,7 @@ import { ITEMS_BY_ID } from '../data/items.js';
 import { levelFromXp } from '../../core/xp.js';
 import * as bank from './bank.js';
 import * as camp from './upgrades.js';
+import { applyEmberkeepingWear } from './repairs.js';
 
 /** +1% XP per mastery level of the running action (see balance-notes.md). */
 export const MASTERY_XP_BONUS_PER_LEVEL = 0.01;
@@ -114,6 +115,7 @@ export function completeCycle(state, action, rng) {
   }
 
   events.push({ type: 'cycle', actionId: action.id, gains: applied });
+  applyEmberkeepingWear(state, action);
   return { events };
 }
 

@@ -220,7 +220,7 @@ body {
 .btn-danger { border-color: rgba(192, 86, 79, 0.6); color: #eda49d; background: rgba(192, 86, 79, 0.08); }
 .btn-ghost { background: none; }
 .btn-disabled { color: var(--faint); cursor: default; }
-.btn-small { min-height: 38px; padding: 6px 14px; font-size: 13px; width: fit-content; }
+.btn-small { min-height: 44px; padding: 6px 14px; font-size: 13px; width: fit-content; }
 .btn-wide { width: 100%; }
 
 /* ── progress bars ─────────────────────────────────────────── */
@@ -739,3 +739,75 @@ html.reduced-motion *::after {
 .sell-actions { display: flex; gap: 8px; margin-bottom: 8px; }
 .sell-actions .btn { flex: 1; min-height: 46px; }
 .sell-actions + .btn { min-height: 46px; }
+
+/* ── S2 bank chrome ────────────────────────────────────────── */
+.bank-search {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px; /* iOS zoom guard */
+}
+.bank-search:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+.bank-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.bank-tab {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+.bank-tab.active {
+  border-color: rgba(217, 164, 65, 0.55);
+  color: var(--gold-hi);
+  background: rgba(217, 164, 65, 0.12);
+}
+.bank-pin { font-size: 11px; color: var(--gold); min-height: 0; line-height: 1; }
+.bank-tile.pinned { border-color: var(--gold); }
+
+.preset-actions { display: flex; flex-direction: column; gap: 8px; }
+.preset-list { display: flex; flex-direction: column; gap: 8px; }
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+}
+.preset-row span { flex: 1; min-width: 0; }
+
+.qty-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.qty-row .btn { min-height: 44px; padding: 8px 4px; font-size: 13px; }
+
+.trade-card { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.trade-rare { border-color: rgba(217, 164, 65, 0.4); }
+.camp-starve { padding: 10px 0; }
+.repair-kits { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.repair-row { display: flex; flex-direction: column; gap: 6px; }
+
+.theme-dusk .bank-tab.active { border-color: #7a8ab8; color: #c5d0f0; }
+.theme-choir .bank-tab.active { border-color: #c4a574; color: #f0e0c0; }
+.theme-ash .bank-tab.active { border-color: #888; color: #ddd; }
+.theme-gilt .bank-tab.active { border-color: var(--gold-hi); color: var(--gold-hi); }

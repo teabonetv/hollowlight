@@ -25,6 +25,7 @@ const { ACTIONS_BY_ID } = await import('../src/game/data/actions.js');
 const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
 const runner = await import('../src/game/systems/action-runner.js');
 const { sellItems, bankCount, bankSellValue } = await import('../src/game/systems/bank.js');
+const { liveSellUnit } = await import('../src/game/systems/store.js');
 const { buyUpgrade } = await import('../src/game/systems/upgrades.js');
 const { formatNumber } = await import('../src/core/format.js');
 const { paintHud } = await import('../src/ui/hud.js');
@@ -110,12 +111,14 @@ test('Sell 1 / 10 / All redraw HUD, camp cells, and Bank qty/worth without remou
   session.refresh();
   assertViewsMatchSave(session, { fogwortQty: 3290 });
 
+  const liveUnit = liveSellUnit(state, 'fogwort');
+  const lumenBeforeAll = state.lumen;
   const all = sellItems(state, 'fogwort', 3290);
   assert.equal(all.ok, true);
-  assert.equal(all.gained, 3290 * unit);
+  assert.equal(all.gained, 3290 * liveUnit);
   session.refresh();
   assertViewsMatchSave(session, { fogwortQty: 0 });
-  assert.equal(state.lumen, 20 + 3301 * unit);
+  assert.equal(state.lumen, lumenBeforeAll + all.gained);
 });
 
 test('a completed Tend cycle updates HUD + camp stats to the save (no remount)', () => {

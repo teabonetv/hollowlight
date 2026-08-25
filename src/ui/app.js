@@ -25,7 +25,11 @@ import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
-import { sellItems } from '../game/systems/bank.js';
+import { sellItems, togglePin as pinItem, savePreset as writePreset, applyPreset as usePreset,
+  deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot } from '../game/systems/bank.js';
+import * as storeSys from '../game/systems/store.js';
+import { offerItems } from '../game/systems/offerings.js';
+import { repairLantern as doRepair } from '../game/systems/repairs.js';
 
 import { el, clear } from './dom.js';
 import { icon } from './icons.js';
@@ -36,6 +40,7 @@ import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
 import {
   renderCampScreen, renderBankScreen, renderMapScreen, renderJournalScreen,
 } from './screens/tabs.js';
+import { renderStoreScreen } from './screens/store.js';
 
 const AUTOSAVE_MS = 30_000;
 
@@ -51,8 +56,9 @@ function boot() {
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
-  const ui = { tab: 'camp', skillId: null };
+  const ui = { tab: 'camp', skillId: null, campView: null };
   let liveUpdate = () => {};
+  let sheetRepaint = null;
   let rng = createRng(1);
 
   // ── save / load / adopt ────────────────────────────────────────
@@ -156,6 +162,7 @@ function boot() {
     persist();
     updateHud();
     liveUpdate();
+    sheetRepaint?.();
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -166,6 +173,7 @@ function boot() {
     if (ui.tab === 'bank') return renderBankScreen(ctx);
     if (ui.tab === 'map') return renderMapScreen(ctx);
     if (ui.tab === 'journal') return renderJournalScreen(ctx);
+    if (ui.campView === 'store') return renderStoreScreen(ctx);
     return renderCampScreen(ctx);
   }
 
@@ -179,6 +187,7 @@ function boot() {
   function setTab(tab) {
     ui.tab = tab;
     ui.skillId = null;
+    ui.campView = null;
     for (const b of document.querySelectorAll('.tabbar button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
       b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
@@ -212,7 +221,79 @@ function boot() {
       return res;
     },
     openSellSheet(itemId) {
-      showSellSheet(modalRoot, ctx, itemId);
+      const ref = showSellSheet(modalRoot, ctx, itemId);
+      sheetRepaint = () => ref?.repaint?.();
+      const orig = ref.close;
+      ref.close = () => { sheetRepaint = null; orig(); };
+    },
+    openStore() { ui.tab = 'camp'; ui.campView = 'store'; renderScreen(); },
+    backToCamp() { ui.campView = null; ui.tab = 'camp'; renderScreen(); },
+    storeBuy(itemId, qty) {
+      const res = storeSys.buyFromStore(game, itemId, qty);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
+      toaster.push(`Bought ${res.bought} for ✦${res.spent}.`, 'success');
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    storeSell(itemId, qty) {
+      const res = ctx.sell(itemId, qty);
+      if (res.ok) renderScreen();
+      return res;
+    },
+    buyKindlingBundle() {
+      const res = storeSys.buyKindlingBundle(game);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
+      toaster.push('Kindling bundle — eight handfuls of Tinderscrap.', 'success');
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    offer(itemId, qty) {
+      const res = offerItems(game, itemId, qty);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    repairLantern(kitId) {
+      const res = doRepair(game, kitId);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not repair.', 'warn'); return res; }
+      toaster.push(`Lantern ${res.integrity}/100.`, 'success');
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    togglePin(itemId) {
+      pinItem(game, itemId);
+      afterMutation();
+    },
+    savePreset(kind) {
+      const items = kind === 'gear' ? captureGearSnapshot(game.bank) : captureBankSnapshot(game.bank);
+      const name = kind === 'gear' ? 'Gear set' : 'Loadout';
+      writePreset(game, name, items, { kind: kind === 'gear' ? 'gear' : 'loadout' });
+      toaster.push(`${name} saved.`, 'success');
+      afterMutation();
+      renderScreen();
+    },
+    applyPreset(id) {
+      const res = usePreset(game, id);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      const miss = res.missing.length;
+      toaster.push(miss ? `Pinned. Missing ${miss} stacks.` : 'Loadout pinned — you have every stack.', miss ? 'warn' : 'success');
+      afterMutation();
+      renderScreen();
+    },
+    deletePreset(id) {
+      dropPreset(game, id);
+      afterMutation();
+      renderScreen();
+    },
+    buyTheme(themeId) {
+      const res = storeSys.buyTheme(game, themeId);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not dye.', 'warn'); return res; }
+      toaster.push(res.spent ? 'Tab dye unlocked. Cosmetic only.' : 'Tab dye equipped.', 'success');
+      afterMutation();
+      renderScreen();
+      return res;
     },
     buyUpgrade(trackId) {
       const res = camp.buyUpgrade(game, trackId);
@@ -285,6 +366,7 @@ function boot() {
       for (const ev of events) bus.emit(ev.type, ev);
       updateHud();
       liveUpdate();
+      sheetRepaint?.();
       // Cycle / halt / stop mutate bank, lumen, xp — flush now so a reload
       // cannot drop HUD-visible completions. Playtime-only ticks wait for
       // the 30s interval (or hide/pagehide).

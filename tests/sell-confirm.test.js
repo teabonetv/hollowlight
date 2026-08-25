@@ -24,10 +24,11 @@ if (!globalThis.navigator) globalThis.navigator = {};
 const { showSellSheet, sellConfirmPending, clearSellConfirm } =
   await import('../src/ui/modals.js');
 const { sellItems, needsSellConfirm } = await import('../src/game/systems/bank.js');
-const { ITEMS } = await import('../src/game/data/items.js');
+const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
 
-// A real item id so ITEMS_BY_ID lookups work.
-const ITEM = [...ITEMS].sort((a, b) => b.sell - a.sell)[0];
+// Non-unique staple — unique relics always confirm, which would skip the
+// "single tap at qty ≤ 25" regression. Fogwort sells for ✦3.
+const ITEM = ITEMS_BY_ID.fogwort;
 const SELL = ITEM.sell;
 
 function makeCtx(qty) {
@@ -55,9 +56,11 @@ function confirmBtn(mount) {
   return btns.find((b) => (b.className ?? '').includes('btn-wide'));
 }
 
-test('needsSellConfirm policy: above 25 needs a tap, at/below sells outright', () => {
+test('unique items always demand a confirm tap, even at qty 1', () => {
   assert.equal(needsSellConfirm(26), true);
   assert.equal(needsSellConfirm(25), false);
+  assert.equal(needsSellConfirm(1, { unique: true }), true);
+  assert.equal(needsSellConfirm(1), false);
 });
 
 test('first tap arms the confirm and shows the total; nothing sells yet', () => {

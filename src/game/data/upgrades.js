@@ -13,6 +13,8 @@
 // goal (minutes → hours → days); every number is justified in
 // src/game/data/balance-notes.md §"Keeper's Camp upgrade tracks".
 
+import { ITEMS_BY_ID } from './items.js';
+
 /** @type {Array<{id:string,name:string,desc:string,glyph:string,effect:string,perTier:number,cap:number,tiers:Array<{name:string,flavor:string,lumen:number,items?:Object<string,number>}>}>} */
 export const TRACKS = [
   {
@@ -95,8 +97,6 @@ export function trackLumenTotal(track) {
 /** Data sanity guard for tests/tools: ascending costs, sane effects, real items. */
 export function validateTracks() {
   const errors = [];
-  const known = new Set(['tinderscrap', 'bogmoss', 'cindercoal', 'fogwort', 'palecap',
-    'graveresin', 'rushwick', 'moonquartz', 'emberstone']);
   for (const t of TRACKS) {
     if (!Array.isArray(t.tiers) || t.tiers.length < 3) errors.push(`${t.id}: needs ≥3 tiers`);
     let prev = -Infinity;
@@ -106,7 +106,7 @@ export function validateTracks() {
       }
       prev = tier.lumen;
       for (const [id, qty] of Object.entries(tier.items ?? {})) {
-        if (!known.has(id)) errors.push(`${t.id}: tier ${i} references unknown item ${id}`);
+        if (!ITEMS_BY_ID[id]) errors.push(`${t.id}: tier ${i} references unknown item ${id}`);
         if (!(qty > 0)) errors.push(`${t.id}: tier ${i} item ${id} needs positive qty`);
       }
     }
