@@ -23,6 +23,8 @@ export const OIL_CHECK_MS = 8000;
 export const FOG_BITE_MS = 2000;
 export const FOG_BITE_DMG = 2;
 export const FOG_HIT_MULT = 0.85;
+/** First dry lantern in a fight: a breath before fog-bite, so Combat-1 is not a wipe. */
+export const FOG_GRACE_MS = 10000;
 
 export const AUTO_EAT_DEFAULT_THRESHOLD = 0.45;
 export const AUTO_BREW_DEFAULT_THRESHOLD = 0.30;

@@ -430,7 +430,14 @@ function boot() {
       return res;
     },
     setCombatStyle(styleId) {
-      return combat.setStyle(game, styleId);
+      const res = combat.setStyle(game, styleId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    equipWeapon(itemId) {
+      const res = combat.equipWeapon(game, itemId);
+      if (res.ok) afterMutation();
+      return res;
     },
     isReducedMotion: () => !!game.settings.reducedMotion,
     setReducedMotion(on) { game.settings.reducedMotion = !!on; persist(); applyMotionClass(); },
@@ -564,7 +571,19 @@ function boot() {
     applyMotionClass();
     persist();
   }
-  setTab('camp');
+  if (combat.fightWouldResume(game)) {
+    ui.tab = 'skills';
+    ui.skillId = 'combat';
+    ui.campView = null;
+    for (const b of document.querySelectorAll('.tabbar button')) {
+      b.classList.toggle('active', b.dataset.tab === 'skills');
+      b.setAttribute('aria-selected', b.dataset.tab === 'skills' ? 'true' : 'false');
+    }
+    renderScreen();
+    screenRoot.scrollTop = 0;
+  } else {
+    setTab('camp');
+  }
   // Boot guard for index.html's fallback screen (F1d Fix 3): the inline boot
   // watchdog reveals a retry screen if this flag isn't set within 8s.
   window.__HOLLOWLIGHT_BOOTED = true;
