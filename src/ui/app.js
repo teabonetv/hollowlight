@@ -52,6 +52,8 @@ import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
 import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
 
 const AUTOSAVE_MS = 30_000;
+const UI_KEY = 'hollowlight.ui';
+const UI_TABS = new Set(['camp', 'skills', 'bank', 'map', 'journal']);
 
 function boot() {
   // ── persistent pieces ──────────────────────────────────────────
@@ -104,10 +106,10 @@ function boot() {
   /** @returns true when this boot created a brand-new save */
   function loadOrInit() {
     const raw = storageGet(window.localStorage);
-    if (!raw) { adopt(freshGame()); return true; }
+    if (!raw) { adopt(freshGame(), { paint: false }); return true; }
     try {
       const { state } = deserializeSave(raw);
-      adopt(state);
+      adopt(state, { paint: false });
       return false;
     } catch (e) {
       const reason = e instanceof SaveError ? e.reason : 'unknown';
@@ -127,7 +129,7 @@ function boot() {
           },
         }, 'Begin again')],
       });
-      adopt(freshGame());
+      adopt(freshGame(), { paint: false });
       return true;
     }
   }
@@ -231,6 +233,56 @@ function boot() {
     liveUpdate = s.update ?? (() => {});
   }
 
+  function paintTabChrome(tab) {
+    for (const b of document.querySelectorAll('.tabbar button')) {
+      const on = b.dataset.tab === tab;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    }
+  }
+
+  function writeUiRoute() {
+    try {
+      window.localStorage.setItem(UI_KEY, JSON.stringify({
+        tab: ui.tab,
+        skillId: ui.skillId,
+        almanac: ui.almanac,
+        campView: ui.campView,
+      }));
+    } catch { /* quota / private mode */ }
+  }
+
+  function readUiRoute() {
+    try {
+      const raw = window.localStorage.getItem(UI_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function applyUiRoute(saved) {
+    if (!saved) return false;
+    if (!UI_TABS.has(saved.tab)) return false;
+    ui.tab = saved.tab;
+    ui.skillId = (saved.tab === 'skills' && saved.skillId && SKILL_BY_ID[saved.skillId])
+      ? saved.skillId
+      : null;
+    ui.almanac = typeof saved.almanac === 'string' ? saved.almanac : 'overview';
+    ui.campView = saved.tab === 'camp' && saved.campView === 'store' ? 'store' : null;
+    return true;
+  }
+
+  function showRoute() {
+    paintTabChrome(ui.tab);
+    renderScreen();
+    screenRoot.scrollTop = 0;
+    writeUiRoute();
+  }
+
   function setTab(tab) {
     ui.tab = tab;
     ui.skillId = null;
@@ -240,12 +292,7 @@ function boot() {
       game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
     }
     if (tab === 'map') game.stats.mapOpens = (game.stats.mapOpens ?? 0) + 1;
-    for (const b of document.querySelectorAll('.tabbar button')) {
-      b.classList.toggle('active', b.dataset.tab === tab);
-      b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
-    }
-    renderScreen();
-    screenRoot.scrollTop = 0;
+    showRoute();
     afterMutation({ stamp: false });
   }
 
@@ -277,8 +324,8 @@ function boot() {
       const orig = ref.close;
       ref.close = () => { sheetRepaint = null; orig(); };
     },
-    openStore() { ui.tab = 'camp'; ui.campView = 'store'; renderScreen(); },
-    backToCamp() { ui.campView = null; ui.tab = 'camp'; renderScreen(); },
+    openStore() { ui.tab = 'camp'; ui.campView = 'store'; showRoute(); },
+    backToCamp() { ui.campView = null; ui.tab = 'camp'; showRoute(); },
     storeBuy(itemId, qty) {
       const res = storeSys.buyFromStore(game, itemId, qty);
       if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
@@ -355,19 +402,21 @@ function boot() {
       afterMutation({ redraw: true });
       return res;
     },
-    openSkill(id) { ui.tab = 'skills'; ui.skillId = id; renderScreen(); },
-    openSkillsList() { ui.skillId = null; renderScreen(); },
+    openSkill(id) {
+      ui.tab = 'skills';
+      ui.skillId = id;
+      ui.campView = null;
+      showRoute();
+    },
+    openSkillsList() { ui.skillId = null; showRoute(); },
     almanacView: () => ui.almanac,
     openAlmanac(view = 'overview') {
       ui.tab = 'journal';
       ui.almanac = view;
+      ui.campView = null;
       if (view === 'stars') game.stats.starsOpens = (game.stats.starsOpens ?? 0) + 1;
       game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
-      for (const b of document.querySelectorAll('.tabbar button')) {
-        b.classList.toggle('active', b.dataset.tab === 'journal');
-        b.setAttribute('aria-selected', b.dataset.tab === 'journal' ? 'true' : 'false');
-      }
-      renderScreen();
+      showRoute();
       afterMutation({ stamp: false });
     },
     ensureDailies() { ensureDailies(game, Date.now()); },
@@ -439,6 +488,10 @@ function boot() {
       if (res.ok) afterMutation();
       return res;
     },
+    setCombatAutoContinue(on) {
+      combat.ensureCombat(game).autoContinue = !!on;
+      afterMutation();
+    },
     resumeCombat() {
       combat.resumeCombat(game);
       afterMutation();
@@ -460,7 +513,13 @@ function boot() {
     },
     resetGame() {
       try { window.localStorage.removeItem(SAVE_KEY); } catch {}
+      try { window.localStorage.removeItem(UI_KEY); } catch {}
+      ui.tab = 'camp';
+      ui.skillId = null;
+      ui.campView = null;
       adopt(freshGame());
+      paintTabChrome('camp');
+      writeUiRoute();
       persist();
       toaster.push('A new flame is kindled.', 'success');
     },
@@ -578,22 +637,22 @@ function boot() {
     applyMotionClass();
     persist();
   }
+  const restored = applyUiRoute(readUiRoute());
   if (combat.fightWouldResume(game)) {
-    ui.tab = 'skills';
-    ui.skillId = 'combat';
-    ui.campView = null;
-    for (const b of document.querySelectorAll('.tabbar button')) {
-      b.classList.toggle('active', b.dataset.tab === 'skills');
-      b.setAttribute('aria-selected', b.dataset.tab === 'skills' ? 'true' : 'false');
+    if (!restored || (ui.tab === 'skills' && ui.skillId === 'combat')) {
+      ui.tab = 'skills';
+      ui.skillId = 'combat';
+      ui.campView = null;
     }
-    renderScreen();
-    screenRoot.scrollTop = 0;
-    // Fight HUD mounts paused (Resume is explicit). Persist boot feats so
-    // HUD==save without restamping the offline window.
-    afterMutation({ stamp: false });
-  } else {
-    setTab('camp');
+  } else if (!restored) {
+    ui.tab = 'camp';
+    ui.skillId = null;
+    ui.campView = null;
   }
+  showRoute();
+  // Fight HUD mounts paused (Resume is explicit). Persist boot feats so
+  // HUD==save without restamping the offline window.
+  afterMutation({ stamp: false });
   // Boot guard for index.html's fallback screen (F1d Fix 3): the inline boot
   // watchdog reveals a retry screen if this flag isn't set within 8s.
   window.__HOLLOWLIGHT_BOOTED = true;

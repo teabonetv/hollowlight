@@ -69,18 +69,14 @@ function chipRow(className, chips) {
 }
 
 function cockpitLine(kit) {
-  if (!kit) return 'Acc — · your max — · foe max —';
-  return `Acc ${kit.hitPct}% vs ${kit.vsName} · your max ${kit.playerMaxHit} · foe max ${kit.foeMaxHit}`;
+  if (!kit) return 'Acc — / they — · your max — · foe max —';
+  return `Acc ${kit.hitPct}% / they ${kit.foeHitPct}% · your max ${kit.playerMaxHit} · foe max ${kit.foeMaxHit}`;
 }
 
-function weaponSubline(st) {
-  const off = st.offense;
-  const w = off?.weapon;
-  const styleName = STYLE_BY_ID[st.style]?.name ?? st.style;
-  const name = w?.id && w.id !== 'unarmed'
-    ? (ITEMS_BY_ID[w.id]?.name ?? w.id)
-    : 'Unarmed';
-  return `${name} · ${styleName} ${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow`;
+function weaponToggleLabel(weapon) {
+  if (!weapon) return 'Unarmed';
+  if (weapon.id === 'wick-knife') return 'Knife';
+  return ITEMS_BY_ID[weapon.id]?.name ?? weapon.id;
 }
 
 function handSlot(ctx, st, paint) {
@@ -274,13 +270,21 @@ function huntCard(ctx, enemy, paint) {
   const lockedBoss = enemy.boss && !combat.guardianStirred(ctx.state, enemy.zoneId);
   const kills = ctx.state.combat.kills[enemy.id] ?? 0;
   const sips = combat.oilSipsRemaining(ctx.state);
+  const dry = sips <= 0;
+  const blocked = lockedBoss || dry;
   const btnLabel = lockedBoss
     ? `Locked · ${enemy.stirKills} kills`
-    : enemy.boss ? 'Challenge' : 'Hunt';
+    : dry
+      ? 'Need oil'
+      : enemy.boss ? 'Challenge' : 'Hunt';
 
   const start = () => {
     if (lockedBoss) {
       ctx.toast(`${enemy.name} will not face a stranger yet.`, 'info');
+      return;
+    }
+    if (dry) {
+      ctx.toast('The lantern is dry — buy wick-oil at the stall before a stretch.', 'warn');
       return;
     }
     const res = ctx.startFight(enemy.id);
@@ -301,12 +305,12 @@ function huntCard(ctx, enemy, paint) {
       el('span', { class: 'chip' }, `weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? enemy.weakness}`),
       el('span', { class: 'chip' }, `resists ${STYLE_BY_ID[enemy.resist]?.name ?? enemy.resist}`),
       kills ? el('span', { class: 'chip' }, `${kills} slain`) : null,
-      el('span', { class: 'chip' }, `${formatNoun(sips, 'sip')} before Hunt`),
+      el('span', { class: `chip ${dry ? 'chip-warn' : ''}` }, `${formatNoun(sips, 'sip')} before Hunt`),
     ]),
     el('button', {
-      class: `btn btn-wide ${lockedBoss ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+      class: `btn btn-wide ${blocked ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
       onclick: start,
-      'aria-disabled': lockedBoss ? 'true' : 'false',
+      'aria-disabled': blocked ? 'true' : 'false',
     }, btnLabel));
 }
 
@@ -318,21 +322,44 @@ function lanternCopy(st, state) {
   return `Lantern fed · ${formatNoun(sips, 'sip')} · next in ${formatSeconds(st.oilMs)}`;
 }
 
+function handChip(ctx, st, paint) {
+  const held = combat.heldWeapon(ctx.state);
+  const owned = combat.ownedWeapons(ctx.state);
+  const name = held ? (ITEMS_BY_ID[held.id]?.name ?? held.id) : 'Unarmed';
+  const row = el('div', { class: 'hand-chip' });
+  row.append(el('span', { class: 'hand-chip-name' }, name));
+  const toggles = el('div', { class: 'hand-chip-toggles' });
+  toggles.append(el('button', {
+    class: `btn ${held ? 'btn-ghost' : 'btn-primary on'}`,
+    onclick: () => {
+      ctx.equipWeapon?.('unarmed');
+      paint();
+    },
+  }, 'Unarmed'));
+  for (const w of owned) {
+    const on = held?.id === w.id;
+    toggles.append(el('button', {
+      class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
+      onclick: () => {
+        ctx.equipWeapon?.(w.id);
+        paint();
+      },
+    }, weaponToggleLabel(w)));
+  }
+  row.append(toggles);
+  return row;
+}
+
 function buildFight(ctx, st, paint) {
   const enemy = st.enemy;
   const foe = st.foe;
   const wrap = el('div', { class: 'combat-fight' });
 
-  wrap.append(el('p', { class: 'muted small' },
-    `${ZONE_BY_ID[st.zoneId]?.settlement ?? ''} · seed ${ctx.state.combat.encounterSeed}`));
-
   if (st.paused) {
-    wrap.append(el('div', { class: 'card encounter-held' },
-      el('h3', { class: 'track-name' }, 'Encounter held'),
-      el('p', { class: 'action-desc' },
-        'The stretch froze when you left. Resume when you are ready — the foe waits on the same seed.'),
+    wrap.append(el('div', { class: 'encounter-held' },
+      el('p', { class: 'encounter-held-copy' }, 'Encounter held — same seed.'),
       el('button', {
-        class: 'btn btn-primary btn-wide',
+        class: 'btn btn-primary',
         onclick: () => {
           if (ctx.resumeCombat) ctx.resumeCombat();
           else combat.resumeCombat(ctx.state);
@@ -341,13 +368,8 @@ function buildFight(ctx, st, paint) {
       }, 'Resume')));
   }
 
-  wrap.append(handSlot(ctx, st, paint));
-
-  wrap.append(el('p', { class: 'kit-line fight-cockpit' }, cockpitLine(st.cockpit)));
-
   wrap.append(fighterBlock({
     title: 'You',
-    sub: weaponSubline(st),
     hp: st.playerHp,
     max: st.playerMaxHp,
     next: st.playerNextMs,
@@ -357,9 +379,7 @@ function buildFight(ctx, st, paint) {
 
   wrap.append(fighterBlock({
     title: foe?.name ?? 'Foe',
-    sub: enemy
-      ? `${st.phase?.phase?.name ? st.phase.phase.name + ' · ' : ''}${STYLE_BY_ID[enemy.style]?.name ?? ''} · weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? ''}`
-      : '',
+    sub: enemy ? `weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? ''}` : '',
     hp: foe?.hp ?? 0,
     max: foe?.maxHp ?? 1,
     next: foe?.nextActMs ?? 0,
@@ -367,8 +387,14 @@ function buildFight(ctx, st, paint) {
     fillClass: 'hp-foe',
   }));
 
+  wrap.append(el('p', { class: 'kit-line fight-cockpit' }, cockpitLine(st.cockpit)));
+
   wrap.append(el('p', { class: `oil-line ${st.lanternFed ? 'muted' : 'danger'}` },
     lanternCopy(st, ctx.state)));
+
+  wrap.append(eatRow(ctx, st, paint));
+
+  wrap.append(handChip(ctx, st, paint));
 
   const styles = el('div', { class: 'style-row' });
   for (const s of STYLES) {
@@ -380,15 +406,15 @@ function buildFight(ctx, st, paint) {
   }
   wrap.append(styles);
 
-  wrap.append(eatRow(ctx, st, paint));
-
   const keep = el('label', { class: 'auto-toggle combat-keep' });
   const input = el('input', { type: 'checkbox' });
-  input.checked = st.autoContinue;
+  input.checked = !!st.autoContinue;
   keep.append(input, el('span', { class: 'switch' }), el('span', { class: 'auto-text' }, 'Keep hunting this foe'));
   keep.addEventListener('click', (e) => {
     e.preventDefault();
-    ctx.state.combat.autoContinue = !ctx.state.combat.autoContinue;
+    const next = !ctx.state.combat.autoContinue;
+    if (ctx.setCombatAutoContinue) ctx.setCombatAutoContinue(next);
+    else ctx.state.combat.autoContinue = next;
     paint();
   });
   wrap.append(keep);
@@ -412,7 +438,7 @@ function fighterBlock({ title, sub, hp, max, next, speed, fillClass }) {
     el('div', { class: 'fighter-head' },
       el('strong', {}, title),
       el('span', { class: 'muted' }, `${hp} / ${max}`)),
-    el('p', { class: 'muted small' }, sub),
+    sub ? el('p', { class: 'muted small' }, sub) : null,
     el('div', { class: `bar bar-lg hp-bar`, role: 'progressbar', 'aria-label': `${title} vitality` },
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })),
     el('div', { class: 'action-barline' },
@@ -436,8 +462,6 @@ function eatRow(ctx, st, paint) {
       },
     }, `${food.name} +${pending} · ${n}`));
   }
-  const oilN = combat.oilSipsRemaining(ctx.state);
-  row.append(el('span', { class: 'chip' }, `oil ×${oilN}`));
   return row;
 }
 

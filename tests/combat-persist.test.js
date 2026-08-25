@@ -7,6 +7,21 @@ import assert from 'node:assert/strict';
 const { FakeNode } = await import('./helpers/fake-node.mjs');
 const { deserializeSave } = await import('../src/core/save.js');
 
+function tabButton(tab) {
+  const b = new FakeNode('button');
+  b.dataset.tab = tab;
+  b.setAttribute('data-tab', tab);
+  if (tab === 'camp') {
+    b.classList.add('active');
+    b.setAttribute('aria-selected', 'true');
+  } else {
+    b.setAttribute('aria-selected', 'false');
+  }
+  return b;
+}
+
+const tabButtons = ['camp', 'skills', 'bank', 'map', 'journal'].map(tabButton);
+
 const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
@@ -15,6 +30,7 @@ const elements = {
   'modal-root': new FakeNode('div'),
   toasts: new FakeNode('div'),
   'btn-settings': new FakeNode('button'),
+  'boot-fallback': new FakeNode('div'),
 };
 const docEl = new FakeNode('html');
 
@@ -25,7 +41,10 @@ globalThis.document = {
   createElement: (t) => new FakeNode(t),
   createTextNode: (s) => ({ nodeType: 3, textContent: String(s) }),
   getElementById: (id) => elements[id] ?? null,
-  querySelectorAll: () => [],
+  querySelectorAll: (sel) => {
+    if (sel === '.tabbar button') return tabButtons;
+    return [];
+  },
   addEventListener() {},
   removeEventListener() {},
 };
@@ -92,4 +111,39 @@ test('combat ticks flush HP into hollowlight.save in the same eval', () => {
   assert.match(painted, new RegExp(`${state.combat.player.hp} / `));
   assert.match(painted, new RegExp(`${state.combat.foe.hp} / ${state.combat.foe.maxHp}`));
   assert.equal(/1 souls/.test(painted), false);
+});
+
+function tabIs(tab) {
+  const btn = tabButtons.find((b) => b.dataset.tab === tab);
+  return {
+    active: btn.classList.contains('active'),
+    selected: btn.getAttribute('aria-selected') === 'true',
+  };
+}
+
+test('after reload the selected tab matches the combat screen', async () => {
+  if (!/Pale Moth/.test(elements.screen.textContent ?? '')) {
+    const pale = elements.screen.querySelectorAll('button')
+      .find((b) => /Face the pale-things/.test(b.textContent ?? ''));
+    pale?.click();
+    const hunt = elements.screen.querySelectorAll('button')
+      .find((b) => (b.textContent ?? '') === 'Hunt');
+    hunt?.click();
+  }
+  assert.equal(tabIs('skills').active, true, 'Skills selected while Combat is painted');
+  assert.equal(tabIs('skills').selected, true);
+  assert.equal(tabIs('camp').active, false);
+  assert.equal(tabIs('camp').selected, false);
+  assert.match(elements.screen.textContent ?? '', /Pale Moth/);
+
+  await import('../src/ui/app.js?tab-reload');
+
+  assert.equal(tabIs('skills').active, true, 'Skills still selected after reload');
+  assert.equal(tabIs('skills').selected, true);
+  assert.equal(tabIs('camp').active, false);
+  assert.equal(tabIs('camp').selected, false);
+  const painted = elements.screen.textContent ?? '';
+  assert.match(painted, /Pale Moth/);
+  assert.match(painted, /Resume|Fall back/);
+  assert.match(painted, /You/);
 });

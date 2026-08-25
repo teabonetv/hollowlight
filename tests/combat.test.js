@@ -376,6 +376,10 @@ test('wick-knife accuracy raises shown hit % and max-hit vs unarmed', () => {
   assert.ok(knife.playerMaxHit > un.playerMaxHit);
   assert.equal(knife.foeMaxHit, un.foeMaxHit);
   assert.equal(knife.vsName, 'Pale Moth');
+  const moth = ENEMIES_BY_ID['pale-moth'];
+  const off = combat.playerOffense(armed, 'strike');
+  assert.equal(knife.foeHitPct, Math.round(hitChance(moth.accuracy, off.avoidance) * 100));
+  assert.equal(knife.hitPct, Math.round(hitChance(off.accuracy, moth.avoidance) * 100));
 });
 
 test('after combat ticks, deserialize HP matches live HP without pagehide', () => {
@@ -404,4 +408,45 @@ test('kills of 1 soul use singular in the log', () => {
   assert.equal(kill.souls, 1);
   assert.ok(s.combat.log.some((l) => /1 soul/.test(l.text)));
   assert.equal(s.combat.log.some((l) => /1 souls/.test(l.text)), false);
+});
+
+test('keep hunting defaults off on a fresh save', () => {
+  const s = createState({ rngSeed: 1 });
+  assert.equal(s.combat.autoContinue, false);
+});
+
+test('auto-continue refuses the next moth while the lantern is dry', () => {
+  const s = createState({ rngSeed: 3 });
+  s.bank['wick-oil'] = 0;
+  s.bank['lamp-oil'] = 0;
+  s.combat.autoContinue = true;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.ok(kill);
+  assert.equal(s.combat.fighting, false);
+  assert.equal(s.combat.foe, null);
+  assert.equal(combat.lanternIsFed(s), false);
+});
+
+test('auto-continue chains the next moth while the lantern is fed', () => {
+  const s = createState({ rngSeed: 3 });
+  s.combat.autoContinue = true;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.ok(kill);
+  assert.equal(s.combat.fighting, true);
+  assert.equal(s.combat.foe?.id, 'pale-moth');
+  assert.ok(combat.lanternIsFed(s));
 });
