@@ -14,9 +14,19 @@ export function hydrateState(state) {
   state.perks.respecs ??= 0;
   state.achievements ??= { unlocked: {} };
   state.achievements.unlocked ??= {};
-  state.cosmetics ??= { titles: [], frames: ['plain'], lanternFrame: 'plain', activeTitle: null };
-  state.cosmetics.titles ??= [];
-  state.cosmetics.frames ??= ['plain'];
+  const c = state.cosmetics ?? {};
+  state.cosmetics = {
+    bankTheme: c.bankTheme ?? 'default',
+    unlocked: Array.isArray(c.unlocked) ? c.unlocked : ['default'],
+    titles: Array.isArray(c.titles) ? c.titles : [],
+    frames: Array.isArray(c.frames) ? c.frames : ['plain'],
+    lanternFrame: c.lanternFrame ?? 'plain',
+    activeTitle: c.activeTitle ?? null,
+  };
+  state.bankPins ??= [];
+  state.bankPresets ??= [];
+  state.store ??= { pressure: {}, pressureAt: {} };
+  if (!Number.isFinite(state.lanternIntegrity)) state.lanternIntegrity = 100;
   state.dailies ??= null;
   state.actions ??= { active: {}, autoRestart: {}, completed: {} };
   state.actions.autoRestart ??= {};

@@ -20,6 +20,7 @@ import * as bank from './bank.js';
 import * as mods from './modifiers.js';
 import { grantRadianceFromXp } from './radiance.js';
 import { recordCycle } from './stats.js';
+import { applyEmberkeepingWear } from './repairs.js';
 
 /** +1% XP per mastery level of the running action (see balance-notes.md). */
 export const MASTERY_XP_BONUS_PER_LEVEL = mods.MASTERY_XP_BONUS_PER_LEVEL;
@@ -121,6 +122,7 @@ export function completeCycle(state, action, rng) {
   }
 
   events.push({ type: 'cycle', actionId: action.id, gains: applied });
+  applyEmberkeepingWear(state, action);
   return { events };
 }
 

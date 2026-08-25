@@ -10,10 +10,53 @@
 import { hydrateState } from '../game/hydrate.js';
 
 export const SAVE_KEY = 'hollowlight.save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 3;
 
 /** @type {Array<{from:number, migrate:(s:any)=>any}>} */
-export const MIGRATIONS = [];
+export const MIGRATIONS = [
+  {
+    from: 1,
+    migrate(state) {
+      return {
+        ...state,
+        bankPins: state.bankPins ?? [],
+        bankPresets: state.bankPresets ?? [],
+        store: state.store ?? { pressure: {}, pressureAt: {} },
+        lanternIntegrity: Number.isFinite(state.lanternIntegrity) ? state.lanternIntegrity : 100,
+        cosmetics: {
+          bankTheme: state.cosmetics?.bankTheme ?? 'default',
+          unlocked: state.cosmetics?.unlocked ?? ['default'],
+          titles: state.cosmetics?.titles ?? [],
+          frames: state.cosmetics?.frames ?? ['plain'],
+          lanternFrame: state.cosmetics?.lanternFrame ?? 'plain',
+          activeTitle: state.cosmetics?.activeTitle ?? null,
+        },
+      };
+    },
+  },
+  {
+    from: 2,
+    migrate(state) {
+      return {
+        ...state,
+        radiance: state.radiance ?? 0,
+        radianceFrac: state.radianceFrac ?? 0,
+        radianceEarned: state.radianceEarned ?? 0,
+        perks: state.perks ?? { owned: [], respecs: 0 },
+        achievements: state.achievements ?? { unlocked: {} },
+        dailies: state.dailies ?? null,
+        cosmetics: {
+          bankTheme: state.cosmetics?.bankTheme ?? 'default',
+          unlocked: state.cosmetics?.unlocked ?? ['default'],
+          titles: state.cosmetics?.titles ?? [],
+          frames: state.cosmetics?.frames ?? ['plain'],
+          lanternFrame: state.cosmetics?.lanternFrame ?? 'plain',
+          activeTitle: state.cosmetics?.activeTitle ?? null,
+        },
+      };
+    },
+  },
+];
 
 export class SaveError extends Error {
   constructor(reason, detail) {

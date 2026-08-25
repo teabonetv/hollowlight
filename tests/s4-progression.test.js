@@ -186,7 +186,7 @@ test('nextWants always offers three concrete pulls; camp completion is defined',
   assert.ok(totalCompletion(s).pct >= 0);
 });
 
-test('old saves hydrate S4 fields on deserialize without a version bump', () => {
+test('old saves migrate v1→v3 and hydrate S4 fields', () => {
   const json = JSON.stringify({
     version: 1,
     savedAt: 1,
@@ -195,8 +195,33 @@ test('old saves hydrate S4 fields on deserialize without a version bump', () => 
   const { state } = deserializeSave(json);
   assert.equal(state.radiance, 0);
   assert.ok(state.perks);
+  assert.deepEqual(state.bankPins, []);
+  assert.ok(state.store.pressure);
+  assert.equal(state.lanternIntegrity, 100);
   assert.equal(state.actions.autoRestart['tend-flame'], true);
   assert.equal(state.stats.beaconsKindled, 1);
+});
+
+test('schema v2 saves keep the stall and gain S4 fields (v2→v3)', () => {
+  const json = JSON.stringify({
+    version: 2,
+    savedAt: 1,
+    state: {
+      lumen: 50,
+      bankPins: ['fogwort'],
+      store: { pressure: { fogwort: 3 }, pressureAt: {} },
+      lanternIntegrity: 88,
+      cosmetics: { bankTheme: 'dusk', unlocked: ['default', 'dusk'] },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(state.radiance, 0);
+  assert.ok(state.perks);
+  assert.deepEqual(state.bankPins, ['fogwort']);
+  assert.equal(state.store.pressure.fogwort, 3);
+  assert.equal(state.lanternIntegrity, 88);
+  assert.equal(state.cosmetics.bankTheme, 'dusk');
+  assert.equal(state.cosmetics.lanternFrame, 'plain');
 });
 
 test('fresh save still round-trips through serialize/deserialize', () => {

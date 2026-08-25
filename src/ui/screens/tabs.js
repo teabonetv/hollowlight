@@ -4,38 +4,46 @@
 
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
-import { ITEMS, ITEM_CATEGORIES, ITEMS_BY_ID } from '../../game/data/items.js';
-import { TRACKS, TRACKS_BY_ID } from '../../game/data/upgrades.js';
-import { bankCount, bankSellValue } from '../../game/systems/bank.js';
+import { TRACKS } from '../../game/data/upgrades.js';
+import { REPAIR_KITS } from '../../game/data/repairs.js';
+import { KINDLING_BUNDLE } from '../../game/data/store.js';
+import { bankCount } from '../../game/systems/bank.js';
+import { lanternIntegrity } from '../../game/systems/repairs.js';
 import * as camp from '../../game/systems/upgrades.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
 import { nextWants, totalCompletion } from '../../game/systems/completion.js';
 import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
 import { taskProgress } from '../../game/systems/dailies.js';
+import { renderBankScreen } from './bank.js';
 
+export { renderBankScreen };
 export { renderJournalScreen } from './meta.js';
+
+function campCycles(state) {
+  return Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
+}
 
 export function renderCampScreen(ctx) {
   const { state } = ctx;
   ctx.ensureDailies?.();
-  const totalCycles = Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
-  const complete = totalCompletion(state);
   const wants = nextWants(state);
   const title = state.cosmetics?.activeTitle;
 
-  const stats = [
-    ['Lumen', formatNumber(state.lumen)],
-    ['Radiance', formatNumber(state.radiance ?? 0)],
-    ['Flame units', formatNumber(state.flame)],
-    ['Time by the flame', formatDuration(state.stats.playtimeMs)],
-    ['Cycles worked', formatNumber(totalCycles)],
-    ['Completion', complete.label],
-  ];
+  const lumenVal = el('span', { class: 'stat-value' });
+  const radianceVal = el('span', { class: 'stat-value' });
+  const flameVal = el('span', { class: 'stat-value' });
+  const timeVal = el('span', { class: 'stat-value' });
+  const cyclesVal = el('span', { class: 'stat-value' });
+  const completeVal = el('span', { class: 'stat-value' });
+
 
   const trackRefs = TRACKS.map((t) => buildTrackCard(ctx, t));
   const emptyBanner = el('div', { class: 'empty-state camp-empty' },
     el('span', { class: 'empty-icon', html: icon('camp') }),
     el('p', { class: 'empty-text' }, 'Nothing upgraded yet — the lantern hungers.'));
+
+  const tinderBanner = el('div', { class: 'empty-state camp-starve' });
+  const repairCard = buildRepairCard(ctx);
 
   const root = el('section', { class: 'screen camp' },
     el('div', { class: 'sigil-wrap', 'aria-hidden': 'true' }, el('div', { class: 'sigil' })),
@@ -44,9 +52,12 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'camp-flavor' },
       'The last ember of the Hollow sleeps in your lantern. Feed it, and carry its light down the pilgrim road.'),
     el('div', { class: 'stat-grid' },
-      stats.map(([k, v]) => el('div', { class: 'stat-cell' },
-        el('span', { class: 'stat-value' }, v),
-        el('span', { class: 'stat-label' }, k)))),
+      el('div', { class: 'stat-cell' }, lumenVal, el('span', { class: 'stat-label' }, 'Lumen')),
+      el('div', { class: 'stat-cell' }, radianceVal, el('span', { class: 'stat-label' }, 'Radiance')),
+      el('div', { class: 'stat-cell' }, flameVal, el('span', { class: 'stat-label' }, 'Flame units')),
+      el('div', { class: 'stat-cell' }, timeVal, el('span', { class: 'stat-label' }, 'Time by the flame')),
+      el('div', { class: 'stat-cell' }, cyclesVal, el('span', { class: 'stat-label' }, 'Cycles worked')),
+      el('div', { class: 'stat-cell' }, completeVal, el('span', { class: 'stat-label' }, 'Completion'))),
     el('h2', { class: 'section-title' }, 'Waiting for you'),
     el('p', { class: 'section-sub muted' }, 'Three things to want next — always.'),
     el('div', { class: 'want-list camp-wants' },
@@ -67,8 +78,16 @@ export function renderCampScreen(ctx) {
         'Tend the Flame'),
       el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openSkill('foraging') },
         'Walk the fog-line'),
+      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openStore?.() },
+        'The General Store'),
       el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openAlmanac?.('stars') },
         'Open the constellation')),
+
+    tinderBanner,
+
+    el('h2', { class: 'section-title' }, 'The Lantern'),
+    el('p', { class: 'section-sub muted' }, 'Repairs spend scrap and Lumen. A cracked chimney still burns — just poorer.'),
+    repairCard.node,
 
     // ── The Keeper's Camp — upgrade tracks (F1c economy sink) ──
     el('h2', { class: 'section-title' }, "The Keeper's Camp"),
@@ -78,10 +97,41 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'footnote muted' },
       'Sell what you gather at the Bank; spend it here. Offline progress keeps working while you rest — up to 12 hours, honestly counted.'));
 
+  function paintStats() {
+    const s = ctx.state;
+    lumenVal.textContent = formatNumber(s.lumen);
+    radianceVal.textContent = formatNumber(s.radiance ?? 0);
+    flameVal.textContent = formatNumber(s.flame);
+    cyclesVal.textContent = formatNumber(campCycles(s));
+    timeVal.textContent = formatDuration(s.stats.playtimeMs);
+    completeVal.textContent = totalCompletion(s).label;
+
+    const tinder = bankCount(s.bank, 'tinderscrap');
+    if (tinder <= 0) {
+      tinderBanner.style.display = '';
+      clear(tinderBanner);
+      tinderBanner.append(
+        el('p', { class: 'empty-text' },
+          `Kindling is gone — the stall still sells Tinderscrap, and a ${KINDLING_BUNDLE.name} is ✦${KINDLING_BUNDLE.cost} for eight handfuls. Or walk the fog-line; herbs carry dry tinder home.`),
+        el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openStore?.() },
+          'Buy kindling at the stall'));
+    } else if (tinder < 8) {
+      tinderBanner.style.display = '';
+      clear(tinderBanner);
+      tinderBanner.append(
+        el('p', { class: 'empty-text' },
+          `Only ${formatNumber(tinder)} Tinderscrap left. Forage the fog-line (30% tinder) or buy a bundle before Tend goes dark.`));
+    } else {
+      tinderBanner.style.display = 'none';
+    }
+  }
+
   function update() {
+    paintStats();
     const anyOwned = TRACKS.some((t) => camp.upgradeLevel(ctx.state, t.id) > 0);
     emptyBanner.style.display = anyOwned ? 'none' : '';
     for (const r of trackRefs) r.update();
+    repairCard.update();
   }
   update();
 
@@ -189,44 +239,35 @@ function buildTrackCard(ctx, track) {
   };
 }
 
-export function renderBankScreen(ctx) {
-  const { state } = ctx;
-  let discovered = 0;
-  for (const it of ITEMS) if (bankCount(state.bank, it.id) > 0) discovered++;
+function buildRepairCard(ctx) {
+  const integrityLine = el('span', { class: 'track-effect' });
+  const kitsHost = el('div', { class: 'repair-kits' });
 
-  const root = el('section', { class: 'screen' },
-    el('header', { class: 'screen-head' },
-      el('h1', { class: 'screen-title' }, 'Bank'),
-      el('p', { class: 'screen-sub' },
-        `${discovered} of ${ITEMS.length} items known · worth ✦${formatNumber(bankSellValue(state.bank))}`)));
-
-  for (const [catId, catName] of ITEM_CATEGORIES) {
-    const items = ITEMS.filter((i) => i.category === catId);
-    if (!items.length) continue;
-    const grid = el('div', { class: 'bank-cat' },
-      el('h2', { class: 'bank-cat-name' }, catName),
-      el('div', { class: 'bank-grid' }));
-
-    for (const it of items) {
-      const qty = bankCount(state.bank, it.id);
-      grid.children[1].append(el('button', {
-        class: `bank-tile ${qty > 0 ? 'owned' : 'unowned'}`,
-        title: qty > 0 ? `Sell ${it.name}` : it.flavor,
-        onclick: () => qty > 0
-          ? ctx.openSellSheet(it.id)
-          : ctx.toast(`${it.name}: not yet found. ${it.flavor}`, 'info'),
-        'aria-label': `${it.name}, ${qty} owned${qty > 0 ? `, sells for ✦${it.sell} each` : ''}`,
-      },
-        el('span', { class: 'bank-qty' }, qty > 0 ? formatNumber(qty) : '—'),
-        el('span', { class: 'bank-name' }, it.name),
-        el('span', { class: 'bank-sell muted' }, `✦${it.sell}${it.tier > 1 ? ` · T${it.tier}` : ''}`)));
+  function paint() {
+    const i = lanternIntegrity(ctx.state);
+    integrityLine.textContent = `Integrity ${i}/100`;
+    clear(kitsHost);
+    for (const kit of REPAIR_KITS) {
+      const btn = el('button', {
+        class: 'btn btn-ghost btn-wide',
+        onclick: () => ctx.repairLantern?.(kit.id),
+      }, `${kit.name} · +${kit.restore} · ✦${kit.lumen}`);
+      kitsHost.append(el('div', { class: 'repair-row' },
+        el('p', { class: 'track-flavor muted' }, kit.flavor),
+        btn));
     }
-    root.append(grid);
   }
-
-  root.append(el('p', { class: 'footnote muted' },
-    'Tap a lit stack to sell it — every coin goes back into the camp.'));
-  return { node: root, update: () => {} };
+  paint();
+  return {
+    node: el('article', { class: 'card repair-card' },
+      el('div', { class: 'track-head' },
+        el('span', { class: 'skill-icon glyph-flame', html: icon('flame') }),
+        el('span', { class: 'track-title' },
+          el('h3', { class: 'track-name' }, 'Lantern glass'),
+          integrityLine)),
+      kitsHost),
+    update: paint,
+  };
 }
 
 const SETTLEMENTS = [

@@ -7,7 +7,9 @@ import { OFFLINE_CAP_HOURS } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
 import { ACTIONS } from '../game/data/actions.js';
-import { bankCount, needsSellConfirm } from '../game/systems/bank.js';
+import { bankCount, needsSellConfirm, isPinned } from '../game/systems/bank.js';
+import { liveSellUnit } from '../game/systems/store.js';
+import { sparksFor } from '../game/systems/offerings.js';
 
 /**
  * Opens a modal. Returns { close, panel }. Only one modal at a time; Escape
@@ -182,28 +184,32 @@ export function clearSellConfirm(itemId) {
   pendingSellConfirms.delete(itemId);
 }
 /**
- * Sell sheet — tap a bank stack, see its lore/uses/value, sell 1 / 10 / All.
+ * Sell sheet — tap a bank stack, see its lore/uses/value, sell 1 / 10 / 100 / All.
  * "Sell All" on stacks above SELL_CONFIRM_THRESHOLD demands a second tap
  * (F1d Fix 2: the armed confirm is component state keyed by item id, so
  * re-renders can't lose it). `ctx.sell(itemId, qty)` does the engine work.
+ *
+ * After a sale the labels always re-read the live bank. Selling the last
+ * unit paints “0 in the bank” and then closes — the sheet must never keep
+ * showing the pre-sale stack (or an armed “Tap again”) after the goods are gone.
  */
 export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFIRM_WINDOW_MS } = {}) {
   const item = ITEMS_BY_ID[itemId];
   if (!item) return;
 
-  // Which live actions feed on / produce this item (charter interlock copy).
   const feeds = [];
-  const sources = [];
+  const actionSources = [];
   for (const a of ACTIONS) {
     if ((a.costs ?? []).some((c) => c.id === itemId)) feeds.push(a.name);
-    if ((a.outputs ?? []).some((o) => o.kind === 'item' && o.id === itemId)) sources.push(a.name);
+    if ((a.outputs ?? []).some((o) => o.kind === 'item' && o.id === itemId)) actionSources.push(a.name);
   }
+  const sources = [...new Set([...(item.sources ?? []), ...actionSources.map((n) => `Gathered by ${n}`)])];
+  const uses = [...new Set([...(item.uses ?? []), ...feeds.map((n) => `Feeds ${n}`)])];
 
   const qtyLabel = el('span', { class: 'sell-qty' });
   const worthLabel = el('span', { class: 'sell-worth gold' });
   const confirmBtn = el('button', {
     class: 'btn btn-danger btn-wide',
-    // Announce the armed confirm so a screen-reader player hears it too.
     'aria-live': 'assertive',
   });
 
@@ -211,18 +217,27 @@ export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFI
 
   function ownedQty() { return bankCount(ctx.state.bank, itemId); }
 
+  function unitPrice() { return liveSellUnit(ctx.state, itemId); }
+
   function paintButtons() {
     const qty = ownedQty();
+    const unit = unitPrice();
     qtyLabel.textContent = `${formatNumber(qty)} in the bank`;
-    worthLabel.textContent = `stack worth ✦${formatNumber(qty * item.sell)}`;
+    worthLabel.textContent = `stack worth ✦${formatNumber(qty * unit)} at today’s stall`;
 
-    for (const b of [sell1Btn, sell10Btn]) {
+    for (const b of [sell1Btn, sell10Btn, sell100Btn]) {
       b.style.display = '';
       b.disabled = false;
       b.setAttribute('aria-disabled', 'false');
     }
     sell1Btn.textContent = 'Sell 1';
     sell10Btn.textContent = 'Sell 10';
+    sell100Btn.textContent = 'Sell 100';
+    if (qty < 100) {
+      sell100Btn.disabled = true;
+      sell100Btn.textContent = `Sell 100 (${qty})`;
+      sell100Btn.setAttribute('aria-disabled', 'true');
+    }
     if (qty < 10) {
       sell10Btn.disabled = true;
       sell10Btn.textContent = `Sell 10 (${qty})`;
@@ -231,33 +246,41 @@ export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFI
     if (qty < 1) {
       sell1Btn.disabled = true;
       sell1Btn.setAttribute('aria-disabled', 'true');
+      sell100Btn.disabled = true;
+      sell100Btn.setAttribute('aria-disabled', 'true');
+    }
+
+    if (qty <= 0) {
+      clearSellConfirm(itemId);
+      confirmBtn.className = 'btn btn-ghost btn-wide btn-disabled';
+      confirmBtn.textContent = 'None left in the bank';
+      confirmBtn.setAttribute('aria-disabled', 'true');
+      return;
     }
 
     if (awaitingConfirm()) {
-      // Armed: keep the danger styling and the live totals visible. Every
-      // re-render repaints this from component state — it can neither be
-      // lost nor show a stale amount.
       confirmBtn.className = 'btn btn-danger btn-wide';
-      confirmBtn.textContent = `Tap again — sell all ${formatNumber(qty)} for ✦${formatNumber(qty * item.sell)}`;
+      confirmBtn.textContent = `Tap again — sell all ${formatNumber(qty)} for ✦${formatNumber(qty * unit)}`;
       confirmBtn.setAttribute('aria-disabled', 'false');
     } else {
       confirmBtn.className = 'btn btn-wide ' + (qty > 0 ? 'btn-ghost' : 'btn-ghost btn-disabled');
-      confirmBtn.textContent = `Sell All — ✦${formatNumber(qty * item.sell)}`;
+      confirmBtn.textContent = `Sell All — ✦${formatNumber(qty * unit)}`;
       confirmBtn.setAttribute('aria-disabled', qty > 0 ? 'false' : 'true');
     }
   }
 
   function doSell(qtyRequested) {
     const res = ctx.sell(itemId, qtyRequested);
-    if (!res.ok) { ctx.toast(res.error ?? 'Could not sell.', 'warn'); return; }
+    if (!res.ok) { ctx.toast(res.error ?? 'Could not sell.', 'warn'); paintButtons(); return; }
     clearSellConfirm(itemId);
     ctx.toast(`Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`, 'success');
-    if (ownedQty() <= 0) { ref.close(); return; }
     paintButtons();
+    if (ownedQty() <= 0) { ref.close(); }
   }
 
   const sell1Btn = el('button', { class: 'btn btn-primary' , onclick: () => doSell(1) }, '');
   const sell10Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(10) }, '');
+  const sell100Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(100) }, '');
 
   let expiryTimer = 0;
   function armConfirm() {
@@ -269,7 +292,7 @@ export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFI
   confirmBtn.addEventListener('click', () => {
     const qty = ownedQty();
     if (qty <= 0) return;
-    if (needsSellConfirm(qty) && !awaitingConfirm()) {
+    if (needsSellConfirm(qty, item) && !awaitingConfirm()) {
       armConfirm();
       paintButtons();
       return;
@@ -280,30 +303,60 @@ export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFI
   });
 
   const useChips = el('div', { class: 'chips sell-uses' },
-    sources.length ? el('span', { class: 'chip chip-yield' }, `Gathered by ${sources.join(', ')}`) : null,
-    feeds.length ? el('span', { class: 'chip chip-cost' }, `Feeds ${feeds.join(', ')}`) : null,
-    (!sources.length && !feeds.length)
-      ? el('span', { class: 'chip chip-free' }, 'No craft uses it yet — traders will.') : null);
+    sources.slice(0, 4).map((s) => el('span', { class: 'chip chip-yield' }, s)),
+    uses.slice(0, 4).map((u) => el('span', { class: 'chip chip-cost' }, u)));
+
+  const pinBtn = el('button', { class: 'btn btn-ghost btn-small' });
+  function paintPin() {
+    if (!ctx.togglePin) { pinBtn.style.display = 'none'; return; }
+    pinBtn.style.display = '';
+    pinBtn.textContent = isPinned(ctx.state, itemId) ? 'Unpin' : 'Pin to top';
+  }
+  pinBtn.addEventListener('click', () => {
+    ctx.togglePin?.(itemId);
+    paintPin();
+  });
+
+  const offerBtn = el('button', { class: 'btn btn-ghost btn-wide' });
+  function paintOffer() {
+    if (!ctx.offer) { offerBtn.style.display = 'none'; return; }
+    const qty = ownedQty();
+    const sparks = sparksFor(item);
+    offerBtn.style.display = '';
+    offerBtn.disabled = qty < 1;
+    offerBtn.textContent = qty < 1
+      ? 'Nothing to offer'
+      : `Offer 1 for ${sparks} Radiance spark${sparks === 1 ? '' : 's'}`;
+  }
+  offerBtn.addEventListener('click', () => {
+    const res = ctx.offer?.(itemId, 1);
+    if (!res?.ok) { ctx.toast(res?.error ?? 'Could not offer.', 'warn'); return; }
+    ctx.toast(`Offered ${item.name} — +${res.sparks} Radiance.`, 'success');
+    paintButtons();
+    paintOffer();
+    if (ownedQty() <= 0) ref.close();
+  });
 
   const body = el('div', {},
     el('p', { class: 'sell-flavor' }, `“${item.flavor}”`),
+    pinBtn,
     useChips,
     el('p', { class: 'sell-line' },
-      el('span', {}, `Sells for ✦${item.sell} each · `),
+      el('span', {}, `Sells for ✦${item.sell} each (catalog) · `),
       qtyLabel,
       el('br'),
       worthLabel),
-    el('div', { class: 'sell-actions' }, sell1Btn, sell10Btn),
-    confirmBtn);
+    el('div', { class: 'sell-actions' }, sell1Btn, sell10Btn, sell100Btn),
+    confirmBtn,
+    offerBtn);
 
   const ref = openModal(mount, { title: item.name, body });
 
-  // Keep the sheet honest while it is open (actions keep running).
   paintButtons();
+  paintPin();
+  paintOffer();
   const origClose = ref.close;
   ref.close = () => { clearSellConfirm(itemId); clearTimeout(expiryTimer); origClose(); };
-  // F1d Fix 2: let callers/tests force a re-render tick; the armed confirm
-  // must survive it untouched.
-  ref.repaint = paintButtons;
+  ref.repaint = () => { paintButtons(); paintPin(); paintOffer(); };
   return ref;
 }
