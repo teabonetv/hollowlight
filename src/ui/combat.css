@@ -2,6 +2,21 @@
 .combat-root { display: flex; flex-direction: column; gap: 14px; }
 .combat-intro { margin: 0; font-style: italic; }
 .chip.chip-warn { border-color: rgba(192, 86, 79, 0.55); color: #eda49d; }
+.combat-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.chip-sep { color: var(--faint); font-size: 12px; user-select: none; }
+.kit-line {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gold-hi);
+  letter-spacing: 0.01em;
+}
+.fight-cockpit {
+  padding: 10px 12px;
+  border: 1px solid var(--gold-lo);
+  border-radius: var(--radius-sm);
+  background: rgba(217, 164, 65, 0.08);
+}
+.encounter-held { border-color: var(--gold-lo); }
 .weapon-card { margin: 0; }
 .weapon-row {
   display: flex;

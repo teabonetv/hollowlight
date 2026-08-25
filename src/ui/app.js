@@ -13,7 +13,7 @@
 import { createEventBus } from '../core/event-bus.js';
 import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
-import { formatDuration } from '../core/format.js';
+import { formatDuration, formatNoun } from '../core/format.js';
 import {
   SAVE_KEY, serializeSave, deserializeSave, SaveError,
   storageGet, storageSet,
@@ -160,7 +160,7 @@ function boot() {
     renderScreen();
   });
   bus.on('combat-kill', ({ enemyId, xp, souls }) => {
-    toaster.push(`Fell a foe · +${xp} Combat XP, ${souls} souls.`, 'success');
+    toaster.push(`Fell a foe · +${xp} Combat XP, ${formatNoun(souls, 'soul')}.`, 'success');
     pushLog(game, `Combat: a foe (${enemyId}) fell.`, game.stats.playtimeMs);
   });
   bus.on('combat-death', ({ zoneId, lumen }) => {
@@ -446,6 +446,10 @@ function boot() {
       if (res.ok) afterMutation();
       return res;
     },
+    resumeCombat() {
+      combat.resumeCombat(game);
+      afterMutation();
+    },
     isReducedMotion: () => !!game.settings.reducedMotion,
     setReducedMotion(on) { game.settings.reducedMotion = !!on; persist(); applyMotionClass(); },
     exportSave() { game.rngState = rng.getState(); return serializeSave(game, game.savedAt); },
@@ -513,9 +517,10 @@ function boot() {
       liveUpdate();
       sheetRepaint?.();
       // Cycle / halt / stop mutate bank, lumen, xp — flush now so a reload
-      // cannot drop HUD-visible completions. Playtime-only ticks wait for
-      // the 30s interval (or hide/pagehide).
-      if (events.length > 0) persist();
+      // cannot drop HUD-visible completions. An unpaused fight also flushes
+      // every tick (≤100ms) so painted HP matches hollowlight.save mid-blow,
+      // not only on pagehide. Playtime-only ticks wait for the 30s interval.
+      if (events.length > 0 || combat.combatShouldFlush(game)) persist();
     },
   });
 

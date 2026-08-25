@@ -28,6 +28,7 @@ function makeCtx(state) {
     assignVigil: () => combat.assignVigil(state, { categoryId: 'pale', seed: 1 }),
     setCombatStyle: (id) => combat.setStyle(state, id),
     equipWeapon: (id) => combat.equipWeapon(state, id),
+    resumeCombat: () => combat.resumeCombat(state),
   };
 }
 
@@ -52,18 +53,70 @@ test('camp offers a tap through to combat', () => {
   assert.match(scr.node.textContent ?? '', /Face the pale-things/);
 });
 
-test('a live fight paints HP, styles, eat, flee, weapon, and a log', () => {
+test('a live fight paints HP, styles, eat, flee, weapon, cockpit, and a log', () => {
   const state = createState({ rngSeed: 4 });
   combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
   const scr = renderSkillDetail(makeCtx(state), 'combat');
-  assert.match(scr.node.textContent ?? '', /Pale Moth/);
-  assert.match(scr.node.textContent ?? '', /Strike/);
-  assert.match(scr.node.textContent ?? '', /Wick-knife/);
-  assert.match(scr.node.textContent ?? '', /3–6/);
-  assert.match(scr.node.textContent ?? '', /Fall back/);
-  assert.match(scr.node.textContent ?? '', /Lantern-loaf/);
+  const text = scr.node.textContent ?? '';
+  assert.match(text, /Pale Moth/);
+  assert.match(text, /Strike/);
+  assert.match(text, /Wick-knife/);
+  assert.match(text, /3–6/);
+  assert.match(text, /Fall back/);
+  assert.match(text, /Lantern-loaf/);
+  assert.match(text, /Acc \d+%/);
+  assert.match(text, /your max \d+/);
+  assert.match(text, /foe max \d+/);
   assert.ok(scr.node.querySelector('.combat-log'));
   scr.update();
+});
+
+test('0 oil never paints Lantern fed; hub chip is dry not ready', () => {
+  const state = createState({ rngSeed: 2 });
+  state.bank['wick-oil'] = 0;
+  state.bank['lamp-oil'] = 0;
+  const hub = renderSkillDetail(makeCtx(state), 'combat');
+  const hubText = hub.node.textContent ?? '';
+  assert.match(hubText, /lantern dry/);
+  assert.equal(/lantern ready/.test(hubText), false);
+  assert.match(hubText, /0 lantern sips/);
+  assert.match(hubText, / · /);
+
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const fight = renderSkillDetail(makeCtx(state), 'combat');
+  const fightText = fight.node.textContent ?? '';
+  assert.equal(/Lantern fed/.test(fightText), false);
+  assert.match(fightText, /Lantern dry/);
+});
+
+test('hand card hit % changes when the wick-knife is unequipped', () => {
+  const armed = createState({ rngSeed: 4 });
+  const aText = renderSkillDetail(makeCtx(armed), 'combat').node.textContent ?? '';
+  const aAcc = aText.match(/Acc (\d+)%/);
+  assert.ok(aAcc);
+
+  const bare = createState({ rngSeed: 4 });
+  combat.equipWeapon(bare, 'unarmed');
+  const bText = renderSkillDetail(makeCtx(bare), 'combat').node.textContent ?? '';
+  const bAcc = bText.match(/Acc (\d+)%/);
+  assert.ok(bAcc);
+  assert.ok(Number(aAcc[1]) > Number(bAcc[1]));
+});
+
+test('after N combat ticks painted HP equals deserialized save HP', () => {
+  const state = createState({ rngSeed: 4 });
+  state.combat.autoContinue = false;
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  combat.resumeCombat(state);
+  for (let i = 0; i < 18; i++) combat.tickCombat(state, 100);
+  const json = serializeSave(state, 12);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const { state: saved } = deserializeSave(json);
+  assert.equal(saved.combat.player.hp, state.combat.player.hp);
+  assert.equal(saved.combat.foe.hp, state.combat.foe.hp);
+  const painted = scr.node.textContent ?? '';
+  assert.match(painted, new RegExp(`${state.combat.player.hp} / ${combat.playerMaxHp(state)}`));
+  assert.match(painted, new RegExp(`${state.combat.foe.hp} / ${state.combat.foe.maxHp}`));
 });
 
 test('hub HTML does not print null when deathSite is empty', () => {
@@ -89,14 +142,24 @@ test('eat button heal matches the integer that will land on HP', () => {
   assert.equal(pending, 8);
 });
 
-test('mid-fight deserialize re-enters the fight screen', () => {
+test('mid-fight deserialize stays paused until Resume; paint does not auto-resume', () => {
   const live = createState({ rngSeed: 4 });
   combat.startFight(live, 'pale-moth', { encounterSeed: 1 });
   const { state } = deserializeSave(serializeSave(live, 9));
   assert.equal(combat.fightWouldResume(state), true);
+  assert.equal(state.combat.paused, true);
+  const hp = state.combat.player.hp;
   const scr = renderSkillDetail(makeCtx(state), 'combat');
-  assert.match(scr.node.textContent ?? '', /Pale Moth/);
-  assert.match(scr.node.textContent ?? '', /Fall back/);
+  const text = scr.node.textContent ?? '';
+  assert.match(text, /Pale Moth/);
+  assert.match(text, /Encounter held/);
+  assert.match(text, /Resume/);
+  assert.equal(state.combat.paused, true, 'paint must not resumeCombat');
+  combat.tickCombat(state, 8000);
+  assert.equal(state.combat.player.hp, hp);
+  const resume = scr.node.querySelectorAll('button').find((b) => /Resume/.test(b.textContent ?? ''));
+  assert.ok(resume);
+  resume.click();
   assert.equal(state.combat.paused, false);
   assert.equal(state.combat.fighting, true);
 });

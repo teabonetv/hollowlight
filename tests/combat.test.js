@@ -342,3 +342,66 @@ test('grantCombatXp uses the same rounding as live kills', () => {
   // mastery starts at 1 → ×1.01, altar at 0 → ×1
   assert.equal(xp, Math.round(11 * 1.01));
 });
+
+test('a hunt with empty flasks starts dry and never counts as fed', () => {
+  const s = createState({ rngSeed: 14 });
+  s.bank['wick-oil'] = 0;
+  s.bank['lamp-oil'] = 0;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  assert.equal(combat.oilSipsRemaining(s), 0);
+  assert.equal(combat.lanternIsFed(s), false);
+  assert.equal(s.combat.lanternDry, true);
+  const st = combat.combatStatus(s);
+  assert.equal(st.lanternFed, false);
+  assert.ok(s.combat.log.some((l) => /lantern is dry|goes dry/i.test(l.text)));
+});
+
+test('hub lantern chip is not ready at 0 sips even if lanternDry is false', () => {
+  const s = createState({ rngSeed: 15 });
+  s.bank['wick-oil'] = 0;
+  s.bank['lamp-oil'] = 0;
+  s.combat.lanternDry = false;
+  assert.equal(combat.lanternIsFed(s), false);
+});
+
+test('wick-knife accuracy raises shown hit % and max-hit vs unarmed', () => {
+  const armed = createState({ rngSeed: 1 });
+  combat.startFight(armed, 'pale-moth', { encounterSeed: 1 });
+  const knife = combat.fightCockpit(armed);
+  const bare = createState({ rngSeed: 1 });
+  combat.equipWeapon(bare, 'unarmed');
+  combat.startFight(bare, 'pale-moth', { encounterSeed: 1 });
+  const un = combat.fightCockpit(bare);
+  assert.ok(knife.hitPct > un.hitPct, `${knife.hitPct} vs ${un.hitPct}`);
+  assert.ok(knife.playerMaxHit > un.playerMaxHit);
+  assert.equal(knife.foeMaxHit, un.foeMaxHit);
+  assert.equal(knife.vsName, 'Pale Moth');
+});
+
+test('after combat ticks, deserialize HP matches live HP without pagehide', () => {
+  const s = createState({ rngSeed: 16 });
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 7 });
+  for (let i = 0; i < 24; i++) combat.tickCombat(s, 100);
+  assert.equal(combat.combatShouldFlush(s), true);
+  const json = serializeSave(s, 1);
+  const { state } = deserializeSave(json);
+  assert.equal(state.combat.player.hp, s.combat.player.hp);
+  assert.equal(state.combat.foe.hp, s.combat.foe.hp);
+});
+
+test('kills of 1 soul use singular in the log', () => {
+  const s = createState({ rngSeed: 3 });
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.equal(kill.souls, 1);
+  assert.ok(s.combat.log.some((l) => /1 soul/.test(l.text)));
+  assert.equal(s.combat.log.some((l) => /1 souls/.test(l.text)), false);
+});
