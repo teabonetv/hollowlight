@@ -16,7 +16,7 @@
 import { createEventBus } from '../core/event-bus.js';
 import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
-import { formatDuration } from '../core/format.js';
+import { formatDuration, formatNoun } from '../core/format.js';
 import {
   SAVE_KEY, serializeSave, deserializeSave, SaveError,
   storageGet, storageSet,
@@ -169,7 +169,7 @@ function boot() {
     renderScreen();
   });
   bus.on('combat-kill', ({ enemyId, xp, souls }) => {
-    toaster.push(`Fell a foe · +${xp} Combat XP, ${souls} souls.`, 'success');
+    toaster.push(`Fell a foe · +${xp} Combat XP, ${formatNoun(souls, 'soul')}.`, 'success');
     pushLog(game, `Combat: a foe (${enemyId}) fell.`, game.stats.playtimeMs);
   });
   bus.on('combat-death', ({ zoneId, lumen }) => {
@@ -439,6 +439,10 @@ function boot() {
       if (res.ok) afterMutation();
       return res;
     },
+    resumeCombat() {
+      combat.resumeCombat(game);
+      afterMutation();
+    },
     isReducedMotion: () => !!game.settings.reducedMotion,
     setReducedMotion(on) { game.settings.reducedMotion = !!on; persist(); applyMotionClass(); },
     exportSave() { game.rngState = rng.getState(); return serializeSave(game, game.savedAt); },
@@ -525,13 +529,16 @@ function boot() {
       game.stats.playtimeMs += dtMs;
       for (const ev of events) bus.emit(ev.type, ev);
       const newly = flushAchievementsQuiet();
-      if (events.length > 0 || newly > 0) persist({ stamp: true });
+      // Cycle / halt / stop / feat grants mutate wallet — flush before HUD
+      // paint so a reload cannot drop HUD-visible work. An unpaused fight
+      // also flushes every tick (≤100ms) so painted HP matches the save
+      // mid-blow. Playtime-only ticks wait for the 30s interval.
+      if (events.length > 0 || newly > 0 || combat.combatShouldFlush(game)) {
+        persist({ stamp: true });
+      }
       updateHud();
       liveUpdate();
       sheetRepaint?.();
-      // Cycle / halt / stop / feat grants mutate wallet — flush now so a
-      // reload cannot drop HUD-visible work. Playtime-only ticks wait for
-      // the 30s interval (or hide/pagehide).
     },
   });
 
@@ -581,7 +588,8 @@ function boot() {
     }
     renderScreen();
     screenRoot.scrollTop = 0;
-    // Remount unpauses the fight; persist that plus any boot feats so HUD==save.
+    // Fight HUD mounts paused (Resume is explicit). Persist boot feats so
+    // HUD==save without restamping the offline window.
     afterMutation({ stamp: false });
   } else {
     setTab('camp');

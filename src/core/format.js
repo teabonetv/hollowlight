@@ -50,3 +50,10 @@ export function formatSeconds(ms) {
   if (!Number.isFinite(ms) || ms <= 0) return '0.0s';
   return `${(Math.round(ms / 100) / 10).toFixed(1)}s`;
 }
+
+/** "1 soul" / "4 souls" — never "1 souls". `n` is floored like formatNumber. */
+export function formatNoun(n, singular, plural = `${singular}s`) {
+  const count = Math.floor(Number(n));
+  const word = count === 1 ? singular : plural;
+  return `${formatNumber(count)} ${word}`;
+}

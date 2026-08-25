@@ -4,7 +4,7 @@
 
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
-import { formatNumber, formatSeconds } from '../../core/format.js';
+import { formatNumber, formatSeconds, formatNoun } from '../../core/format.js';
 import { ZONES, ZONE_BY_ID } from '../../game/data/combat/zones.js';
 import { STYLES, STYLE_BY_ID } from '../../game/data/combat/styles.js';
 import { FOOD, FOOD_ORDER } from '../../game/data/combat/consumables.js';
@@ -21,7 +21,7 @@ export function renderCombatPanel(ctx) {
 
   function paint() {
     clear(root);
-    combat.resumeCombat(ctx.state);
+    // Do not resumeCombat() here — reload pause must stay visible until Resume.
     const st = combat.combatStatus(ctx.state);
     if (st.fighting) root.append(buildFight(ctx, st, paint));
     else root.append(buildHub(ctx, st, paint));
@@ -58,6 +58,21 @@ function buildHub(ctx, st, paint) {
   return wrap;
 }
 
+function chipRow(className, chips) {
+  const parts = chips.filter(Boolean);
+  const row = el('div', { class: className });
+  parts.forEach((chip, i) => {
+    if (i) row.append(el('span', { class: 'chip-sep', 'aria-hidden': 'true' }, ' · '));
+    row.append(chip);
+  });
+  return row;
+}
+
+function cockpitLine(kit) {
+  if (!kit) return 'Acc — · your max — · foe max —';
+  return `Acc ${kit.hitPct}% vs ${kit.vsName} · your max ${kit.playerMaxHit} · foe max ${kit.foeMaxHit}`;
+}
+
 function weaponSubline(st) {
   const off = st.offense;
   const w = off?.weapon;
@@ -72,6 +87,7 @@ function handSlot(ctx, st, paint) {
   const held = combat.heldWeapon(ctx.state);
   const off = combat.playerOffense(ctx.state, st.style ?? ctx.state.combat.player.style);
   const owned = combat.ownedWeapons(ctx.state);
+  const kit = st.cockpit ?? combat.fightCockpit(ctx.state);
   const card = el('article', { class: 'card weapon-card' },
     el('div', { class: 'action-head' },
       el('h2', { class: 'action-name' }, 'Hand'),
@@ -81,6 +97,7 @@ function handSlot(ctx, st, paint) {
     held
       ? `${ITEMS_BY_ID[held.id]?.name ?? held.id} — ${STYLE_BY_ID[held.style]?.name ?? held.style} ${held.minDmg}–${held.maxDmg} · ${formatSeconds(held.speedMs)} / blow · +${held.accuracy} acc.`
       : `Unarmed ${STYLE_BY_ID[st.style]?.name ?? st.style} ${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow.`));
+  card.append(el('p', { class: 'kit-line' }, cockpitLine(kit)));
 
   if (held && held.style !== st.style) {
     card.append(el('p', { class: 'muted small' },
@@ -115,11 +132,12 @@ function handSlot(ctx, st, paint) {
 
 function soulsLine(ctx, st) {
   const sips = combat.oilSipsRemaining(ctx.state);
-  return el('div', { class: 'combat-meta' },
-    el('span', { class: 'chip chip-gold' }, `${formatNumber(st.souls)} souls`),
-    el('span', { class: 'chip' }, st.lanternDry ? 'lantern dry' : 'lantern ready'),
-    el('span', { class: `chip ${sips > 0 ? '' : 'chip-warn'}` },
-      sips > 0 ? `${sips} lantern sip${sips === 1 ? '' : 's'}` : '0 lantern sips'));
+  const fed = combat.lanternIsFed(ctx.state);
+  return chipRow('combat-meta chips', [
+    el('span', { class: 'chip chip-gold' }, formatNoun(st.souls, 'soul')),
+    el('span', { class: `chip ${fed ? '' : 'chip-warn'}` }, fed ? 'lantern ready' : 'lantern dry'),
+    el('span', { class: `chip ${sips > 0 ? '' : 'chip-warn'}` }, formatNoun(sips, 'lantern sip')),
+  ]);
 }
 
 function deathBanner(ctx, st, paint) {
@@ -174,7 +192,7 @@ function vigilCard(ctx, st, paint) {
       el('div', { class: 'bar bar-lg', role: 'progressbar' },
         el('span', { class: 'bar-fill', style: `width:${Math.min(100, (v.kills / v.required) * 100).toFixed(1)}%` })),
       spec ? el('p', { class: 'muted small' },
-        `Completion: ✦${spec.lumen}, ${spec.souls} souls, ${spec.xp} Combat XP.`) : null,
+        `Completion: ✦${spec.lumen}, ${formatNoun(spec.souls, 'soul')}, ${spec.xp} Combat XP.`) : null,
     );
   } else {
     card.append(
@@ -275,20 +293,29 @@ function huntCard(ctx, enemy, paint) {
       el('h2', { class: 'action-name' }, enemy.name),
       el('span', { class: 'mastery-badge' }, enemy.boss ? 'Guardian' : enemy.category)),
     el('p', { class: 'action-desc' }, enemy.flavor),
-    el('div', { class: 'chips' },
+    chipRow('chips', [
       el('span', { class: 'chip' }, `${enemy.hp} HP`),
       el('span', { class: 'chip' }, `${formatSeconds(enemy.speedMs)} / blow`),
       el('span', { class: 'chip chip-xp' }, `${enemy.xp} XP`),
-      el('span', { class: 'chip chip-gold' }, `${enemy.souls} souls`),
+      el('span', { class: 'chip chip-gold' }, formatNoun(enemy.souls, 'soul')),
       el('span', { class: 'chip' }, `weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? enemy.weakness}`),
       el('span', { class: 'chip' }, `resists ${STYLE_BY_ID[enemy.resist]?.name ?? enemy.resist}`),
       kills ? el('span', { class: 'chip' }, `${kills} slain`) : null,
-      el('span', { class: 'chip' }, `${sips} sip${sips === 1 ? '' : 's'} before Hunt`)),
+      el('span', { class: 'chip' }, `${formatNoun(sips, 'sip')} before Hunt`),
+    ]),
     el('button', {
       class: `btn btn-wide ${lockedBoss ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
       onclick: start,
       'aria-disabled': lockedBoss ? 'true' : 'false',
     }, btnLabel));
+}
+
+function lanternCopy(st, state) {
+  const sips = st.oilSips ?? combat.oilSipsRemaining(state);
+  if (!combat.lanternIsFed(state) || sips <= 0) {
+    return 'Lantern dry — the fog gathers. Drink oil or fall back.';
+  }
+  return `Lantern fed · ${formatNoun(sips, 'sip')} · next in ${formatSeconds(st.oilMs)}`;
 }
 
 function buildFight(ctx, st, paint) {
@@ -299,7 +326,24 @@ function buildFight(ctx, st, paint) {
   wrap.append(el('p', { class: 'muted small' },
     `${ZONE_BY_ID[st.zoneId]?.settlement ?? ''} · seed ${ctx.state.combat.encounterSeed}`));
 
+  if (st.paused) {
+    wrap.append(el('div', { class: 'card encounter-held' },
+      el('h3', { class: 'track-name' }, 'Encounter held'),
+      el('p', { class: 'action-desc' },
+        'The stretch froze when you left. Resume when you are ready — the foe waits on the same seed.'),
+      el('button', {
+        class: 'btn btn-primary btn-wide',
+        onclick: () => {
+          if (ctx.resumeCombat) ctx.resumeCombat();
+          else combat.resumeCombat(ctx.state);
+          paint();
+        },
+      }, 'Resume')));
+  }
+
   wrap.append(handSlot(ctx, st, paint));
+
+  wrap.append(el('p', { class: 'kit-line fight-cockpit' }, cockpitLine(st.cockpit)));
 
   wrap.append(fighterBlock({
     title: 'You',
@@ -323,10 +367,8 @@ function buildFight(ctx, st, paint) {
     fillClass: 'hp-foe',
   }));
 
-  wrap.append(el('p', { class: `oil-line ${st.lanternDry ? 'danger' : 'muted'}` },
-    st.lanternDry
-      ? 'Lantern dry — the fog gathers. Drink oil or fall back.'
-      : `Lantern fed · ${st.oilSips ?? combat.oilSipsRemaining(ctx.state)} sip${(st.oilSips ?? 0) === 1 ? '' : 's'} · next in ${formatSeconds(st.oilMs)}`));
+  wrap.append(el('p', { class: `oil-line ${st.lanternFed ? 'muted' : 'danger'}` },
+    lanternCopy(st, ctx.state)));
 
   const styles = el('div', { class: 'style-row' });
   for (const s of STYLES) {

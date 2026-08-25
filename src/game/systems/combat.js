@@ -14,6 +14,7 @@ import {
 } from '../data/combat/consumables.js';
 import { VIGIL_TIERS, VIGIL_TIER_BY_N, VIGIL_CATEGORIES, VIGIL_CATEGORY_BY_ID } from '../data/combat/vigils.js';
 import { ITEMS_BY_ID } from '../data/items.js';
+import { formatNoun } from '../../core/format.js';
 import { masteryXpMultiplier } from './action-runner.js';
 import * as bank from './bank.js';
 import * as camp from './upgrades.js';
@@ -90,6 +91,18 @@ export function oilSipsRemaining(state) {
   let n = 0;
   for (const id of OIL_ORDER) n += bank.bankCount(state.bank, id);
   return n;
+}
+
+/** Fed only when flasks remain and the lantern is not already dry. */
+export function lanternIsFed(state) {
+  ensureCombat(state);
+  return oilSipsRemaining(state) > 0 && !state.combat.lanternDry;
+}
+
+/** Flush HP/oil mid-fight without waiting for pagehide (every tick ≤100ms). */
+export function combatShouldFlush(state) {
+  ensureCombat(state);
+  return !!(state.combat.fighting && state.combat.foe && !state.combat.paused);
 }
 
 /** True when a deserialized encounter should paint the fight HUD (or stay paused until then). */
@@ -185,6 +198,41 @@ export function playerOffense(state, style) {
     speedMs: w.speedMs,
     accuracy: 8 + 2 * lv + (w.accuracy ?? 0),
     avoidance: Math.round(7 + 1.5 * lv),
+  };
+}
+
+/** Stretch preview target, or the live foe when a fight is up. */
+export function planningEnemy(state) {
+  ensureCombat(state);
+  const c = state.combat;
+  if (c.fighting && c.foe) return ENEMIES_BY_ID[c.foe.id] ?? null;
+  const zoneId = c.zoneId || 'hearthway';
+  return enemiesInZone(zoneId, { bosses: false })[0] ?? null;
+}
+
+/**
+ * Live cockpit: hit % (weapon acc vs this foe), your max-hit, foe max-hit.
+ * Same math the blow uses, so wick-knife +4 acc is a number you plan with.
+ */
+export function fightCockpit(state, enemy = planningEnemy(state)) {
+  ensureCombat(state);
+  if (!enemy) return null;
+  const style = state.combat.player.style;
+  const off = playerOffense(state, style);
+  const live = state.combat.foe && state.combat.foe.id === enemy.id;
+  const hp = live ? state.combat.foe.hp : enemy.hp;
+  const maxHp = live ? state.combat.foe.maxHp : enemy.hp;
+  const phase = activePhase(enemy, hp, maxHp).phase;
+  let chance = hitChance(off.accuracy, Math.round(enemy.avoidance));
+  if (state.combat.lanternDry) chance *= FOG_HIT_MULT;
+  const pMult = styleMultiplier(style, enemy.weakness, enemy.resist);
+  return {
+    vsId: enemy.id,
+    vsName: enemy.name,
+    hitChance: chance,
+    hitPct: Math.round(chance * 100),
+    playerMaxHit: Math.max(1, Math.round(off.maxDmg * pMult)),
+    foeMaxHit: Math.max(1, Math.round(enemy.maxDmg * (phase.dmgMult ?? 1))),
   };
 }
 
@@ -383,10 +431,11 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
   state.combat.enemyId = enemyId;
   state.combat.encounterSeed = seed >>> 0;
   state.combat.rngState = seed >>> 0;
-  state.combat.lanternDry = false;
-  state.combat.dryAnnounced = false;
+  const dry = oilSipsRemaining(state) <= 0;
+  state.combat.lanternDry = dry;
+  state.combat.dryAnnounced = dry;
   state.combat.oilMs = OIL_CHECK_MS;
-  state.combat.fogMs = FOG_BITE_MS;
+  state.combat.fogMs = dry ? FOG_GRACE_MS : FOG_BITE_MS;
   state.combat.player.nextActMs = off.speedMs;
   const phase0 = activePhase(enemy, enemy.hp, enemy.hp).phase;
   state.combat.foe = {
@@ -398,6 +447,9 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
     phaseIndex: 0,
   };
   pushCombatLog(state, `You meet ${enemy.name} on ${ZONE_BY_ID[enemy.zoneId]?.stretch ?? 'the road'}.`, 'start');
+  if (dry) {
+    pushCombatLog(state, 'The lantern is dry. The fog gathers — a few breaths before it bites.', 'fog');
+  }
   return { ok: true, seed: state.combat.encounterSeed };
 }
 
@@ -497,7 +549,7 @@ function onKill(state, rng) {
   const dropText = applied.length
     ? applied.map((d) => (d.kind === 'lumen' ? `✦${d.qty}` : `${d.name} ×${d.qty}`)).join(', ')
     : 'nothing but quiet';
-  pushCombatLog(state, `${enemy.name} falls. +${xp} Combat XP, ${enemy.souls} souls. Loot: ${dropText}.`, 'kill');
+  pushCombatLog(state, `${enemy.name} falls. +${xp} Combat XP, ${formatNoun(enemy.souls, 'soul')}. Loot: ${dropText}.`, 'kill');
 
   const vigilEvents = progressVigil(state, enemy);
 
@@ -628,7 +680,7 @@ function progressVigil(state, enemy) {
   state.lumen += spec.lumen;
   state.souls += spec.souls;
   const { xp, events } = grantCombatXp(state, spec.xp);
-  pushCombatLog(state, `Vigil complete — ${VIGIL_CATEGORY_BY_ID[v.category]?.name ?? v.category}. +✦${spec.lumen}, ${spec.souls} souls, ${xp} XP.`, 'vigil');
+  pushCombatLog(state, `Vigil complete — ${VIGIL_CATEGORY_BY_ID[v.category]?.name ?? v.category}. +✦${spec.lumen}, ${formatNoun(spec.souls, 'soul')}, ${xp} XP.`, 'vigil');
   state.combat.vigils.current = null;
   state.combat.vigils.completed += 1;
   state.combat.vigils.nextTier = Math.min(VIGIL_TIERS.length, v.tier + 1);
@@ -747,7 +799,9 @@ export function combatStatus(state) {
     offense: off,
     weapon: heldWeapon(state),
     oilSips: oilSipsRemaining(state),
+    lanternFed: lanternIsFed(state),
     paused: !!c.paused,
+    cockpit: fightCockpit(state, enemy ?? planningEnemy(state)),
     foe: c.foe,
     enemy,
     phase,

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatNumber, formatDuration, formatSeconds } from '../src/core/format.js';
+import { formatNumber, formatDuration, formatSeconds, formatNoun } from '../src/core/format.js';
 
 test('formatNumber: plain integers below 100k', () => {
   assert.equal(formatNumber(0), '0');
@@ -43,4 +43,12 @@ test('formatSeconds shows tenths for action bars', () => {
   assert.equal(formatSeconds(0), '0.0s');
   assert.equal(formatSeconds(3_400), '3.4s');
   assert.equal(formatSeconds(6500), '6.5s');
+});
+
+test('formatNoun never pluralises a count of 1', () => {
+  assert.equal(formatNoun(1, 'soul'), '1 soul');
+  assert.equal(formatNoun(0, 'soul'), '0 souls');
+  assert.equal(formatNoun(4, 'soul'), '4 souls');
+  assert.equal(formatNoun(1, 'lantern sip'), '1 lantern sip');
+  assert.equal(formatNoun(2, 'lantern sip'), '2 lantern sips');
 });
