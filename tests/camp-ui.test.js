@@ -153,19 +153,39 @@ function bootSellSheet(state) {
   return { mount, ctx, sold };
 }
 
-test('sell sheet shows lore, per-unit value, stack worth and three sell buttons', () => {
+test('sell sheet shows lore, catalog unit, live stall worth, and honest sell controls', () => {
   const s = createState({ rngSeed: 7 });
   s.bank.fogwort = 12;
   const { mount } = bootSellSheet(s);
   const panel = mount.querySelector('.modal-panel');
   assert.match(panel.textContent ?? '', /grey herb that only grows/, 'lore line');
-  assert.match(panel.textContent ?? '', /Sells for ✦3 each/);
+  assert.match(panel.textContent ?? '', /Sells for ✦3 each \(catalog\)/);
   assert.match(panel.textContent ?? '', /12 in the bank/);
-  assert.match(panel.textContent ?? '', /stack worth ✦36/);
+  assert.match(panel.textContent ?? '', /stack worth ✦36 at today’s stall/);
   const buttons = panel.querySelectorAll('button');
   assert.ok(buttons.some((b) => b.textContent === 'Sell 1'));
   assert.ok(buttons.some((b) => b.textContent === 'Sell 10'));
+  assert.equal(buttons.some((b) => /Sell 100/.test(b.textContent ?? '')), false,
+    'Sell 100 is omitted when the stack is below 100');
   assert.ok(buttons.some((b) => /Sell All/.test(b.textContent ?? '')));
+  assert.ok(panel.querySelector('.sell-qty-input'), 'custom qty control present');
+});
+
+test('Sell 10/100 leave the DOM when qty is too low; custom qty 7 sells seven', () => {
+  const s = createState({ rngSeed: 17 });
+  s.bank.fogwort = 7;
+  const { mount, sold } = bootSellSheet(s);
+  const panel = mount.querySelector('.modal-panel');
+  const buttons = panel.querySelectorAll('button');
+  assert.ok(buttons.some((b) => b.textContent === 'Sell 1'));
+  assert.equal(buttons.some((b) => b.textContent === 'Sell 10'), false);
+  assert.equal(buttons.some((b) => /Sell 100/.test(b.textContent ?? '')), false);
+  const qty = panel.querySelector('.sell-qty-input');
+  qty.value = 7;
+  const sellCustom = buttons.find((b) => b.textContent === 'Sell');
+  sellCustom.click();
+  assert.deepEqual(sold, [{ ok: true, sold: 7, gained: 21 }]);
+  assert.equal(s.bank.fogwort, undefined);
 });
 
 test('Sell 10 deducts ten stacks and pays ten times the value', () => {

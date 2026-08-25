@@ -1,19 +1,50 @@
 // Bank screen — owned-first dense grid, catalogue opt-in, desktop inspector.
 
 import { el, clear } from '../dom.js';
-import { ITEMS, ITEM_CATEGORIES, BANK_TABS, DEFAULT_BANK_TAB } from '../../game/data/items.js';
+import { icon } from '../icons.js';
+import { ITEMS, ITEM_CATEGORIES, DEFAULT_BANK_TAB } from '../../game/data/items.js';
 import {
-  bankCount, bankSellValue, filterItems, isPinned, isCatalogueTab,
+  bankCount, bankSellValue, filterItems, isPinned, isCatalogueTab, visibleBankTabs,
 } from '../../game/systems/bank.js';
 import { formatNumber } from '../../core/format.js';
 import { createItemInspector } from '../item-inspector.js';
 
 const DESKTOP_INSPECTOR_MQ = '(min-width: 900px)';
 
+const CAT_GLYPH = {
+  fuel: 'flame',
+  herb: 'leaf',
+  fungi: 'leaf',
+  resin: 'candle',
+  ore: 'pick',
+  gem: 'spark',
+  fish: 'hook',
+  oddity: 'star',
+  component: 'gear',
+  candle: 'candle',
+  oil: 'candle',
+  gear: 'anvil',
+  drop: 'chest',
+  relic: 'star',
+  consumable: 'camp',
+  cosmetic: 'spark',
+};
+
 export function prefersDockedInspector() {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
     && window.matchMedia(DESKTOP_INSPECTOR_MQ).matches;
+}
+
+export function itemTileGlyph(item) {
+  return CAT_GLYPH[item?.category] ?? 'chest';
+}
+
+export function itemTileInitials(item) {
+  const words = String(item?.name ?? '').split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0][0] + words[1][0]).toUpperCase();
+  const compact = words[0] ?? '?';
+  return compact.slice(0, 2).toUpperCase();
 }
 
 export function renderBankScreen(ctx) {
@@ -43,30 +74,25 @@ export function renderBankScreen(ctx) {
   });
 
   const tabBar = el('div', { class: 'bank-tabs', role: 'tablist', 'aria-label': 'Bank categories' });
-  const tabBtns = [];
-  for (const [id, label] of BANK_TABS) {
-    const b = el('button', {
-      class: 'bank-tab',
-      type: 'button',
-      role: 'tab',
-      'data-tab': id,
-      onclick: () => {
-        filter.tab = id;
-        paintTabs();
-        syncGrid();
-      },
-    }, label);
-    tabBtns.push(b);
-    tabBar.append(b);
-  }
-  function tabIdOf(b) {
-    return b.attrs?.['data-tab'] ?? b.dataset?.tab;
-  }
   function paintTabs() {
-    for (const b of tabBtns) {
-      const on = tabIdOf(b) === filter.tab;
-      b.className = `bank-tab${on ? ' active' : ''}`;
-      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    const allowed = new Set(visibleBankTabs(ctx.state.bank).map(([id]) => id));
+    if (!allowed.has(filter.tab)) filter.tab = DEFAULT_BANK_TAB;
+    clear(tabBar);
+    for (const [id, label] of visibleBankTabs(ctx.state.bank)) {
+      const on = id === filter.tab;
+      const b = el('button', {
+        class: `bank-tab${on ? ' active' : ''}`,
+        type: 'button',
+        role: 'tab',
+        'data-tab': id,
+        'aria-selected': on ? 'true' : 'false',
+        onclick: () => {
+          filter.tab = id;
+          paintTabs();
+          syncGrid();
+        },
+      }, label);
+      tabBar.append(b);
     }
   }
 
@@ -76,7 +102,7 @@ export function renderBankScreen(ctx) {
       'Stacks you carry live here. Gather along the fog-line — the Catalogue tab is the atlas of what still waits in the dark.'));
 
   const gridHost = el('div', { class: 'bank-grids' });
-  const tiles = new Map(); // id -> { item, tile, qtyEl, sellEl, pinMark, catEl }
+  const tiles = new Map(); // id -> { item, tile, qtyEl, pinMark, glyphEl, nameEl }
 
   function inspect(itemId) {
     selectedId = itemId;
@@ -123,26 +149,40 @@ export function renderBankScreen(ctx) {
 
   function makeTile(it) {
     const qtyEl = el('span', { class: 'bank-qty' });
-    const sellEl = el('span', { class: 'bank-sell muted' });
     const pinMark = el('span', { class: 'bank-pin' });
+    const glyphEl = el('span', { class: 'bank-glyph', 'aria-hidden': 'true' });
+    const nameEl = el('span', { class: 'bank-name' }, it.name);
     const tile = el('button', {
       type: 'button',
+      'data-item': it.id,
       onclick: () => inspect(it.id),
-    }, pinMark, qtyEl, el('span', { class: 'bank-name' }, it.name), sellEl);
-    return { item: it, tile, qtyEl, sellEl, pinMark };
+    }, pinMark, qtyEl, glyphEl, nameEl);
+    return { item: it, tile, qtyEl, pinMark, glyphEl, nameEl };
   }
 
-  function paintTile(rec) {
-    const { item: it, tile, qtyEl, sellEl, pinMark } = rec;
+  function paintTile(rec, dense) {
+    const { item: it, tile, qtyEl, pinMark, glyphEl, nameEl } = rec;
     const qty = bankCount(ctx.state.bank, it.id);
     const pinned = isPinned(ctx.state, it.id);
-    tile.className = `bank-tile ${qty > 0 ? 'owned' : 'unowned'}${pinned ? ' pinned' : ''}${selectedId === it.id ? ' selected' : ''}`;
+    const rarity = it.unique ? 'unique' : it.rare ? 'rare' : `tier-${it.tier ?? 1}`;
+    tile.className = [
+      'bank-tile',
+      dense ? 'bank-tile-dense' : 'bank-tile-catalogue',
+      qty > 0 ? 'owned' : 'unowned',
+      pinned ? 'pinned' : '',
+      selectedId === it.id ? 'selected' : '',
+      `cat-${it.category}`,
+      rarity,
+    ].filter(Boolean).join(' ');
     tile.title = qty > 0 ? `Inspect ${it.name}` : it.flavor;
-    tile.setAttribute('aria-label',
-      `${it.name}, ${qty} owned${qty > 0 ? `, sells for ✦${it.sell} each` : ''}`);
+    tile.setAttribute('aria-label', `${it.name}, ${qty} owned`);
     qtyEl.textContent = qty > 0 ? formatNumber(qty) : '—';
-    sellEl.textContent = `✦${it.sell}${it.tier > 1 ? ` · T${it.tier}` : ''}`;
     pinMark.textContent = pinned ? '★' : '';
+    const glyph = itemTileGlyph(it);
+    glyphEl.innerHTML = icon(glyph);
+    if (!glyphEl.innerHTML) glyphEl.textContent = itemTileInitials(it);
+    nameEl.textContent = it.name;
+    nameEl.className = dense ? 'bank-name visually-hidden' : 'bank-name';
   }
 
   function syncGrid() {
@@ -164,6 +204,7 @@ export function renderBankScreen(ctx) {
 
     clear(gridHost);
     const catalogue = isCatalogueTab(filter.tab);
+    const dense = !catalogue;
     if (!visible.length) {
       emptyState.style.display = '';
     } else {
@@ -186,7 +227,7 @@ export function renderBankScreen(ctx) {
           for (const it of group) {
             const rec = tiles.get(it.id) ?? makeTile(it);
             tiles.set(it.id, rec);
-            paintTile(rec);
+            paintTile(rec, false);
             tilesHost.append(rec.tile);
           }
           gridHost.append(grid);
@@ -196,7 +237,7 @@ export function renderBankScreen(ctx) {
         for (const it of visible) {
           const rec = tiles.get(it.id) ?? makeTile(it);
           tiles.set(it.id, rec);
-          paintTile(rec);
+          paintTile(rec, dense);
           tilesHost.append(rec.tile);
         }
         gridHost.append(tilesHost);
@@ -256,7 +297,7 @@ export function renderBankScreen(ctx) {
     let discovered = 0;
     for (const it of ITEMS) if (bankCount(ctx.state.bank, it.id) > 0) discovered++;
     headerSub.textContent =
-      `${discovered} of ${ITEMS.length} items known · worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
+      `${discovered} of ${ITEMS.length} items known · catalog worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
     paintTabs();
     syncGrid();
     paintPresets();

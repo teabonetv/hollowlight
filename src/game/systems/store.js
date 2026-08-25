@@ -4,6 +4,7 @@
 // deterministic and offline/live never disagree.
 
 import { ITEMS_BY_ID } from '../data/items.js';
+import { recordLumenSpend } from './stats.js';
 import {
   ALWAYS_STOCK, KINDLING_BUNDLE, BANK_THEMES,
   catalogBuyPrice, sellUnitPrice, buyUnitPrice, recoveredPressure,
@@ -90,6 +91,7 @@ export function buyFromStore(state, itemId, qty = 1) {
   const total = unit * n;
   if (state.lumen < total) return { ok: false, error: 'Not enough Lumen.' };
   state.lumen -= total;
+  recordLumenSpend(state, total);
   bankAdd(state.bank, itemId, n);
   return { ok: true, bought: n, spent: total, unit };
 }
@@ -98,6 +100,7 @@ export function buyKindlingBundle(state) {
   const { cost, grants } = KINDLING_BUNDLE;
   if (state.lumen < cost) return { ok: false, error: 'Not enough Lumen.' };
   state.lumen -= cost;
+  recordLumenSpend(state, cost);
   for (const g of grants) bankAdd(state.bank, g.id, g.qty);
   return { ok: true, spent: cost, grants: grants.map((g) => ({ ...g })) };
 }
@@ -113,6 +116,7 @@ export function buyTheme(state, themeId) {
   }
   if (state.lumen < theme.cost) return { ok: false, error: 'Not enough Lumen.' };
   state.lumen -= theme.cost;
+  recordLumenSpend(state, theme.cost);
   state.cosmetics.unlocked.push(themeId);
   state.cosmetics.bankTheme = themeId;
   return { ok: true, equipped: themeId, spent: theme.cost };

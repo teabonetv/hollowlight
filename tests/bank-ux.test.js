@@ -68,8 +68,38 @@ test('desktop matchMedia docks the inspector instead of opening a sheet', () => 
   const tinder = scr.node.querySelectorAll('.bank-tile').find((t) => /Tinderscrap/.test(t.textContent ?? ''));
   tinder.click();
   assert.deepEqual(opened, [], 'sheet stays closed when the inspector is docked');
+  assert.equal(/✦/.test(tinder.textContent ?? ''), false, 'tile itself has no price caption');
   const dock = scr.node.querySelector('.bank-inspector');
   assert.match(dock.textContent ?? '', /Tinderscrap|in the bank|tinder/i);
+  assert.match(dock.textContent ?? '', /Sells for ✦/);
+  assert.match(dock.textContent ?? '', /catalog/);
 
   globalThis.window = prev;
+});
+
+test('owned grid tiles are dense glyphs with no per-tile ✦price captions', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const tiles = scr.node.querySelectorAll('.bank-tile');
+  assert.ok(tiles.length > 0);
+  assert.ok(tiles.every((t) => t.classList.contains('bank-tile-dense')));
+  assert.ok(tiles.every((t) => t.querySelector('.bank-glyph')));
+  for (const t of tiles) {
+    assert.equal(/✦/.test(t.textContent ?? ''), false, 'price stays off the tile');
+    assert.ok(t.querySelector('.bank-qty'), 'qty badge present');
+  }
+  assert.match(scr.node.querySelector('.screen-sub').textContent ?? '', /catalog worth ✦/);
+});
+
+test('owned tab chips are core tabs plus only categories that hold stock', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const labels = scr.node.querySelectorAll('.bank-tab').map((t) => t.textContent);
+  assert.deepEqual(labels.slice(0, 3), ['Owned', 'Pinned', 'Catalogue']);
+  assert.ok(labels.includes('Fuel'));
+  assert.ok(labels.includes('Herbs'));
+  assert.equal(labels.includes('Fish'), false);
+  assert.equal(labels.includes('Gems'), false);
+  assert.equal(labels.includes('Ores'), false);
+  assert.ok(labels.length < 12, 'empty categories are not a second inventory');
 });

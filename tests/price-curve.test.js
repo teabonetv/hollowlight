@@ -75,6 +75,7 @@ test('kindling bundle grants 8 tinder and spends 12 Lumen', () => {
   const res = buyKindlingBundle(s);
   assert.equal(res.ok, true);
   assert.equal(s.lumen, 0);
+  assert.equal(s.stats.lumenSpent, 12);
   assert.equal(s.bank.tinderscrap, before + 8);
 });
 
@@ -85,6 +86,9 @@ test('buying from the stall spends live buy and stocks the bank', () => {
   const res = buyFromStore(s, 'tinderscrap', 5);
   assert.equal(res.ok, true);
   assert.equal(res.spent, unit * 5);
+  assert.equal(s.lumen, 100 - res.spent);
+  assert.equal(res.spent, 100 - s.lumen, 'toast/HUD spend is the wallet delta');
+  assert.equal(s.stats.lumenSpent, res.spent, 'stall buys count as lumen spent');
   assert.equal(s.bank.tinderscrap, 30 + 5);
 });
 

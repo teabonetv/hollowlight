@@ -4,6 +4,16 @@ import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '../data/achievements.js';
 import { PERKS } from '../data/perks.js';
 import { ownedSet } from './radiance.js';
 
+/** Player-facing feat toast. Lumen/Radiance grants name the wallet delta. */
+export function featToastMessage(a) {
+  const r = a?.reward;
+  if (r?.kind === 'lumen' && r.qty > 0) return `Feat: ${a.name}. +✦${r.qty}.`;
+  if (r?.kind === 'radiance' && r.qty > 0) {
+    return `Feat: ${a.name}. +${r.qty} Radiance.`;
+  }
+  return `Feat: ${a.name}.`;
+}
+
 export function achievementBonus(state, stat) {
   let sum = 0;
   for (const id of Object.keys(state.achievements?.unlocked ?? {})) {
