@@ -63,6 +63,31 @@ test('fallback markup is self-contained (inline styles, retry reloads)', () => {
     'watchdog registered before the app module loads');
 });
 
+test('hidden wins over the overlay display rule (specificity)', () => {
+  const style = html.match(/<div id="boot-fallback"[\s\S]*?<style>([\s\S]*?)<\/style>/);
+  assert.ok(style, 'fallback has an inline <style> block');
+  const css = style[1];
+
+  const idOnly = css.match(/#boot-fallback\s*\{([^}]*)\}/);
+  assert.ok(idOnly, '#boot-fallback { … } exists');
+  assert.equal(
+    /display\s*:/.test(idOnly[1]),
+    false,
+    '#boot-fallback { display:… } must not exist — it beats UA [hidden]',
+  );
+
+  assert.match(
+    css,
+    /#boot-fallback\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*;?\s*\}/,
+    '[hidden] on the id must hide with !important so ID rules cannot leak',
+  );
+  assert.match(
+    css,
+    /#boot-fallback:not\(\[hidden\]\)\s*\{\s*display\s*:\s*flex\s*;?\s*\}/,
+    'watchdog removing hidden still shows a full-screen flex overlay',
+  );
+});
+
 test('app.js signals a successful boot', async () => {
   const appSrc = readFileSync(join(root, 'src', 'ui', 'app.js'), 'utf8');
   assert.match(appSrc, /__HOLLOWLIGHT_BOOTED = true/,
