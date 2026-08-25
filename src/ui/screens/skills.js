@@ -170,7 +170,13 @@ function buildActionCard(ctx, action) {
       yieldChips.append(el('span', { class: `chip ${o.kind === 'item' ? 'chip-yield' : 'chip-yield gold'}` }, text));
       if (o.chance !== undefined) yieldChips.lastChild.append(el('em', { class: 'chip-chance' }, ` ${Math.round(o.chance * 100)}%`));
     }
-    yieldChips.append(el('span', { class: 'chip chip-xp' }, `${action.xp} XP`));
+    const st = status();
+    let xpText = `${st.xpBase} XP`;
+    if (st.xpGrant !== st.xpBase) xpText = `${st.xpBase} → ${st.xpGrant} XP`;
+    else if (Math.abs((st.xpRaw ?? st.xpBase) - st.xpBase) > 1e-9) {
+      xpText = `${(st.xpRaw).toFixed(1)} XP`;
+    }
+    yieldChips.append(el('span', { class: 'chip chip-xp' }, xpText));
   }
 
   function paintToggle() {
@@ -199,9 +205,8 @@ function buildActionCard(ctx, action) {
   function update() {
     const st = status();
     fill.style.width = st.running ? `${(st.frac * 100).toFixed(1)}%` : '0%';
-    timeLabel.textContent = st.running
-      ? formatSeconds(st.etaMs)
-      : `${formatSeconds(st.durationMs)} / cycle`;
+    timeLabel.textContent = `${formatSeconds(st.durationMs)} / cycle`;
+    paintChips();
     masteryBadge.textContent = `Mastery ${st.mastery.level}`;
     const hook = nextMasteryHook(action.id, st.mastery.level);
     masteryBadge.title = hook

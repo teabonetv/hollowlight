@@ -8,8 +8,11 @@
 
 import { formatNumber } from '../core/format.js';
 
-export function paintHud(hudLumen, hudFlame, state, hudRadiance) {
+export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
+  const radiance = formatNumber(state.radiance ?? 0);
   if (hudLumen) hudLumen.textContent = `✦ ${formatNumber(state.lumen)}`;
   if (hudFlame) hudFlame.textContent = `${formatNumber(state.flame)} flame`;
-  if (hudRadiance) hudRadiance.textContent = `✧ ${formatNumber(state.radiance ?? 0)}`;
+  if (hudRadiance) hudRadiance.textContent = `✧ ${radiance}`;
+  const unspent = extras.unspentRadiance;
+  if (unspent) unspent.textContent = `${radiance} Radiance unspent`;
 }
