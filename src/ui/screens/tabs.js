@@ -5,21 +5,31 @@
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
 import { ITEMS, ITEM_CATEGORIES, ITEMS_BY_ID } from '../../game/data/items.js';
-import { ACTIONS } from '../../game/data/actions.js';
 import { TRACKS, TRACKS_BY_ID } from '../../game/data/upgrades.js';
 import { bankCount, bankSellValue } from '../../game/systems/bank.js';
 import * as camp from '../../game/systems/upgrades.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
+import { nextWants, totalCompletion } from '../../game/systems/completion.js';
+import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
+import { taskProgress } from '../../game/systems/dailies.js';
+
+export { renderJournalScreen } from './meta.js';
 
 export function renderCampScreen(ctx) {
   const { state } = ctx;
+  ctx.ensureDailies?.();
   const totalCycles = Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
+  const complete = totalCompletion(state);
+  const wants = nextWants(state);
+  const title = state.cosmetics?.activeTitle;
 
   const stats = [
     ['Lumen', formatNumber(state.lumen)],
+    ['Radiance', formatNumber(state.radiance ?? 0)],
     ['Flame units', formatNumber(state.flame)],
-    ['Cycles worked', formatNumber(totalCycles)],
     ['Time by the flame', formatDuration(state.stats.playtimeMs)],
+    ['Cycles worked', formatNumber(totalCycles)],
+    ['Completion', complete.label],
   ];
 
   const trackRefs = TRACKS.map((t) => buildTrackCard(ctx, t));
@@ -30,17 +40,35 @@ export function renderCampScreen(ctx) {
   const root = el('section', { class: 'screen camp' },
     el('div', { class: 'sigil-wrap', 'aria-hidden': 'true' }, el('div', { class: 'sigil' })),
     el('h1', { class: 'camp-title' }, 'Hearthway Hollow'),
+    title ? el('p', { class: 'camp-title-worn' }, title) : null,
     el('p', { class: 'camp-flavor' },
       'The last ember of the Hollow sleeps in your lantern. Feed it, and carry its light down the pilgrim road.'),
     el('div', { class: 'stat-grid' },
       stats.map(([k, v]) => el('div', { class: 'stat-cell' },
         el('span', { class: 'stat-value' }, v),
         el('span', { class: 'stat-label' }, k)))),
+    el('h2', { class: 'section-title' }, 'Waiting for you'),
+    el('p', { class: 'section-sub muted' }, 'Three things to want next — always.'),
+    el('div', { class: 'want-list camp-wants' },
+      wants.length
+        ? wants.map((w) => el('button', {
+          class: 'want-row',
+          onclick: () => {
+            if (w.go === 'skills') ctx.openSkill?.(w.skillId ?? 'emberkeeping');
+            else ctx.openAlmanac?.(w.go);
+          },
+        },
+          el('span', { class: 'want-title' }, w.title),
+          el('span', { class: 'want-detail muted' }, w.detail)))
+        : el('p', { class: 'muted' }, 'The road is quiet. Tend the flame.')),
+    dailyStrip(ctx),
     el('div', { class: 'camp-actions' },
       el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openSkill('emberkeeping') },
         'Tend the Flame'),
       el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openSkill('foraging') },
-        'Walk the fog-line')),
+        'Walk the fog-line'),
+      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openAlmanac?.('stars') },
+        'Open the constellation')),
 
     // ── The Keeper's Camp — upgrade tracks (F1c economy sink) ──
     el('h2', { class: 'section-title' }, "The Keeper's Camp"),
@@ -58,6 +86,26 @@ export function renderCampScreen(ctx) {
   update();
 
   return { node: root, update };
+}
+
+function dailyStrip(ctx) {
+  const pack = ctx.state.dailies;
+  const tasks = pack?.tasks ?? [];
+  if (!tasks.length) return el('p', { class: 'muted small' }, 'Daily embers kindle on load.');
+  return el('div', { class: 'daily-strip' },
+    el('button', { class: 'daily-strip-head', onclick: () => ctx.openAlmanac?.('dailies') },
+      el('span', { class: 'section-title', style: 'margin:0' }, 'Daily embers'),
+      el('span', { class: 'muted small' }, 'tap to open')),
+    ...tasks.map((t) => {
+      const def = DAILY_POOL_BY_ID[t.id];
+      const p = taskProgress(ctx.state, t);
+      return el('button', {
+        class: `daily-chip ${t.claimed ? 'claimed' : p.done ? 'ready' : ''}`,
+        onclick: () => ctx.openAlmanac?.('dailies'),
+      },
+        el('span', {}, def?.label ?? t.id),
+        el('span', { class: 'muted' }, t.claimed ? 'claimed' : `${p.current}/${p.need}`));
+    }));
 }
 
 /** Human label for a track's current summed effect, e.g. “+10% action speed”. */
@@ -211,30 +259,6 @@ export function renderMapScreen(ctx) {
       road,
       el('p', { class: 'footnote muted' },
         'One beacon kindled. Eleven sleep. Each will unlock new crafts when relit.')),
-    update: () => {},
-  };
-}
-
-export function renderJournalScreen(ctx) {
-  const entries = [...ctx.state.log].reverse();
-
-  const list = entries.length
-    ? el('div', { class: 'journal-list' },
-      entries.map((e) => el('div', { class: 'journal-entry' },
-        el('span', { class: 'journal-text' }, e.text),
-        e.t ? el('span', { class: 'muted journal-time' }, formatDuration(e.t)) : null)))
-    : el('div', { class: 'empty-state' },
-      el('span', { class: 'empty-icon', html: icon('book') }),
-      el('h2', { class: 'empty-title' }, 'Blank pages'),
-      el('p', { class: 'empty-text' },
-        'Level up, unlock crafts, kindle beacons — the Journal remembers every step of the journey.'));
-
-  return {
-    node: el('section', { class: 'screen' },
-      el('header', { class: 'screen-head' },
-        el('h1', { class: 'screen-title' }, 'Journal'),
-        el('p', { class: 'screen-sub' }, 'A record of light carried.')),
-      list),
     update: () => {},
   };
 }

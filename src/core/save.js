@@ -7,6 +7,8 @@
 //   { from: 1, migrate(state) { ...; return newState } }
 // deserialize walks them in order until the save reaches SAVE_VERSION.
 
+import { hydrateState } from '../game/hydrate.js';
+
 export const SAVE_KEY = 'hollowlight.save';
 export const SAVE_VERSION = 1;
 
@@ -55,6 +57,8 @@ export function deserializeSave(json, { currentVersion = SAVE_VERSION, migration
     v += 1;
   }
   if (v !== currentVersion) throw new SaveError('unmigratable', `${parsed.version}→${v}`);
+
+  state = hydrateState(state);
 
   return { state, savedAt: Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0 };
 }

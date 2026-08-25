@@ -10,8 +10,8 @@
 // so it works for any future content set without edits.
 
 import { levelFromXp } from './xp.js';
-import { masteryXpMultiplier } from '../game/systems/action-runner.js';
-import { effectiveDurationMs, xpMultiplier } from '../game/systems/upgrades.js';
+import { xpGrantMultiplier, effectiveDurationMs, lumenGainMultiplier, radianceGainMultiplier } from '../game/systems/modifiers.js';
+import { grantRadianceFromXp } from '../game/systems/radiance.js';
 
 export const OFFLINE_CAP_HOURS = 12;
 export const OFFLINE_MIN_AWAY_MS = 60_000;
@@ -40,6 +40,8 @@ export function computeOfflineProgress({
   const capped = awayMs > creditedMs;
 
   const next = structuredClone(state);
+  next.stats ??= {};
+  const originalPlaytimeMs = next.stats.playtimeMs ?? 0;
   /** @type {Record<string,{id,name,qty}>} */ const itemGains = {};
   const xpGains = {};
   const actionLines = [];
@@ -75,8 +77,7 @@ export function computeOfflineProgress({
       const skill = next.skills[action.skill];
       if (!skill.mastery[actionId]) skill.mastery[actionId] = { xp: 0, level: 1 };
       const mastery = skill.mastery[actionId];
-      const mult = masteryXpMultiplier(mastery.level);
-      const campMult = xpMultiplier(next); // Ember Altar applies offline too
+      const lumenMult = lumenGainMultiplier(next);
 
       for (const o of action.outputs ?? []) {
         const expected = o.min !== undefined
@@ -93,22 +94,27 @@ export function computeOfflineProgress({
           });
           slot.qty += qty;
           next.bank[o.id] = (next.bank[o.id] ?? 0) + qty;
+          next.stats.itemsGathered = (next.stats.itemsGathered ?? 0) + qty;
         } else if (o.kind === 'lumen') {
-          lumenGained += qty;
-          next.lumen += qty;
+          const lit = clampPositive(weighted * lumenMult);
+          lumenGained += lit;
+          next.lumen += lit;
+          next.stats.lumenEarned = (next.stats.lumenEarned ?? 0) + lit;
         } else if (o.kind === 'resource') {
           if (o.id === 'flame') flameGained += qty;
           next[o.id] = (next[o.id] ?? 0) + qty;
         }
       }
 
-      const perCycle = Math.round(action.xp * mult * campMult);
+      const perCycle = Math.round(action.xp * xpGrantMultiplier(next, mastery.level));
       const xpGain = perCycle * completions; // identical rounding to live play
       skill.xp += xpGain;
       xpGains[action.skill] = (xpGains[action.skill] ?? 0) + xpGain;
+      grantRadianceFromXp(next, action.xp * completions, radianceGainMultiplier(next));
       mastery.xp += action.masteryXp * completions;
       mastery.level = levelFromXp(mastery.xp);
       next.actions.completed[actionId] = (next.actions.completed[actionId] ?? 0) + completions;
+      next.stats.actionsDone = (next.stats.actionsDone ?? 0) + completions;
 
       actionLines.push({ actionId, name: action.name, completions, xp: xpGain });
     }
@@ -123,10 +129,17 @@ export function computeOfflineProgress({
     if (lvl > levelsBefore[id]) levelUps.push({ skillId: id, level: lvl });
   }
 
+  // Wall-clock that produced credited work lands in playtime so the HUD
+  // cannot go backwards on Claim (S4 honesty bug).
+  if (creditedMs >= OFFLINE_MIN_AWAY_MS) {
+    next.stats.playtimeMs = originalPlaytimeMs + creditedMs;
+  }
+
   return {
     awayMs,
     creditedMs,
     capped,
+    originalPlaytimeMs,
     gains: {
       items: Object.values(itemGains),
       lumen: lumenGained,

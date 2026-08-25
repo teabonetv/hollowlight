@@ -3,6 +3,7 @@
 // is taken — no partial pays, ever.
 
 import { ITEMS_BY_ID } from '../data/items.js';
+import { recordSell } from './stats.js';
 
 export function bankCount(bank, itemId) {
   return bank[itemId] ?? 0;
@@ -68,5 +69,6 @@ export function sellItems(state, itemId, qty) {
   if (state.bank[itemId] === 0) delete state.bank[itemId]; // tidy saves
   const gained = n * item.sell;
   state.lumen += gained;
+  recordSell(state, n, gained);
   return { ok: true, sold: n, gained };
 }

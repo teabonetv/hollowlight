@@ -17,10 +17,12 @@ import { SKILL_BY_ID } from '../data/skills.js';
 import { ITEMS_BY_ID } from '../data/items.js';
 import { levelFromXp } from '../../core/xp.js';
 import * as bank from './bank.js';
-import * as camp from './upgrades.js';
+import * as mods from './modifiers.js';
+import { grantRadianceFromXp } from './radiance.js';
+import { recordCycle } from './stats.js';
 
 /** +1% XP per mastery level of the running action (see balance-notes.md). */
-export const MASTERY_XP_BONUS_PER_LEVEL = 0.01;
+export const MASTERY_XP_BONUS_PER_LEVEL = mods.MASTERY_XP_BONUS_PER_LEVEL;
 
 export function masteryXpMultiplier(masteryLevel) {
   return 1 + MASTERY_XP_BONUS_PER_LEVEL * masteryLevel;
@@ -61,8 +63,9 @@ export function applyGains(state, gains) {
       bank.bankAdd(state.bank, g.id, g.qty);
       applied.push({ kind: 'item', id: g.id, name: ITEMS_BY_ID[g.id]?.name ?? g.id, qty: g.qty });
     } else if (g.kind === 'lumen') {
-      state.lumen += g.qty;
-      applied.push({ kind: 'lumen', qty: g.qty });
+      const qty = Math.max(0, Math.round(g.qty * mods.lumenGainMultiplier(state)));
+      state.lumen += qty;
+      applied.push({ kind: 'lumen', qty });
     } else if (g.kind === 'resource') {
       state[g.id] = (state[g.id] ?? 0) + g.qty;
       applied.push({ kind: 'resource', id: g.id, qty: g.qty });
@@ -83,20 +86,24 @@ export function completeCycle(state, action, rng) {
   }
 
   bank.bankPay(state.bank, action.costs);
-  const gains = rollOutputs(action, rng, { extraYieldChance: camp.yieldChance(state) });
+  const gains = rollOutputs(action, rng, { extraYieldChance: mods.yieldChance(state) });
   const applied = applyGains(state, gains);
+  recordCycle(state, applied);
 
   const events = [];
   const skill = state.skills[action.skill];
   const mastery = ensureMastery(skill, action.id);
   const beforeLevel = skill.level;
 
-  // XP: base × mastery × Ember Altar (identical expression order in the
-  // offline calculator so live and offline never disagree by 1).
-  skill.xp += Math.round(action.xp * masteryXpMultiplier(mastery.level) * camp.xpMultiplier(state));
+  // XP stack (mastery → camp → radiance → achievement → hooks) is shared
+  // with the offline calculator so live and offline never disagree by 1.
+  const xpGain = Math.round(action.xp * mods.xpGrantMultiplier(state, mastery.level));
+  skill.xp += xpGain;
+  const sparks = grantRadianceFromXp(state, action.xp, mods.radianceGainMultiplier(state));
+  if (sparks > 0) events.push({ type: 'radiance', qty: sparks });
 
   const mBefore = mastery.level;
-  mastery.xp += action.masteryXp;
+  mastery.xp += Math.round(action.masteryXp * mods.masteryXpMultiplier(state));
   mastery.level = levelFromXp(mastery.xp);
   if (mastery.level > mBefore) {
     events.push({ type: 'mastery-levelup', actionId: action.id, level: mastery.level });
@@ -123,6 +130,7 @@ export function autoRestartEnabled(state, action) {
 
 export function setAutoRestart(state, actionId, enabled) {
   state.actions.autoRestart[actionId] = !!enabled;
+  state.stats.autoRestartToggles = (state.stats.autoRestartToggles ?? 0) + 1;
 }
 
 /**
@@ -143,13 +151,16 @@ export function tickActions(state, dtMs, rng) {
     while (guard++ < 10000) {
       // Lantern & Wick shortens every cycle; read per-iteration so a
       // mid-run purchase applies from the next cycle onward.
-      const durationMs = camp.effectiveDurationMs(state, action);
+      const durationMs = mods.effectiveDurationMs(state, action);
       if (progress < durationMs) break;
       progress -= durationMs;
 
       const result = completeCycle(state, action, rng);
       if (result.halted) {
         delete state.actions.active[actionId];
+        if (/tinderscrap/i.test(result.reason ?? '')) {
+          state.stats.tinderHalts = (state.stats.tinderHalts ?? 0) + 1;
+        }
         events.push({ type: 'halted', actionId, reason: result.reason });
         progress = 0;
         break;
@@ -199,13 +210,25 @@ export function startAction(state, actionId) {
   }
 
   state.actions.active[actionId] = { progressMs: 0 };
+  // Persist the painted default (ON) so save.actions.autoRestart is not {}
+  // while the switch shows on. Missing keys used to stay missing until the
+  // player toggled twice.
+  if (state.actions.autoRestart[actionId] === undefined) {
+    state.actions.autoRestart[actionId] = true;
+  }
   return { ok: true };
 }
 
 /** Stop an action by id; omit to stop all (used by offline/reset paths). */
 export function stopAction(state, actionId) {
-  if (actionId !== undefined) delete state.actions.active[actionId];
-  else state.actions.active = {};
+  if (actionId !== undefined) {
+    if (state.actions.active[actionId]) {
+      state.stats.manualStops = (state.stats.manualStops ?? 0) + 1;
+    }
+    delete state.actions.active[actionId];
+  } else {
+    state.actions.active = {};
+  }
 }
 
 /** Snapshot for UI rows: locked? affordable? running? progress/eta? */
@@ -216,7 +239,7 @@ export function actionStatus(state, actionId) {
   const locked = !action || !skill || skill.level < action.unlockLevel;
   const affordable = bank.canAfford(state.bank, action?.costs ?? []);
   // Duration reflects Lantern & Wick speed so bars/ETAs match real ticks.
-  const durationMs = action ? camp.effectiveDurationMs(state, action) : 0;
+  const durationMs = action ? mods.effectiveDurationMs(state, action) : 0;
   return {
     action,
     running: !!active,

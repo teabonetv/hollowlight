@@ -15,6 +15,7 @@
 import { TRACKS_BY_ID } from '../data/upgrades.js';
 import { ITEMS_BY_ID } from '../data/items.js';
 import * as bank from './bank.js';
+import { recordLumenSpend } from './stats.js';
 
 export function upgradeLevel(state, trackId) {
   return state.campUpgrades?.[trackId] ?? 0;
@@ -66,6 +67,7 @@ export function buyUpgrade(state, trackId) {
 
   // Atomic pay: verified affordable above, so both deductions succeed.
   state.lumen -= tier.lumen;
+  recordLumenSpend(state, tier.lumen);
   bank.bankPay(state.bank, Object.entries(tier.items ?? {}).map(([id, qty]) => ({ id, qty })));
   state.campUpgrades ??= {};
   state.campUpgrades[trackId] = level + 1;

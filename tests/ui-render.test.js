@@ -91,8 +91,9 @@ test('camp renders stats and quick actions', () => {
   state.flame = 42;
   const scr = tabs.renderCampScreen(makeCtx(state));
   const cells = scr.node.querySelectorAll('.stat-cell');
-  assert.equal(cells.length, 4);
-  assert.match(cells[1].textContent ?? '', /42/);
+  assert.equal(cells.length, 6);
+  assert.match(scr.node.textContent ?? '', /42/);
+  assert.match(scr.node.textContent ?? '', /Waiting for you/);
 });
 
 test('bank groups items by category and marks owned stacks', () => {

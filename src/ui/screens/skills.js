@@ -7,6 +7,7 @@ import { icon } from '../icons.js';
 import { SKILLS, SKILL_BY_ID } from '../../game/data/skills.js';
 import { actionsForSkill } from '../../game/data/actions.js';
 import { ITEMS_BY_ID } from '../../game/data/items.js';
+import { nextMasteryHook } from '../../game/data/mastery.js';
 import { levelProgress } from '../../core/xp.js';
 import { formatNumber, formatSeconds } from '../../core/format.js';
 import { bankCount } from '../../game/systems/bank.js';
@@ -130,6 +131,7 @@ function buildActionCard(ctx, action) {
   const toggleLabel = el('label', { class: 'auto-toggle' });
   const toggleInput = el('input', { type: 'checkbox' });
   const masteryBadge = el('span', { class: 'mastery-badge' }, '');
+  const masteryHint = el('p', { class: 'mastery-hint muted' }, '');
 
   function paintChips() {
     clear(costChips); clear(yieldChips);
@@ -182,6 +184,13 @@ function buildActionCard(ctx, action) {
       ? formatSeconds(st.etaMs)
       : `${formatSeconds(st.durationMs)} / cycle`;
     masteryBadge.textContent = `Mastery ${st.mastery.level}`;
+    const hook = nextMasteryHook(action.id, st.mastery.level);
+    masteryBadge.title = hook
+      ? `Next: ${hook.name} at ${hook.level}`
+      : 'All listed mastery rewards reached';
+    masteryHint.textContent = hook
+      ? `Next: ${hook.name} (Lv ${hook.level}) — ${hook.desc}`
+      : 'Mastery complete for this action’s listed rewards.';
     paintButton();
   }
 
@@ -197,6 +206,7 @@ function buildActionCard(ctx, action) {
         el('h2', { class: 'action-name' }, action.name),
         masteryBadge),
       el('p', { class: 'action-desc' }, action.desc),
+      masteryHint,
       el('div', { class: 'action-chips' }, el('span', { class: 'chips-label' }, 'Costs'), costChips),
       el('div', { class: 'action-chips' }, el('span', { class: 'chips-label' }, 'Yields'), yieldChips),
       el('div', { class: 'action-barline' },

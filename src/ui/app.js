@@ -28,8 +28,13 @@ import { createToaster } from './toast.js';
 import { openModal, showOfflineModal, showSettingsModal, showSellSheet } from './modals.js';
 import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
 import {
-  renderCampScreen, renderBankScreen, renderMapScreen, renderJournalScreen,
+  renderCampScreen, renderBankScreen, renderMapScreen,
 } from './screens/tabs.js';
+import { renderAlmanacScreen } from './screens/meta.js';
+import { hydrateState } from '../game/hydrate.js';
+import { evaluateAchievements } from '../game/systems/achievements.js';
+import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
+import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
 
 const AUTOSAVE_MS = 30_000;
 
@@ -42,10 +47,11 @@ function boot() {
 
   const hudLumen = document.getElementById('hud-lumen');
   const hudFlame = document.getElementById('hud-flame');
+  const hudRadiance = document.getElementById('hud-radiance');
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
-  const ui = { tab: 'camp', skillId: null };
+  const ui = { tab: 'camp', skillId: null, almanac: 'overview' };
   let liveUpdate = () => {};
   let rng = createRng(1);
 
@@ -64,8 +70,9 @@ function boot() {
   }
 
   function adopt(stateObj) {
-    game = stateObj;
+    game = hydrateState(stateObj);
     rng = createRng(game.rngState ?? 1);
+    ensureDailies(game, Date.now());
     applyMotionClass();
     renderScreen();
     updateHud();
@@ -139,6 +146,20 @@ function boot() {
     renderScreen();
   });
 
+  function flushAchievementsQuiet() {
+    if (!game) return;
+    const newly = evaluateAchievements(game);
+    for (const a of newly) {
+      toaster.push(`Feat: ${a.name}.`, 'success');
+      pushLog(game, `Feat lit: ${a.name}.`, game.stats.playtimeMs);
+    }
+    return newly.length;
+  }
+  function flushAchievements() {
+    const n = flushAchievementsQuiet();
+    if (n) { updateHud(); renderScreen(); }
+  }
+
   // ── HUD ────────────────────────────────────────────────────────
   // Lumen counts UP to its new value after sells/purchases (F1c feedback);
   // reduced motion skips straight to the number.
@@ -156,9 +177,10 @@ function boot() {
       startLumenCountUp(shownLumen, target);
     }
     hudFlame.textContent = `${formatNumber(game.flame)} flame`;
+    if (hudRadiance) hudRadiance.textContent = `✧ ${formatNumber(game.radiance ?? 0)}`;
   }
   function startLumenCountUp(from, to) {
-    cancelAnimationFrame?.(lumenAnimId);
+    globalThis.cancelAnimationFrame?.(lumenAnimId);
     const t0 = performance.now();
     const DUR_MS = 450;
     const frame = (t) => {
@@ -177,7 +199,7 @@ function boot() {
     }
     if (ui.tab === 'bank') return renderBankScreen(ctx);
     if (ui.tab === 'map') return renderMapScreen(ctx);
-    if (ui.tab === 'journal') return renderJournalScreen(ctx);
+    if (ui.tab === 'journal') return renderAlmanacScreen(ctx);
     return renderCampScreen(ctx);
   }
 
@@ -191,12 +213,18 @@ function boot() {
   function setTab(tab) {
     ui.tab = tab;
     ui.skillId = null;
+    if (tab === 'journal') {
+      ui.almanac = ui.almanac && ui.almanac !== 'overview' ? ui.almanac : 'overview';
+      game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
+    }
+    if (tab === 'map') game.stats.mapOpens = (game.stats.mapOpens ?? 0) + 1;
     for (const b of document.querySelectorAll('.tabbar button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
       b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
     }
     renderScreen();
     screenRoot.scrollTop = 0;
+    flushAchievements();
   }
 
   // ── ctx handed to screens & modals ─────────────────────────────
@@ -220,7 +248,7 @@ function boot() {
     // ── F1c economy: selling + Keeper's Camp upgrades ──────────────
     sell(itemId, qty) {
       const res = sellItems(game, itemId, qty);
-      if (res.ok) { persist(); updateHud(); }
+      if (res.ok) { persist(); updateHud(); flushAchievementsQuiet(); }
       return res;
     },
     openSellSheet(itemId) {
@@ -235,10 +263,68 @@ function boot() {
       persist();
       updateHud();
       renderScreen();
+      flushAchievements();
       return res;
     },
     openSkill(id) { ui.tab = 'skills'; ui.skillId = id; renderScreen(); },
     openSkillsList() { ui.skillId = null; renderScreen(); },
+    almanacView: () => ui.almanac,
+    openAlmanac(view = 'overview') {
+      ui.tab = 'journal';
+      ui.almanac = view;
+      if (view === 'stars') game.stats.starsOpens = (game.stats.starsOpens ?? 0) + 1;
+      game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
+      for (const b of document.querySelectorAll('.tabbar button')) {
+        b.classList.toggle('active', b.dataset.tab === 'journal');
+        b.setAttribute('aria-selected', b.dataset.tab === 'journal' ? 'true' : 'false');
+      }
+      renderScreen();
+      flushAchievements();
+    },
+    ensureDailies() { ensureDailies(game, Date.now()); },
+    rerollDailies() {
+      const res = rerollDailies(game, Date.now());
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push('The embers shift.', 'info');
+      persist();
+      renderScreen();
+      flushAchievements();
+    },
+    claimDaily(id) {
+      const res = claimDaily(game, id);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push(`+${res.sparks} Radiance from a daily ember.`, 'success');
+      persist();
+      updateHud();
+      renderScreen();
+      flushAchievements();
+    },
+    unlockPerk(id) {
+      const res = unlockPerk(game, id);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push(`Star kindled: ${res.perk.name}.`, 'success');
+      pushLog(game, `Kindled the star “${res.perk.name}”.`, game.stats.playtimeMs);
+      persist();
+      updateHud();
+      renderScreen();
+      flushAchievements();
+    },
+    respecPerks() {
+      const res = respecPerks(game);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      toaster.push(`Stars rearranged. ✦${res.cost} paid, ${res.refund} Radiance returned.`, 'success');
+      persist();
+      updateHud();
+      renderScreen();
+      flushAchievements();
+    },
+    equipTitle(title) {
+      game.cosmetics ??= { titles: [], frames: ['plain'], lanternFrame: 'plain', activeTitle: null };
+      game.cosmetics.activeTitle = title;
+      persist();
+      renderScreen();
+      flushAchievements();
+    },
     isReducedMotion: () => !!game.settings.reducedMotion,
     setReducedMotion(on) { game.settings.reducedMotion = !!on; persist(); applyMotionClass(); },
     exportSave() { game.rngState = rng.getState(); return serializeSave(game, game.savedAt); },
@@ -276,13 +362,17 @@ function boot() {
     const levels = [...res.levelUps];
     showOfflineModal(modalRoot, res, {
       onClaim: () => {
+        const livePlay = game.stats.playtimeMs;
         adopt(res.nextState);
+        const extraLive = Math.max(0, livePlay - (res.originalPlaytimeMs ?? livePlay));
+        game.stats.playtimeMs += extraLive;
+        game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
         persist();
-        game.stats.offlineClaims++;
         pushLog(game,
           `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
           game.stats.playtimeMs);
         for (const lu of levels) bus.emit('levelup', lu);
+        flushAchievements();
         updateHud();
         renderScreen();
       },
@@ -296,6 +386,7 @@ function boot() {
       const events = runner.tickActions(game, dtMs, rng);
       game.stats.playtimeMs += dtMs;
       for (const ev of events) bus.emit(ev.type, ev);
+      flushAchievementsQuiet();
       updateHud();
       liveUpdate();
     },
@@ -306,7 +397,9 @@ function boot() {
     b.addEventListener('click', () => setTab(b.dataset.tab));
   });
   document.getElementById('btn-settings').addEventListener('click', () => {
+    game.stats.settingsOpens = (game.stats.settingsOpens ?? 0) + 1;
     showSettingsModal(modalRoot, ctx);
+    flushAchievements();
   });
 
   document.addEventListener('visibilitychange', () => {
