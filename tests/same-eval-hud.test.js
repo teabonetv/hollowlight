@@ -84,6 +84,8 @@ const { formatNumber } = await import('../src/core/format.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { pushLog } = await import('../src/game/state.js');
 const { unlockPerk } = await import('../src/game/systems/radiance.js');
+const { bankSellValue, bankCount } = await import('../src/game/systems/bank.js');
+const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
 
 function hudNum(node) {
   const m = String(node.textContent ?? '').replace(/,/g, '').match(/(\d+)/);
@@ -157,4 +159,67 @@ test('claim + kindling path: persist-then-paint matches deserialize in one shot'
   assert.equal(hudNum(hudRadiance), env.state.radiance ?? 0);
   assert.equal(hudNum(unspent), env.state.radiance ?? 0);
   assert.match(unspent.textContent, /Radiance unspent/);
+});
+
+test('Sell 1 from the Owned grid: HUD lumen == save.lumen same-eval', () => {
+  const bankTab = tabButtons.find((b) => b.dataset.tab === 'bank');
+  bankTab.click();
+
+  const worthBefore = (() => {
+    const header = elements.screen.querySelector('.screen-sub')?.textContent ?? '';
+    const m = header.match(/catalog worth ✦([\d,]+)/);
+    return m ? Number(m[1].replace(/,/g, '')) : NaN;
+  })();
+  const tinderBefore = bankCount(
+    deserializeSave(storage.getItem(SAVE_KEY)).state.bank, 'tinderscrap');
+  const lumenBefore = hudNum(elements['hud-lumen']);
+  assert.equal(tinderBefore, 30);
+
+  const sellToggle = findButton(elements.screen, /Sell Mode/);
+  assert.ok(sellToggle, 'Sell Mode toggle on the working pack');
+  sellToggle.click();
+
+  let tinder;
+  elements.screen._walk?.((n) => {
+    if (tinder || n === elements.screen) return;
+    if (n.classList?.contains('bank-tile') && /Tinderscrap/.test(n.textContent ?? '')) tinder = n;
+  });
+  assert.ok(tinder, 'Tinderscrap glyph on the grid');
+  const chromeBefore = tinder.querySelector('.bank-chrome')?.textContent ?? '';
+  assert.equal(chromeBefore, `✦${ITEMS_BY_ID.tinderscrap.sell} · ×${formatNumber(30)}`);
+  tinder.click();
+
+  assertHudEqualsSave('after grid Sell 1');
+  const env = JSON.parse(storage.getItem(SAVE_KEY));
+  const { state } = deserializeSave(storage.getItem(SAVE_KEY));
+  assert.equal(bankCount(state.bank, 'tinderscrap'), 29);
+  assert.equal(state.lumen, env.state.lumen);
+  assert.equal(hudNum(elements['hud-lumen']), state.lumen);
+
+  const catalogDrop = ITEMS_BY_ID.tinderscrap.sell;
+  const header = elements.screen.querySelector('.screen-sub')?.textContent ?? '';
+  assert.match(header, new RegExp(`catalog worth ✦${formatNumber(worthBefore - catalogDrop)}`));
+  assert.equal(bankSellValue(state.bank), worthBefore - catalogDrop);
+
+  let tinderAfter;
+  elements.screen._walk?.((n) => {
+    if (tinderAfter || n === elements.screen) return;
+    if (n.classList?.contains('bank-tile') && /Tinderscrap/.test(n.textContent ?? '')) tinderAfter = n;
+  });
+  assert.equal(
+    tinderAfter.querySelector('.bank-chrome')?.textContent,
+    `✦${catalogDrop} · ×${formatNumber(29)}`);
+
+  const featUnlocked = !!env.state.achievements.unlocked['e-sell-1'];
+  if (featUnlocked) {
+    assert.equal(state.lumen, lumenBefore + catalogDrop + 5, 'Fair Trade lumen is extra, not a catalog lie');
+    const toastText = elements.toasts.textContent ?? '';
+    assert.match(toastText, /A Fair Trade/);
+    assert.doesNotMatch(
+      tinderAfter.querySelector('.bank-chrome')?.textContent ?? '',
+      /✦6/,
+      'tile chrome stays on catalog ✦1');
+  } else {
+    assert.equal(state.lumen, lumenBefore + catalogDrop);
+  }
 });
