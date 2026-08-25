@@ -10,11 +10,11 @@
 
 | Field | Value |
 |---|---|
-| Wave | 1 GATE — critic v5 attempt 3 PENDING |
-| Active lanes | none in flight — v5 attempts 1-2 both died to provider 429s (22:33, 12:38); partial evidence exists but is quarantined (critics must not read each other's work) |
+| Wave | 1 GATE — critic v5 attempt 3 RUNNING |
+| Active lanes | F1 critic v5 attempt 3 in flight (fresh, blind; subagent sa-0-804a9d9e, dispatched 12:41 after attempts 1-2 died to provider 429s) |
 | Merged | F1 · F1b · F1c · **F1d @ 8aff8c8** (136/136 green; offline persistence hardened, sell-all confirm re-render-proof, boot watchdog live) |
-| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline/sell/boot) → F1d fixed. v5: not yet delivered |
-| Next | NEXT TICK: re-dispatch F1 critic v5 (fresh, blind, same corrected-methodology brief as attempt 2) → verdict gates Wave 1 |
+| Critic verdicts | v3: MELVOR (no sink) → F1c fixed. v4: MELVOR (offline/sell/boot) → F1d fixed. v5 attempts 1-2 died pre-verdict |
+| Next | v5 attempt-3 verdict → pass ⇒ Wave 1 (S1,S2,S4) / loss ⇒ next gap lane |
 
 ## Round log
 
