@@ -25,6 +25,7 @@ import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
+import * as combat from '../game/systems/combat.js';
 import { sellItems, togglePin as pinItem, savePreset as writePreset, applyPreset as usePreset,
   deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot } from '../game/systems/bank.js';
 import * as storeSys from '../game/systems/store.js';
@@ -77,6 +78,7 @@ function boot() {
 
   function adopt(stateObj) {
     game = stateObj;
+    combat.ensureCombat(game);
     rng = createRng(game.rngState ?? 1);
     applyMotionClass();
     renderScreen();
@@ -149,6 +151,19 @@ function boot() {
     toaster.push(`${a.name} complete.`, 'success');
     pushLog(game, `${a.name} finished its work.`, game.stats.playtimeMs);
     renderScreen();
+  });
+  bus.on('combat-kill', ({ enemyId, xp, souls }) => {
+    toaster.push(`Fell a foe · +${xp} Combat XP, ${souls} souls.`, 'success');
+    pushLog(game, `Combat: a foe (${enemyId}) fell.`, game.stats.playtimeMs);
+  });
+  bus.on('combat-death', ({ zoneId, lumen }) => {
+    toaster.push(`You fall. ✦${lumen} spilled — walk back to recover it.`, 'warn');
+    pushLog(game, `Fell on the ${zoneId} stretch. ✦${lumen} waits at the death-site.`, game.stats.playtimeMs);
+    renderScreen();
+  });
+  bus.on('vigil-complete', ({ category, lumen }) => {
+    toaster.push(`Vigil complete. ✦${lumen} for the lantern.`, 'success');
+    pushLog(game, `A Vigil against ${category} is fulfilled.`, game.stats.playtimeMs);
   });
 
   // ── HUD ────────────────────────────────────────────────────────
@@ -307,6 +322,37 @@ function boot() {
     },
     openSkill(id) { ui.tab = 'skills'; ui.skillId = id; renderScreen(); },
     openSkillsList() { ui.skillId = null; renderScreen(); },
+    startFight(enemyId) {
+      const res = combat.startFight(game, enemyId);
+      if (!res.ok) return res;
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    fleeFight() {
+      const res = combat.fleeFight(game);
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    eatFood(itemId) {
+      const res = combat.eatFood(game, itemId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    recoverLumen(zoneId) {
+      const res = combat.recoverLumen(game, zoneId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    assignVigil() {
+      const res = combat.assignVigil(game);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    setCombatStyle(styleId) {
+      return combat.setStyle(game, styleId);
+    },
     isReducedMotion: () => !!game.settings.reducedMotion,
     setReducedMotion(on) { game.settings.reducedMotion = !!on; persist(); applyMotionClass(); },
     exportSave() { game.rngState = rng.getState(); return serializeSave(game, game.savedAt); },
@@ -362,6 +408,7 @@ function boot() {
     stepMs: TICK_MS,
     onTick(dtMs) {
       const events = runner.tickActions(game, dtMs, rng);
+      events.push(...combat.tickCombat(game, dtMs));
       game.stats.playtimeMs += dtMs;
       for (const ev of events) bus.emit(ev.type, ev);
       updateHud();

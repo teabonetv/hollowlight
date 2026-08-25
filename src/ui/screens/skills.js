@@ -3,6 +3,7 @@
 // detail states so nothing is a dead end.
 
 import { el, clear } from '../dom.js';
+import { renderCombatPanel } from './combat.js';
 import { icon } from '../icons.js';
 import { SKILLS, SKILL_BY_ID } from '../../game/data/skills.js';
 import { actionsForSkill } from '../../game/data/actions.js';
@@ -23,8 +24,10 @@ export function renderSkillsScreen(ctx) {
   for (const s of SKILLS) {
     const sk = state.skills[s.id];
     const prog = levelProgress(sk.xp);
-    const running = actionsForSkill(s.id).some((a) => state.actions.active[a.id]);
     const live = s.wave === 0;
+    const running = s.id === 'combat'
+      ? !!state.combat?.fighting
+      : actionsForSkill(s.id).some((a) => state.actions.active[a.id]);
 
     const row = el('button', {
       class: `skill-row ${live ? '' : 'skill-row-future'}`,
@@ -83,6 +86,22 @@ export function renderSkillDetail(ctx, skillId) {
       el('span', { class: 'bar-fill xp-fill', style: `width:${(prog.frac * 100).toFixed(1)}%` })),
   );
   root.append(xpWrap);
+
+  if (skillId === 'combat') {
+    const panel = renderCombatPanel(ctx);
+    root.append(panel.node);
+    return {
+      node: root,
+      update() {
+        const p = levelProgress(ctx.state.skills.combat.xp);
+        xpWrap.querySelector('.xp-level').textContent = `Level ${p.level}`;
+        xpWrap.querySelector('.xp-count').textContent = p.span === Infinity
+          ? `${formatNumber(p.into)} XP` : `${formatNumber(p.into)} / ${formatNumber(p.span)} XP`;
+        xpWrap.querySelector('.xp-fill').style.width = `${(p.frac * 100).toFixed(1)}%`;
+        panel.update();
+      },
+    };
+  }
 
   if (!live) return comingSoon(root, skill);
 

@@ -38,8 +38,8 @@ test('skills list renders all eight registry rows', () => {
   const scr = renderSkillsScreen(makeCtx(state));
   const rows = scr.node.querySelectorAll('.skill-row');
   assert.equal(rows.length, 8, 'one row per charter skill');
-  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 6,
-    'six skills marked future in wave 0');
+  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 5,
+    'five skills marked future once combat is live');
 });
 
 test('playable skill detail renders action cards with live controls', () => {
@@ -99,7 +99,7 @@ test('bank groups items by category and marks owned stacks', () => {
   const state = createState({ nowMs: 0, rngSeed: 8 }); // starter: tinder, rushwick, fogwort
   const scr = tabs.renderBankScreen(makeCtx(state));
   const owned = scr.node.querySelectorAll('.bank-tile.owned');
-  assert.equal(owned.length, 3, 'three starter stacks lit');
+  assert.equal(owned.length, 6, 'starter stacks lit (gathering + combat provisions)');
   assert.ok(scr.node.querySelectorAll('.bank-tile').length >= 20, '~22 items visible');
 });
 
