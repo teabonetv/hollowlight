@@ -1,6 +1,7 @@
-// Log Book / completion percentages. Total completion is the average of
-// category percents (achievements) plus constellation fill, so a returning
-// player can see one number and three next-hints.
+// Log Book / completion percentages. Total completion is the mean of four
+// honest buckets we actually have: Skills, Mastery, Items, Feats. Tab-open
+// feats still exist; they cannot dominate because they are 6 of ~76 feats
+// and Feats is only one quarter of the headline number.
 
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES } from '../data/achievements.js';
 import { PERKS } from '../data/perks.js';
@@ -8,8 +9,10 @@ import { isUnlocked, triggerMet } from './achievements.js';
 import { cheapestAvailable } from './radiance.js';
 import { DAILY_POOL_BY_ID } from '../data/dailies.js';
 import { taskProgress } from './dailies.js';
-import { ACTIONS_BY_ID } from '../data/actions.js';
-import { SKILL_BY_ID } from '../data/skills.js';
+import { ACTIONS, ACTIONS_BY_ID } from '../data/actions.js';
+import { SKILLS, SKILL_BY_ID } from '../data/skills.js';
+import { ITEMS } from '../data/items.js';
+import { MILESTONE_LEVEL } from '../../core/xp.js';
 
 export function categoryStats(state) {
   const rows = [];
@@ -37,11 +40,56 @@ export function perkCompletion(state) {
   return { done, total: PERKS.length, pct: done / PERKS.length };
 }
 
-/** Front-and-centre number: mean of achievement % and constellation %. */
+export function logCategoryStats(state) {
+  return [
+    skillLogRow(state),
+    masteryLogRow(state),
+    itemsLogRow(state),
+    featsLogRow(state),
+  ];
+}
+
+function clampRatio(have, need) {
+  if (!(need > 0)) return 0;
+  return Math.min(1, Math.max(0, have / need));
+}
+
+function skillLogRow(state) {
+  const cap = MILESTONE_LEVEL;
+  let have = 0;
+  for (const sk of SKILLS) {
+    have += Math.min(cap, state.skills?.[sk.id]?.level ?? 1);
+  }
+  const total = SKILLS.length * cap;
+  return { id: 'skills', name: 'Skills', done: have, total, pct: clampRatio(have, total) };
+}
+
+function masteryLogRow(state) {
+  const cap = MILESTONE_LEVEL;
+  let have = 0;
+  for (const action of ACTIONS) {
+    const m = state.skills?.[action.skill]?.mastery?.[action.id];
+    have += Math.min(cap, m?.level ?? 1);
+  }
+  const total = ACTIONS.length * cap;
+  return { id: 'mastery', name: 'Mastery', done: have, total, pct: clampRatio(have, total) };
+}
+
+function itemsLogRow(state) {
+  const have = Object.values(state.bank ?? {}).filter((n) => n > 0).length;
+  const total = ITEMS.length;
+  return { id: 'items', name: 'Items', done: have, total, pct: clampRatio(have, total) };
+}
+
+function featsLogRow(state) {
+  const a = achievementCompletion(state);
+  return { id: 'feats', name: 'Feats', done: a.done, total: a.total, pct: a.pct };
+}
+
+/** Front-and-centre number: mean of Skills / Mastery / Items / Feats. */
 export function totalCompletion(state) {
-  const a = achievementCompletion(state).pct;
-  const p = perkCompletion(state).pct;
-  const pct = (a + p) / 2;
+  const rows = logCategoryStats(state);
+  const pct = rows.length ? rows.reduce((s, r) => s + r.pct, 0) / rows.length : 0;
   return { pct, label: `${Math.floor(pct * 100)}%` };
 }
 

@@ -23,12 +23,12 @@ function seedFromKey(key, salt = 0) {
   return h >>> 0;
 }
 
-function pickSet(dayKey, salt, exclude = new Set()) {
+function pickSet(dayKey, salt, exclude = new Set(), count = DAILY_TASK_COUNT) {
   const rng = createRng(seedFromKey(dayKey, salt));
   const pool = DAILY_POOL.filter((t) => !exclude.has(t.id));
   const chosen = [];
   const bag = [...pool];
-  while (chosen.length < DAILY_TASK_COUNT && bag.length) {
+  while (chosen.length < count && bag.length) {
     const i = rng.int(bag.length);
     chosen.push(bag.splice(i, 1)[0]);
   }
@@ -92,15 +92,19 @@ export function rerollDailies(state, nowMs) {
   ensureDailies(state, nowMs);
   if (!canReroll(state)) return { ok: false, error: 'Already rerolled today.' };
   const key = state.dailies.dayKey;
-  const exclude = new Set(state.dailies.tasks.map((t) => t.id));
-  const next = pickSet(key, 1, exclude);
+  const kept = (state.dailies.tasks ?? []).filter((t) => t.claimed);
+  const slots = Math.max(0, DAILY_TASK_COUNT - kept.length);
+  const exclude = new Set((state.dailies.tasks ?? []).map((t) => t.id));
+  let next = slots > 0 ? pickSet(key, 1, exclude, slots) : [];
   // If the pool is too small to exclude all, pickSet may return fewer — fall
-  // back to a salted full pick that is allowed to overlap as a last resort.
-  const tasks = next.length === DAILY_TASK_COUNT
-    ? next
-    : pickSet(key, 99, new Set());
+  // back to a salted pick that may overlap unclaimed ids, never claimed ones.
+  if (next.length !== slots) {
+    const claimedIds = new Set(kept.map((t) => t.id));
+    next = pickSet(key, 99, claimedIds, slots);
+  }
+  const fresh = snapshotBaselines(state, next);
   state.dailies.rerollsUsed += 1;
-  state.dailies.tasks = snapshotBaselines(state, tasks);
+  state.dailies.tasks = [...kept, ...fresh].slice(0, DAILY_TASK_COUNT);
   state.stats.dailyRerolls = (state.stats.dailyRerolls ?? 0) + 1;
   return { ok: true, tasks: state.dailies.tasks };
 }

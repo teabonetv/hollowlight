@@ -4,7 +4,7 @@ import { createState } from '../src/game/state.js';
 import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { xpForLevel, levelFromXp } from '../src/core/xp.js';
 import {
-  computeOfflineProgress, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
+  computeOfflineProgress, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS, formatRecapLine,
 } from '../src/core/offline.js';
 import { completeCycle } from '../src/game/systems/action-runner.js';
 import { createRng } from '../src/core/rng.js';
@@ -62,6 +62,15 @@ test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', 
   assert.equal(res.gains.actions[0].completions, 1);
   assert.equal(res.idleNotes[0].missingId, 'tinderscrap');
   assert.equal(res.idleNotes[0].completions, 1);
+  const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
+  assert.equal(
+    formatRecapLine(none.recapLines[0], names),
+    'Tend the Flame ×0 — out of Tinderscrap',
+  );
+  assert.equal(
+    formatRecapLine(res.recapLines[0], names),
+    'Tend the Flame ×1 — out of Tinderscrap',
+  );
 });
 
 

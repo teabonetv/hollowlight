@@ -76,7 +76,9 @@ export function computeOfflineProgress({
         }
       }
       if (completions <= 0) {
-        if (timeCompletions > 0 && missingId) {
+        // Always name a fuel halt, even at ×0 — dropping the line hid "out of
+        // Tinderscrap" from the recap while feats still fired.
+        if (missingId) {
           idleNotes.push({
             actionId, name: action.name, completions: 0, missingId, timeCompletions,
           });
@@ -181,7 +183,36 @@ export function computeOfflineProgress({
     levelUps,
     nextState: next,
     idleNotes,
+    recapLines: mergeRecapLines(actionLines, idleNotes),
     hasGains: actionLines.length > 0,
     hasReport: actionLines.length > 0 || idleNotes.length > 0,
   };
+}
+
+function mergeRecapLines(actionLines, idleNotes) {
+  /** @type {Map<string, object>} */
+  const byId = new Map();
+  for (const line of actionLines) byId.set(line.actionId, { ...line });
+  for (const note of idleNotes) {
+    const prev = byId.get(note.actionId);
+    if (prev) {
+      byId.set(note.actionId, { ...prev, missingId: note.missingId, timeCompletions: note.timeCompletions });
+    } else {
+      byId.set(note.actionId, { ...note, xp: 0 });
+    }
+  }
+  return [...byId.values()];
+}
+
+/**
+ * One recap sentence. Halted actions always include ×N (including 0 and 1).
+ * @param {{name:string, completions?:number, missingId?:string, xp?:number}} line
+ * @param {(id:string)=>string} [resolveItem]
+ */
+export function formatRecapLine(line, resolveItem = (id) => id) {
+  const n = line.completions ?? 0;
+  let text = `${line.name} ×${n}`;
+  if (line.missingId) text += ` — out of ${resolveItem(line.missingId)}`;
+  else if (line.xp > 0) text += ` · +${line.xp} XP`;
+  return text;
 }
