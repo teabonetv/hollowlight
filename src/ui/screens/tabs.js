@@ -4,11 +4,16 @@
 
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
-import { ITEMS, ITEM_CATEGORIES } from '../../game/data/items.js';
 import { TRACKS } from '../../game/data/upgrades.js';
-import { bankCount, bankSellValue } from '../../game/systems/bank.js';
+import { REPAIR_KITS } from '../../game/data/repairs.js';
+import { KINDLING_BUNDLE } from '../../game/data/store.js';
+import { bankCount } from '../../game/systems/bank.js';
+import { lanternIntegrity } from '../../game/systems/repairs.js';
 import * as camp from '../../game/systems/upgrades.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
+import { renderBankScreen } from './bank.js';
+
+export { renderBankScreen };
 
 function campCycles(state) {
   return Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
@@ -25,6 +30,9 @@ export function renderCampScreen(ctx) {
     el('span', { class: 'empty-icon', html: icon('camp') }),
     el('p', { class: 'empty-text' }, 'Nothing upgraded yet — the lantern hungers.'));
 
+  const tinderBanner = el('div', { class: 'empty-state camp-starve' });
+  const repairCard = buildRepairCard(ctx);
+
   const root = el('section', { class: 'screen camp' },
     el('div', { class: 'sigil-wrap', 'aria-hidden': 'true' }, el('div', { class: 'sigil' })),
     el('h1', { class: 'camp-title' }, 'Hearthway Hollow'),
@@ -39,7 +47,15 @@ export function renderCampScreen(ctx) {
       el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openSkill('emberkeeping') },
         'Tend the Flame'),
       el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openSkill('foraging') },
-        'Walk the fog-line')),
+        'Walk the fog-line'),
+      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openStore?.() },
+        'The General Store')),
+
+    tinderBanner,
+
+    el('h2', { class: 'section-title' }, 'The Lantern'),
+    el('p', { class: 'section-sub muted' }, 'Repairs spend scrap and Lumen. A cracked chimney still burns — just poorer.'),
+    repairCard.node,
 
     // ── The Keeper's Camp — upgrade tracks (F1c economy sink) ──
     el('h2', { class: 'section-title' }, "The Keeper's Camp"),
@@ -55,6 +71,25 @@ export function renderCampScreen(ctx) {
     flameVal.textContent = formatNumber(s.flame);
     cyclesVal.textContent = formatNumber(campCycles(s));
     timeVal.textContent = formatDuration(s.stats.playtimeMs);
+
+    const tinder = bankCount(s.bank, 'tinderscrap');
+    if (tinder <= 0) {
+      tinderBanner.style.display = '';
+      clear(tinderBanner);
+      tinderBanner.append(
+        el('p', { class: 'empty-text' },
+          `Kindling is gone — the stall still sells Tinderscrap, and a ${KINDLING_BUNDLE.name} is ✦${KINDLING_BUNDLE.cost} for eight handfuls. Or walk the fog-line; herbs carry dry tinder home.`),
+        el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openStore?.() },
+          'Buy kindling at the stall'));
+    } else if (tinder < 8) {
+      tinderBanner.style.display = '';
+      clear(tinderBanner);
+      tinderBanner.append(
+        el('p', { class: 'empty-text' },
+          `Only ${formatNumber(tinder)} Tinderscrap left. Forage the fog-line (30% tinder) or buy a bundle before Tend goes dark.`));
+    } else {
+      tinderBanner.style.display = 'none';
+    }
   }
 
   function update() {
@@ -62,6 +97,7 @@ export function renderCampScreen(ctx) {
     const anyOwned = TRACKS.some((t) => camp.upgradeLevel(ctx.state, t.id) > 0);
     emptyBanner.style.display = anyOwned ? 'none' : '';
     for (const r of trackRefs) r.update();
+    repairCard.update();
   }
   update();
 
@@ -149,60 +185,35 @@ function buildTrackCard(ctx, track) {
   };
 }
 
-export function renderBankScreen(ctx) {
-  const headerSub = el('p', { class: 'screen-sub' });
-  const tilePainters = [];
+function buildRepairCard(ctx) {
+  const integrityLine = el('span', { class: 'track-effect' });
+  const kitsHost = el('div', { class: 'repair-kits' });
 
-  const root = el('section', { class: 'screen' },
-    el('header', { class: 'screen-head' },
-      el('h1', { class: 'screen-title' }, 'Bank'),
-      headerSub));
-
-  for (const [catId, catName] of ITEM_CATEGORIES) {
-    const items = ITEMS.filter((i) => i.category === catId);
-    if (!items.length) continue;
-    const tilesHost = el('div', { class: 'bank-grid' });
-    const grid = el('div', { class: 'bank-cat' },
-      el('h2', { class: 'bank-cat-name' }, catName),
-      tilesHost);
-
-    for (const it of items) {
-      const qtyEl = el('span', { class: 'bank-qty' });
-      const sellEl = el('span', { class: 'bank-sell muted' });
-      const tile = el('button', {
-        onclick: () => {
-          const q = bankCount(ctx.state.bank, it.id);
-          if (q > 0) ctx.openSellSheet(it.id);
-          else ctx.toast(`${it.name}: not yet found. ${it.flavor}`, 'info');
-        },
-      }, qtyEl, el('span', { class: 'bank-name' }, it.name), sellEl);
-      tilesHost.append(tile);
-
-      tilePainters.push(() => {
-        const qty = bankCount(ctx.state.bank, it.id);
-        tile.className = `bank-tile ${qty > 0 ? 'owned' : 'unowned'}`;
-        tile.title = qty > 0 ? `Sell ${it.name}` : it.flavor;
-        tile.setAttribute('aria-label',
-          `${it.name}, ${qty} owned${qty > 0 ? `, sells for ✦${it.sell} each` : ''}`);
-        qtyEl.textContent = qty > 0 ? formatNumber(qty) : '—';
-        sellEl.textContent = `✦${it.sell}${it.tier > 1 ? ` · T${it.tier}` : ''}`;
-      });
+  function paint() {
+    const i = lanternIntegrity(ctx.state);
+    integrityLine.textContent = `Integrity ${i}/100`;
+    clear(kitsHost);
+    for (const kit of REPAIR_KITS) {
+      const btn = el('button', {
+        class: 'btn btn-ghost btn-wide',
+        onclick: () => ctx.repairLantern?.(kit.id),
+      }, `${kit.name} · +${kit.restore} · ✦${kit.lumen}`);
+      kitsHost.append(el('div', { class: 'repair-row' },
+        el('p', { class: 'track-flavor muted' }, kit.flavor),
+        btn));
     }
-    root.append(grid);
   }
-
-  root.append(el('p', { class: 'footnote muted' },
-    'Tap a lit stack to sell it — every coin goes back into the camp.'));
-
-  function update() {
-    let discovered = 0;
-    for (const it of ITEMS) if (bankCount(ctx.state.bank, it.id) > 0) discovered++;
-    headerSub.textContent =
-      `${discovered} of ${ITEMS.length} items known · worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
-    for (const paint of tilePainters) paint();
-  }
-  update();
-  return { node: root, update };
+  paint();
+  return {
+    node: el('article', { class: 'card repair-card' },
+      el('div', { class: 'track-head' },
+        el('span', { class: 'skill-icon glyph-flame', html: icon('flame') }),
+        el('span', { class: 'track-title' },
+          el('h3', { class: 'track-name' }, 'Lantern glass'),
+          integrityLine)),
+      kitsHost),
+    update: paint,
+  };
 }
 
 const SETTLEMENTS = [

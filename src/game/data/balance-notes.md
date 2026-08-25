@@ -150,3 +150,56 @@ Satchel 3,760 ✦, Altar 6,440 ✦ — **14,180 ✦ all-in**.
 - Speed cap note: +30 % speed multiplies income AND sink affordability alike,
   so late-track players re-earn the next tier ~30 % faster — self-balancing,
   no death spiral in either direction.
+
+## Price curve (S2 General Store)
+
+Selling to the stall is **not** a flat registry dump. Each unit sold adds
+pressure; pressure **lowers the live sell unit** toward a floor, then
+recovers over **playtime** (the same clock as skills — offline and live agree).
+
+```
+pressure'     = min(0.60, pressure + 0.02 × qtySold)
+pressure(t)   = pressure' × 2^(−Δplaytime / 10 min)
+sellUnit      = max( floor(sell × 0.40), round(sell × (1 − pressure)) )   // min 1
+buyUnit       = max( sellUnit+1, round(catalogBuy × (1 − 0.15 × pressure)) )
+catalogBuy    = item.buy ?? max(sell+1, ceil(sell × 2.25))
+```
+
+Tinderscrap is the exception: `buy = 2` (still > sell 1) so a spent starter
+stack is not a dead halt — 20 starter Lumen buys a Kindling Bundle (8 tinder
+for ✦12) or 10 loose scraps. Round-trips still lose Lumen.
+
+Rare shelf: 3 slots, reshuffled every 30 minutes of playtime from the rare
+pool (deterministic hash of the epoch — does not consume combat RNG).
+
+## Offerings & repairs
+
+| Sink | Pays | Returns | Why |
+|---|---|---|---|
+| Altar offering | any bank item | Radiance sparks (see `offerings.js`) | Surplus stacks become prestige fuel. No constellation spend here (S4). |
+| Wick patch | ✦10 + 8 tinder | +25 lantern integrity | Early Lumen+tinder sink |
+| Glass reset | ✦18 + 3 bogmoss + 2 rushwick | +40 | Moss/reed sink |
+| Keeper’s service | ✦45 + 2 resin + 12 tinder | full 100 | Mid-session sink |
+| Tab dyes | ✦80–400 | cosmetic class on bank tabs | **Not** extra slots. Bank is weightless. No real money. |
+
+Lantern integrity starts at 100. Each Emberkeeping cycle −1. At 0 the flame
+still burns (never a second halt). Repairs are optional sinks.
+
+## First ten minutes (starvation)
+
+Tend the Flame eats 1 Tinderscrap / 4 s. The starter 30 last ~2 minutes of
+*pure* tending — not a ten-minute session. Honest outs, none of which are Mining:
+
+1. **Gather Herbs** (unlocked at Fo 1) yields tinder at 30% — the intended loop.
+2. **Hearthway stall** always stocks Tinderscrap at ✦2 and the Kindling Bundle
+   (8 for ✦12). Camp shows a banner + “Buy kindling” when the stack is empty.
+3. Selling fogwort (starter 4 × ✦3) plus Tend’s Lumen drip funds emergency buys.
+
+Camp “Need materials” on upgrades is a *sink gate*, not a game-over. The stall
+and the fog-line keep the first session moving.
+
+## Sell / buy tables (rationale)
+
+Tier-1 goods sell 1–12, tier-2 14–32, tier-3 36–80 (`items.js`). Catalog buy
+is ~2.25× so converting Lumen → goods → Lumen always loses. Emergency tinder
+is cheaper (2×) because it is a mercy faucet, not a wealth engine.

@@ -236,12 +236,16 @@ test('selling pays registry value, updates lumen, tidies empty stacks', () => {
   const s = createState({ rngSeed: 21 });
   s.bank.fogwort = 10; // sells 3 each
   const res = sellItems(s, 'fogwort', 4);
-  assert.deepEqual(res, { ok: true, sold: 4, gained: 12 });
+  assert.equal(res.ok, true);
+  assert.equal(res.sold, 4);
+  assert.equal(res.gained, 12);
   assert.equal(s.bank.fogwort, 6);
   assert.equal(s.lumen, 20 + 12);
 
-  assert.deepEqual(sellItems(s, 'fogwort', 99), { ok: true, sold: 6, gained: 18 },
-    'clamps to what the stack holds');
+  const last = sellItems(s, 'fogwort', 99);
+  assert.equal(last.ok, true);
+  assert.equal(last.sold, 6);
+  assert.equal(last.gained, 18);
   assert.equal(s.bank.fogwort, undefined, 'zero stacks are removed from the save');
 });
 

@@ -90,6 +90,19 @@ test('empty banner hides once any track is upgraded', () => {
 
 // ── bank tab + sell sheet ────────────────────────────────────────
 
+test('bank search hides non-matching tiles without dropping them from the DOM', () => {
+  const s = createState({ rngSeed: 11 });
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const search = scr.node.querySelector('.bank-search');
+  assert.ok(search, 'search field present');
+  search.value = 'fogwort';
+  for (const fn of search._listeners.input ?? []) fn({ target: search });
+  const fog = scr.node.querySelectorAll('.bank-tile').find((t) => /Fogwort/.test(t.textContent ?? ''));
+  const ember = scr.node.querySelectorAll('.bank-tile').find((t) => /Emberstone/.test(t.textContent ?? ''));
+  assert.equal(fog.style.display, '');
+  assert.equal(ember.style.display, 'none');
+});
+
 test('tapping an owned bank stack opens the sell sheet; unowned still toasts', () => {
   const s = createState({ rngSeed: 6 }); // starter owns tinderscrap/rushwick/fogwort
   const opened = [];
@@ -115,7 +128,7 @@ function bootSellSheet(state) {
     state,
     sell: (id, qty) => {
       const res = sellItems(state, id, qty);
-      if (res.ok) sold.push(res);
+      if (res.ok) sold.push({ ok: true, sold: res.sold, gained: res.gained });
       return res;
     },
     toast() {},
@@ -166,6 +179,9 @@ test('Sell All over 25 units demands a confirming second tap', () => {
   sellAll.click(); // second tap commits
   assert.deepEqual(sold, [{ ok: true, sold: 100, gained: 300 }]);
   assert.equal(s.lumen, 320);
+  assert.match(panel.textContent ?? '', /0 in the bank|None left/,
+    'sheet must not keep showing the pre-sale stack after Sell All');
+  assert.doesNotMatch(sellAll.textContent ?? '', /Tap again/);
 });
 
 test('selling the last unit closes the sheet instead of showing an empty one', () => {
