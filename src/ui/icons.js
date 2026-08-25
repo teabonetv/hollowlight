@@ -22,6 +22,14 @@ export const ICONS = {
   close: svg('<path d="M6 6l12 12M18 6L6 18"/>'),
   camp: svg('<path d="M4 20l8-13 8 13"/><path d="M8 20l4-6.5 4 6.5M2.5 20h19"/>'),
   spark: svg('<path d="M12 4v4M12 16v4M4 12h4M16 12h4M6.8 6.8l2.4 2.4M14.8 14.8l2.4 2.4M17.2 6.8l-2.4 2.4M9.2 14.8l-2.4 2.4"/>'),
+  moss: svg('<path d="M4.5 18c2.2-5 4.6-8 7.5-8s5.3 3 7.5 8"/><path d="M7 16.5c1.4-3.4 2.8-5.5 5-5.5s3.6 2.1 5 5.5"/><path d="M6 19h2M16 19h2"/>'),
+  brick: svg('<rect x="3.5" y="7" width="8" height="5" rx="0.6"/><rect x="12.5" y="7" width="8" height="5" rx="0.6"/><rect x="8" y="13.5" width="8" height="5" rx="0.6"/>'),
+  wood: svg('<path d="M6 19L11.5 4.5l2.2.9L8.2 19.9z"/><path d="M11 19l5.2-12 2 .8L13 19.8z"/>'),
+  reed: svg('<path d="M8 20V7"/><path d="M12 20V4.5"/><path d="M16 20V9"/><path d="M8 7l-1.6-2.4M12 4.5l1.2-2M16 9l1.7-2.2"/>'),
+  loaf: svg('<path d="M4.5 13.5C4.5 9.2 7.6 6.5 12 6.5s7.5 2.7 7.5 7v4.2a1.8 1.8 0 0 1-1.8 1.8H6.3a1.8 1.8 0 0 1-1.8-1.8z"/><path d="M7.5 12.2c2.2-1 6.8-1 9 0"/>'),
+  vial: svg('<path d="M9 7V4h6v3"/><path d="M9 7h6l1.2 3.5V18a2 2 0 0 1-2 2h-4.4a2 2 0 0 1-2-2V10.5z"/><path d="M10.2 14h3.6"/>'),
+  mushroom: svg('<path d="M5 11c0-4 3-7.2 7-7.2S19 7 19 11H5z"/><path d="M10 11v8h4v-8"/><path d="M8.2 8.2c.4.6 1.1.9 1.8.6"/>'),
+  drop: svg('<path d="M12 4.5c2.8 3.6 5.2 6.2 5.2 9.2a5.2 5.2 0 1 1-10.4 0C6.8 10.7 9.2 8.1 12 4.5z"/>'),
 };
 
 export function icon(name, cls = '') {

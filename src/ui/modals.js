@@ -14,13 +14,22 @@ import {
 export { sellConfirmPending, clearSellConfirm, SELL_CONFIRM_WINDOW_MS };
 
 /**
- * Opens a modal. Returns { close, panel }. Only one modal at a time; Escape
+ * Opens a modal. Returns { close, panel, overlay }. Only one at a time; Escape
  * and backdrop tap close it unless persistent=true.
+ * `variant: 'sheet'` docks a bottom sheet that leaves the pack grid visible.
  */
-export function openModal(mount, { title, body, actions = [], persistent = false }) {
+export function openModal(mount, {
+  title, body, actions = [], persistent = false, variant = 'dialog',
+} = {}) {
   clear(mount);
 
-  const panel = el('div', { class: 'modal-panel', role: 'dialog', 'aria-modal': 'true' },
+  const isSheet = variant === 'sheet';
+  const panel = el('div', {
+    class: isSheet ? 'modal-panel sheet-panel' : 'modal-panel',
+    role: 'dialog',
+    'aria-modal': 'true',
+  },
+    isSheet ? el('div', { class: 'sheet-handle', 'aria-hidden': 'true' }) : null,
     el('div', { class: 'modal-head' },
       el('h2', { class: 'modal-title' }, title),
       el('button', {
@@ -32,7 +41,9 @@ export function openModal(mount, { title, body, actions = [], persistent = false
     actions.length ? el('div', { class: 'modal-actions' }, actions) : null,
   );
 
-  const overlay = el('div', { class: 'modal-overlay' }, panel);
+  const overlay = el('div', {
+    class: isSheet ? 'modal-overlay sheet-overlay' : 'modal-overlay',
+  }, panel);
   if (!persistent) {
     overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
     document.addEventListener('keydown', onKey);
@@ -47,7 +58,7 @@ export function openModal(mount, { title, body, actions = [], persistent = false
   }
   function onKey(e) { if (e.key === 'Escape') close(); }
 
-  return { close, panel };
+  return { close, panel, overlay };
 }
 
 /** "While you were away…" — honest, capped, per-action breakdown. */
@@ -200,7 +211,7 @@ export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFI
   });
   if (!inspector) return;
 
-  ref = openModal(mount, { title: inspector.title, body: inspector.node });
+  ref = openModal(mount, { title: inspector.title, body: inspector.node, variant: 'sheet' });
   const origClose = ref.close;
   ref.close = () => { inspector.dispose(); origClose(); };
   ref.repaint = inspector.repaint;
