@@ -1,6 +1,11 @@
 // App bootstrap and glue: loads/creates the save, runs the tick loop, wires
-// the tab bar + HUD, autosaves every 30s and on hide/unload, computes honest
-// offline gains on load, and routes engine events into toasts + journal.
+// the tab bar + HUD, flushes the save on gameplay mutations, autosaves playtime
+// every 30s and on hide/unload, computes honest offline gains on load, and
+// routes engine events into toasts + journal.
+//
+// Mutations (cycle complete, start/stop, sell, buy, claim) flush
+// hollowlight.save in the same frame. The 30s interval only covers playtime
+// ticking. Hide still persists; return still computes offline before restamp.
 //
 // Everything DOM-facing lives behind boot(); importing this module from node
 // stays side-effect free.
@@ -21,16 +26,22 @@ import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
 import * as combat from '../game/systems/combat.js';
-import { sellItems } from '../game/systems/bank.js';
+import { sellItems, togglePin as pinItem, savePreset as writePreset, applyPreset as usePreset,
+  deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot } from '../game/systems/bank.js';
+import * as storeSys from '../game/systems/store.js';
+import { offerItems } from '../game/systems/offerings.js';
+import { repairLantern as doRepair } from '../game/systems/repairs.js';
 
 import { el, clear } from './dom.js';
 import { icon } from './icons.js';
+import { paintHud } from './hud.js';
 import { createToaster } from './toast.js';
 import { openModal, showOfflineModal, showSettingsModal, showSellSheet } from './modals.js';
 import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
 import {
   renderCampScreen, renderBankScreen, renderMapScreen, renderJournalScreen,
 } from './screens/tabs.js';
+import { renderStoreScreen } from './screens/store.js';
 
 const AUTOSAVE_MS = 30_000;
 
@@ -46,8 +57,9 @@ function boot() {
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
-  const ui = { tab: 'camp', skillId: null };
+  const ui = { tab: 'camp', skillId: null, campView: null };
   let liveUpdate = () => {};
+  let sheetRepaint = null;
   let rng = createRng(1);
 
   // ── save / load / adopt ────────────────────────────────────────
@@ -155,34 +167,17 @@ function boot() {
   });
 
   // ── HUD ────────────────────────────────────────────────────────
-  // Lumen counts UP to its new value after sells/purchases (F1c feedback);
-  // reduced motion skips straight to the number.
-  let shownLumen = null;
-  let lumenAnimId = 0;
-  function paintLumen(v) {
-    hudLumen.textContent = `✦ ${formatNumber(v)}`;
-  }
+  // Snap to the live save. A rAF count-up used to restart on every tick and
+  // leave the pills mid-lerp while hollowlight.save was already correct.
   function updateHud() {
-    const target = game.lumen;
-    if (shownLumen === null || shownLumen === target || game.settings.reducedMotion) {
-      shownLumen = target;
-      paintLumen(target);
-    } else {
-      startLumenCountUp(shownLumen, target);
-    }
-    hudFlame.textContent = `${formatNumber(game.flame)} flame`;
+    paintHud(hudLumen, hudFlame, game);
   }
-  function startLumenCountUp(from, to) {
-    cancelAnimationFrame?.(lumenAnimId);
-    const t0 = performance.now();
-    const DUR_MS = 450;
-    const frame = (t) => {
-      const p = Math.min(1, (t - t0) / DUR_MS);
-      shownLumen = Math.round(from + (to - from) * p);
-      paintLumen(shownLumen);
-      if (p < 1) lumenAnimId = requestAnimationFrame(frame);
-    };
-    lumenAnimId = requestAnimationFrame(frame);
+
+  function afterMutation() {
+    persist();
+    updateHud();
+    liveUpdate();
+    sheetRepaint?.();
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -193,6 +188,7 @@ function boot() {
     if (ui.tab === 'bank') return renderBankScreen(ctx);
     if (ui.tab === 'map') return renderMapScreen(ctx);
     if (ui.tab === 'journal') return renderJournalScreen(ctx);
+    if (ui.campView === 'store') return renderStoreScreen(ctx);
     return renderCampScreen(ctx);
   }
 
@@ -206,6 +202,7 @@ function boot() {
   function setTab(tab) {
     ui.tab = tab;
     ui.skillId = null;
+    ui.campView = null;
     for (const b of document.querySelectorAll('.tabbar button')) {
       b.classList.toggle('active', b.dataset.tab === tab);
       b.setAttribute('aria-selected', b.dataset.tab === tab ? 'true' : 'false');
@@ -235,11 +232,83 @@ function boot() {
     // ── F1c economy: selling + Keeper's Camp upgrades ──────────────
     sell(itemId, qty) {
       const res = sellItems(game, itemId, qty);
-      if (res.ok) { persist(); updateHud(); }
+      if (res.ok) afterMutation();
       return res;
     },
     openSellSheet(itemId) {
-      showSellSheet(modalRoot, ctx, itemId);
+      const ref = showSellSheet(modalRoot, ctx, itemId);
+      sheetRepaint = () => ref?.repaint?.();
+      const orig = ref.close;
+      ref.close = () => { sheetRepaint = null; orig(); };
+    },
+    openStore() { ui.tab = 'camp'; ui.campView = 'store'; renderScreen(); },
+    backToCamp() { ui.campView = null; ui.tab = 'camp'; renderScreen(); },
+    storeBuy(itemId, qty) {
+      const res = storeSys.buyFromStore(game, itemId, qty);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
+      toaster.push(`Bought ${res.bought} for ✦${res.spent}.`, 'success');
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    storeSell(itemId, qty) {
+      const res = ctx.sell(itemId, qty);
+      if (res.ok) renderScreen();
+      return res;
+    },
+    buyKindlingBundle() {
+      const res = storeSys.buyKindlingBundle(game);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
+      toaster.push('Kindling bundle — eight handfuls of Tinderscrap.', 'success');
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    offer(itemId, qty) {
+      const res = offerItems(game, itemId, qty);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    repairLantern(kitId) {
+      const res = doRepair(game, kitId);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not repair.', 'warn'); return res; }
+      toaster.push(`Lantern ${res.integrity}/100.`, 'success');
+      afterMutation();
+      renderScreen();
+      return res;
+    },
+    togglePin(itemId) {
+      pinItem(game, itemId);
+      afterMutation();
+    },
+    savePreset(kind) {
+      const items = kind === 'gear' ? captureGearSnapshot(game.bank) : captureBankSnapshot(game.bank);
+      const name = kind === 'gear' ? 'Gear set' : 'Loadout';
+      writePreset(game, name, items, { kind: kind === 'gear' ? 'gear' : 'loadout' });
+      toaster.push(`${name} saved.`, 'success');
+      afterMutation();
+      renderScreen();
+    },
+    applyPreset(id) {
+      const res = usePreset(game, id);
+      if (!res.ok) { toaster.push(res.error, 'warn'); return; }
+      const miss = res.missing.length;
+      toaster.push(miss ? `Pinned. Missing ${miss} stacks.` : 'Loadout pinned — you have every stack.', miss ? 'warn' : 'success');
+      afterMutation();
+      renderScreen();
+    },
+    deletePreset(id) {
+      dropPreset(game, id);
+      afterMutation();
+      renderScreen();
+    },
+    buyTheme(themeId) {
+      const res = storeSys.buyTheme(game, themeId);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not dye.', 'warn'); return res; }
+      toaster.push(res.spent ? 'Tab dye unlocked. Cosmetic only.' : 'Tab dye equipped.', 'success');
+      afterMutation();
+      renderScreen();
+      return res;
     },
     buyUpgrade(trackId) {
       const res = camp.buyUpgrade(game, trackId);
@@ -247,8 +316,7 @@ function boot() {
       const track = TRACKS_BY_ID[trackId];
       toaster.push(`${track.name} — ${res.tier.name}. The camp brightens.`, 'success');
       pushLog(game, `Upgraded ${track.name}: ${res.tier.name} (${camp.upgradeLevel(game, trackId)}/${track.tiers.length}).`, game.stats.playtimeMs);
-      persist();
-      updateHud();
+      afterMutation();
       renderScreen();
       return res;
     },
@@ -257,29 +325,29 @@ function boot() {
     startFight(enemyId) {
       const res = combat.startFight(game, enemyId);
       if (!res.ok) return res;
-      persist();
+      afterMutation();
       renderScreen();
       return res;
     },
     fleeFight() {
       const res = combat.fleeFight(game);
-      persist();
+      afterMutation();
       renderScreen();
       return res;
     },
     eatFood(itemId) {
       const res = combat.eatFood(game, itemId);
-      if (res.ok) { persist(); updateHud(); }
+      if (res.ok) afterMutation();
       return res;
     },
     recoverLumen(zoneId) {
       const res = combat.recoverLumen(game, zoneId);
-      if (res.ok) { persist(); updateHud(); }
+      if (res.ok) afterMutation();
       return res;
     },
     assignVigil() {
       const res = combat.assignVigil(game);
-      if (res.ok) persist();
+      if (res.ok) afterMutation();
       return res;
     },
     setCombatStyle(styleId) {
@@ -323,12 +391,12 @@ function boot() {
     showOfflineModal(modalRoot, res, {
       onClaim: () => {
         adopt(res.nextState);
-        persist();
         game.stats.offlineClaims++;
         pushLog(game,
           `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
           game.stats.playtimeMs);
         for (const lu of levels) bus.emit('levelup', lu);
+        persist();
         updateHud();
         renderScreen();
       },
@@ -345,6 +413,11 @@ function boot() {
       for (const ev of events) bus.emit(ev.type, ev);
       updateHud();
       liveUpdate();
+      sheetRepaint?.();
+      // Cycle / halt / stop mutate bank, lumen, xp — flush now so a reload
+      // cannot drop HUD-visible completions. Playtime-only ticks wait for
+      // the 30s interval (or hide/pagehide).
+      if (events.length > 0) persist();
     },
   });
 

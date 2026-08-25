@@ -38,6 +38,16 @@ export function createState({ nowMs = 0, rngSeed = 1 } = {}) {
 
     bank: { ...STARTER_BANK },
 
+    // S2 bank chrome — pins, named loadouts (never extra power).
+    bankPins: [],
+    bankPresets: [],
+
+    // Stall selling-pressure (recovered from playtime, not wall-clock).
+    store: { pressure: {}, pressureAt: {} },
+
+    lanternIntegrity: 100,
+    cosmetics: { bankTheme: 'default', unlocked: ['default'] },
+
     skills,
 
     // generic action-runner state; keyed by action id

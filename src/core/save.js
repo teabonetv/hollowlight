@@ -7,11 +7,38 @@
 //   { from: 1, migrate(state) { ...; return newState } }
 // deserialize walks them in order until the save reaches SAVE_VERSION.
 
+import { createCombatState } from '../game/systems/combat.js';
+
 export const SAVE_KEY = 'hollowlight.save';
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 3;
 
 /** @type {Array<{from:number, migrate:(s:any)=>any}>} */
-export const MIGRATIONS = [];
+export const MIGRATIONS = [
+  {
+    from: 1,
+    migrate(state) {
+      return {
+        ...state,
+        bankPins: state.bankPins ?? [],
+        bankPresets: state.bankPresets ?? [],
+        store: state.store ?? { pressure: {}, pressureAt: {} },
+        lanternIntegrity: Number.isFinite(state.lanternIntegrity) ? state.lanternIntegrity : 100,
+        cosmetics: state.cosmetics ?? { bankTheme: 'default', unlocked: ['default'] },
+      };
+    },
+  },
+  {
+    from: 2,
+    migrate(state) {
+      return {
+        ...state,
+        souls: state.souls ?? 0,
+        beacons: state.beacons ?? { kindled: ['hearthway'] },
+        combat: state.combat ?? createCombatState(),
+      };
+    },
+  },
+];
 
 export class SaveError extends Error {
   constructor(reason, detail) {
