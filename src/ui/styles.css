@@ -1253,9 +1253,19 @@ html.reduced-motion *::after {
 .daily-ready { border-color: rgba(217, 164, 65, 0.45); }
 .daily-claimed { opacity: 0.7; }
 .log-back { margin-top: 4px; }
-.screen.log-items { gap: 10px; }
-.screen.log-items .section-title { margin-top: 8px; }
+.screen.log-items { gap: 8px; }
+.screen.log-items .section-title { margin-top: 4px; margin-bottom: 0; }
 .screen.log-items .log-back { margin-top: 0; }
+.screen.log-items [data-log-drill="items-found"] .cat-bar { display: none; }
+@media (max-width: 719px) {
+  .screen.log-items [data-log-drill="items-found"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .screen.log-items [data-log-drill="items-found"] .log-tile {
+    min-height: 64px;
+    padding: 6px 3px 4px;
+  }
+}
 .log-detail-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .log-detail-row {
   display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;
