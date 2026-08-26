@@ -14,13 +14,20 @@ globalThis.document = {
 globalThis.requestAnimationFrame = (fn) => 0;
 try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
 
-const { createState } = await import('../src/game/state.js');
+const { createState, STARTER_BANK } = await import('../src/game/state.js');
 const { DEFAULT_BANK_TAB, ITEMS, ITEMS_BY_ID } = await import('../src/game/data/items.js');
 const { filterItems, sellItems, bankCount, bankSellValue, uniqueStackCount, lanternRoom } = await import('../src/game/systems/bank.js');
 const { itemGlyph } = await import('../src/game/data/item-glyphs.js');
 const { ICONS, FILLED_ICONS, filledIcon } = await import('../src/ui/icons.js');
 const tabs = await import('../src/ui/screens/tabs.js');
-const { prefersDockedInspector, itemTileGlyph, itemTileChrome } = await import('../src/ui/screens/bank.js');
+const {
+  prefersDockedInspector, itemTileGlyph, itemTileChrome,
+  ownedNameFits, ownedNameClientWidth, OWNED_NAME_LAYOUT,
+} = await import('../src/ui/screens/bank.js');
+const { inspectorPriceLawLine } = await import('../src/ui/item-inspector.js');
+const { liveSellUnit } = await import('../src/game/systems/store.js');
+const { formatHollowChip } = await import('../src/ui/hud.js');
+const { readFileSync } = await import('node:fs');
 const modals = await import('../src/ui/modals.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { formatNumber } = await import('../src/core/format.js');
@@ -75,8 +82,8 @@ test('desktop matchMedia docks the inspector instead of opening a sheet', () => 
   assert.match(tinder.querySelector('.bank-chrome').textContent ?? '', /✦1 · ×/);
   const dock = scr.node.querySelector('.bank-inspector');
   assert.match(dock.textContent ?? '', /Tinderscrap|in the bank|tinder/i);
-  assert.match(dock.textContent ?? '', /Sells for ✦/);
-  assert.match(dock.textContent ?? '', /catalog/);
+  assert.match(dock.textContent ?? '', /catalog ✦1 · stall today ✦1/);
+  assert.match(dock.textContent ?? '', /Fair Trade \/ stall pressure/);
 
   globalThis.window = prev;
 });
@@ -133,6 +140,33 @@ test('every registry glyph exists and Fuel items are unique', () => {
   assert.equal(new Set(glyphs).size, fuels.length, 'no two fuels share a glyph');
   assert.equal(itemTileGlyph(ITEMS_BY_ID.tinderscrap), 'flame');
   assert.equal(itemTileGlyph(ITEMS_BY_ID.bogmoss), 'moss');
+});
+
+test('Catalogue Herbs do not share one leaf — each has a unique filled mark', () => {
+  const herbs = ITEMS.filter((it) => it.category === 'herb');
+  const glyphs = herbs.map((it) => itemTileGlyph(it));
+  assert.equal(new Set(glyphs).size, herbs.length, 'no two herbs share a glyph');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID.fogwort), 'leaf');
+  assert.notEqual(itemTileGlyph(ITEMS_BY_ID['bitter-sage']), 'leaf');
+  assert.notEqual(itemTileGlyph(ITEMS_BY_ID['veil-clover']), 'leaf');
+  assert.notEqual(FILLED_ICONS.parsley, FILLED_ICONS.clover);
+  assert.notEqual(FILLED_ICONS.mint, FILLED_ICONS.clover);
+  assert.notEqual(FILLED_ICONS.sage, FILLED_ICONS.leaf);
+  const s = createState({ rngSeed: 1 });
+  s.bank['bitter-sage'] = 1;
+  s.bank['veil-clover'] = 1;
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const fog = tileByName(scr.node, 'Fogwort');
+  const sage = tileByName(scr.node, 'Bitter-sage');
+  const clover = tileByName(scr.node, 'Veil-clover');
+  const fogSvg = fog.querySelector('.bank-glyph').innerHTML ?? '';
+  const sageSvg = sage.querySelector('.bank-glyph').innerHTML ?? '';
+  const cloverSvg = clover.querySelector('.bank-glyph').innerHTML ?? '';
+  assert.match(fogSvg, /fill="currentColor"/);
+  assert.match(sageSvg, /width="32"/);
+  assert.notEqual(fogSvg, sageSvg);
+  assert.notEqual(sageSvg, cloverSvg);
+  assert.notEqual(fogSvg, cloverSvg);
 });
 
 test('starter Fuel tiles are filled ≥32px silhouettes, not two gold strokes', () => {
@@ -252,7 +286,8 @@ test('phone inspect is a bottom sheet; settings stay a centered modal', () => {
   assert.match(panelKids[1].textContent ?? '', /Tinderscrap/, 'first paint: name');
   const inspector = sheetPanel.querySelector('.item-inspector-body');
   assert.ok(inspector);
-  assert.match(inspector.children[0].textContent ?? '', /catalog/, 'first paint: catalog line');
+  assert.match(inspector.children[0].textContent ?? '', /catalog ✦1 · stall today ✦1/, 'first paint: catalog line');
+  assert.match(inspector.children[0].textContent ?? '', /Fair Trade \/ stall pressure/);
   assert.match(inspector.children[1].textContent ?? '', /Sell 1/, 'first paint: Sell 1');
   assert.match(inspector.children[1].textContent ?? '', /Sell All/, 'first paint: Sell All');
   const lore = inspector.querySelector('.sell-flavor')?.textContent ?? '';
@@ -319,4 +354,49 @@ test('Sell Mode and qty survive a feat-unlocking grid sell remount', () => {
   assert.match(activeQty.textContent ?? '', /×10/);
   assert.equal(bankCount(s.bank, 'tinderscrap'), 20, '×10 sold from the grid');
 });
+
+test('owned dense names wrap at 12px — never ellipsize; starter pack fits 360', () => {
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  const dense = css.match(/\.bank-name-dense\s*\{[^}]+\}/)?.[0] ?? '';
+  assert.match(dense, /font-size:\s*12px/);
+  assert.doesNotMatch(dense, /text-overflow:\s*ellipsis/);
+  assert.doesNotMatch(dense, /white-space:\s*nowrap/);
+  assert.match(css, /\.bank-grid-owned[\s\S]{0,180}repeat\(3/);
+  assert.match(css, /\.bank-tile-dense \.bank-glyph svg \{ width: 32px; height: 32px; \}/);
+  assert.equal(OWNED_NAME_LAYOUT.fontPx, 12);
+  assert.equal(OWNED_NAME_LAYOUT.phoneColumns, 3);
+  assert.equal(OWNED_NAME_LAYOUT.glyphPx, 32);
+
+  const names = [
+    ...Object.keys(STARTER_BANK).map((id) => ITEMS_BY_ID[id].name),
+    ITEMS_BY_ID.driwood.name,
+  ];
+  for (const name of names) {
+    assert.equal(ownedNameFits(name, 360), true, `${name} must fit two lines at 360`);
+  }
+  const client = ownedNameClientWidth(360);
+  // scrollWidth of a nowrap "Rushwick Reed" at 12px exceeds one line; wrap keeps it readable.
+  const rushwickScroll = 'Rushwick Reed'.length * OWNED_NAME_LAYOUT.fontPx * OWNED_NAME_LAYOUT.worstCharEm;
+  assert.ok(rushwickScroll > client, 'Rushwick Reed overflows a single 3-col line (wrap, do not clip)');
+  assert.ok(rushwickScroll <= client * OWNED_NAME_LAYOUT.lines);
+
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const rush = tileByName(scr.node, 'Rushwick Reed');
+  assert.ok(rush, 'Rushwick Reed tile exists');
+  const nameEl = rush.querySelector('.bank-name-dense');
+  assert.equal(nameEl.textContent, 'Rushwick Reed');
+  assert.doesNotMatch(nameEl.textContent, /…|\.\.\./);
+  assert.ok(nameEl.classList.contains('bank-name-dense'));
+});
+
+test('inspector names catalog vs stall today on first paint; HUD hollow chip is N / MAX', () => {
+  const s = createState({ rngSeed: 1 });
+  const unit = liveSellUnit(s, 'tinderscrap');
+  const line = inspectorPriceLawLine(ITEMS_BY_ID.tinderscrap, unit);
+  assert.equal(line, 'catalog ✦1 · stall today ✦1 (Fair Trade / stall pressure)');
+  assert.equal(formatHollowChip(s), `${uniqueStackCount(s.bank)} / ${lanternRoom(s)}`);
+  assert.equal(formatHollowChip(s), '6 / 12');
+});
+
 

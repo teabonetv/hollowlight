@@ -12,6 +12,11 @@ import {
   sellConfirmPending, clearSellConfirm, armSellConfirm, SELL_CONFIRM_WINDOW_MS,
 } from './sell-confirm.js';
 
+/** First-paint price law: catalog vs live stall, named — not two naked numbers. */
+export function inspectorPriceLawLine(item, liveUnit) {
+  return `catalog ✦${item.sell} · stall today ✦${liveUnit} (Fair Trade / stall pressure)`;
+}
+
 function itemMeta(item) {
   const feeds = [];
   const actionSources = [];
@@ -40,6 +45,7 @@ export function createItemInspector(ctx, itemId, {
   const { sources, uses } = itemMeta(item);
   const qtyLabel = el('span', { class: 'sell-qty' });
   const worthLabel = el('span', { class: 'sell-worth gold' });
+  const priceLaw = el('span', { class: 'sell-price-law' });
   const confirmBtn = el('button', {
     class: 'btn btn-wide sell-all-btn',
     'aria-live': 'assertive',
@@ -54,6 +60,7 @@ export function createItemInspector(ctx, itemId, {
     const unit = unitPrice();
     qtyLabel.textContent = `${formatNumber(qty)} in the bank`;
     worthLabel.textContent = `stack worth ✦${formatNumber(qty * unit)} at today’s stall`;
+    priceLaw.textContent = inspectorPriceLawLine(item, unit);
 
     sell1Btn.textContent = 'Sell 1';
     sell1Btn.disabled = qty < 1;
@@ -178,7 +185,8 @@ export function createItemInspector(ctx, itemId, {
   });
 
   const catalogLine = el('p', { class: 'sell-line sell-catalog' },
-    el('span', {}, `Sells for ✦${item.sell} each (catalog) · `),
+    priceLaw,
+    el('br'),
     qtyLabel,
     el('br'),
     worthLabel);

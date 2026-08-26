@@ -159,7 +159,7 @@ test('sell sheet shows lore, catalog unit, live stall worth, and honest sell con
   const { mount } = bootSellSheet(s);
   const panel = mount.querySelector('.modal-panel');
   assert.match(panel.textContent ?? '', /grey herb that only grows/, 'lore line');
-  assert.match(panel.textContent ?? '', /Sells for ✦3 each \(catalog\)/);
+  assert.match(panel.textContent ?? '', /catalog ✦3 · stall today ✦3 \(Fair Trade \/ stall pressure\)/);
   assert.match(panel.textContent ?? '', /12 in the bank/);
   assert.match(panel.textContent ?? '', /stack worth ✦36 at today’s stall/);
   const buttons = panel.querySelectorAll('button');

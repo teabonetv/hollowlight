@@ -18,6 +18,7 @@ const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
+  'hud-hollow': new FakeNode('span'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
   toasts: new FakeNode('div'),
@@ -79,17 +80,22 @@ if (!globalThis.navigator) globalThis.navigator = {};
 const { SAVE_KEY, serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { createState } = await import('../src/game/state.js');
 const { ensureDailies, claimDaily, taskProgress } = await import('../src/game/systems/dailies.js');
-const { paintHud } = await import('../src/ui/hud.js');
+const { paintHud, formatHollowChip } = await import('../src/ui/hud.js');
 const { formatNumber } = await import('../src/core/format.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { pushLog } = await import('../src/game/state.js');
 const { unlockPerk } = await import('../src/game/systems/radiance.js');
-const { bankSellValue, bankCount } = await import('../src/game/systems/bank.js');
+const { bankSellValue, bankCount, uniqueStackCount, lanternRoom } = await import('../src/game/systems/bank.js');
 const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
 
 function hudNum(node) {
   const m = String(node.textContent ?? '').replace(/,/g, '').match(/(\d+)/);
   return m ? Number(m[1]) : NaN;
+}
+
+function hollowChip(node) {
+  const m = String(node.textContent ?? '').match(/(\d+)\s*\/\s*(\d+)/);
+  return m ? { used: Number(m[1]), cap: Number(m[2]) } : null;
 }
 
 function assertHudEqualsSave(label) {
@@ -103,6 +109,11 @@ function assertHudEqualsSave(label) {
   assert.equal(state.lumen, env.state.lumen);
   assert.equal(elements['hud-lumen'].textContent, `✦ ${formatNumber(state.lumen)}`);
   assert.equal(elements['hud-radiance'].textContent, `✧ ${formatNumber(state.radiance ?? 0)}`);
+  const chip = hollowChip(elements['hud-hollow']);
+  assert.ok(chip, `${label}: hollow chip painted`);
+  assert.equal(chip.used, uniqueStackCount(state.bank), `${label}: HUD hollow used == save`);
+  assert.equal(chip.cap, lanternRoom(state), `${label}: HUD hollow cap == save`);
+  assert.equal(elements['hud-hollow'].textContent, formatHollowChip(state));
 }
 
 await import('../src/ui/app.js?same-eval');
@@ -151,14 +162,16 @@ test('claim + kindling path: persist-then-paint matches deserialize in one shot'
   const hudLumen = new FakeNode('span');
   const hudFlame = new FakeNode('span');
   const hudRadiance = new FakeNode('span');
+  const hudHollow = new FakeNode('span');
   const unspent = new FakeNode('span');
   const raw = serializeSave(s, s.savedAt ?? 1);
-  paintHud(hudLumen, hudFlame, s, hudRadiance, { unspentRadiance: unspent });
+  paintHud(hudLumen, hudFlame, s, hudRadiance, { unspentRadiance: unspent, hudHollow });
   const env = JSON.parse(raw);
   assert.equal(hudNum(hudLumen), env.state.lumen);
   assert.equal(hudNum(hudRadiance), env.state.radiance ?? 0);
   assert.equal(hudNum(unspent), env.state.radiance ?? 0);
   assert.match(unspent.textContent, /Radiance unspent/);
+  assert.equal(hudHollow.textContent, formatHollowChip(s));
 });
 
 test('Sell 1 from the Owned grid: HUD lumen == save.lumen same-eval', () => {
