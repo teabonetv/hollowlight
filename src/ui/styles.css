@@ -152,11 +152,21 @@ body {
 }
 @media (max-width: 420px) {
   .brand span { display: none; }
-  .pill { padding: 3px 8px; font-size: 12px; }
+  .pill { padding: 3px 6px; font-size: 11px; }
+  .wallet { gap: 4px; }
+  .hud-counts { gap: 4px; }
 }
 .brand svg { width: 22px; height: 22px; color: var(--gold); }
 
 .wallet { display: flex; align-items: center; gap: 8px; }
+.hud-counts {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
 .pill {
   display: inline-flex;
   align-items: center;
@@ -172,12 +182,14 @@ body {
 }
 .pill.gold { color: var(--gold-hi); border-color: rgba(217, 164, 65, 0.35); }
 .pill.flame { color: #e8b48a; }
+.pill.known,
 .pill.hollow {
   color: var(--gold-hi);
   border-color: rgba(217, 164, 65, 0.35);
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.01em;
   white-space: nowrap;
+  overflow: visible;
 }
 
 .icon-btn {

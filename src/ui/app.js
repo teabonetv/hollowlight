@@ -76,6 +76,7 @@ function boot() {
   const hudLumen = document.getElementById('hud-lumen');
   const hudFlame = document.getElementById('hud-flame');
   const hudRadiance = document.getElementById('hud-radiance');
+  const hudKnown = document.getElementById('hud-known');
   const hudHollow = document.getElementById('hud-hollow');
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
@@ -230,6 +231,7 @@ function boot() {
     const unspent = document.getElementById('almanac-radiance-unspent');
     paintHud(hudLumen, hudFlame, game, hudRadiance, {
       unspentRadiance: unspent,
+      hudKnown,
       hudHollow,
     });
   }

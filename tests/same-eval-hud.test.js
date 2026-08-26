@@ -18,6 +18,7 @@ const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
+  'hud-known': new FakeNode('span'),
   'hud-hollow': new FakeNode('span'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
@@ -80,7 +81,7 @@ if (!globalThis.navigator) globalThis.navigator = {};
 const { SAVE_KEY, serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { createState } = await import('../src/game/state.js');
 const { ensureDailies, claimDaily, taskProgress } = await import('../src/game/systems/dailies.js');
-const { paintHud, formatHollowChip } = await import('../src/ui/hud.js');
+const { paintHud, formatHollowChip, formatKnownChip } = await import('../src/ui/hud.js');
 const { formatNumber } = await import('../src/core/format.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { pushLog } = await import('../src/game/state.js');
@@ -115,6 +116,10 @@ function assertHudEqualsSave(label) {
   assert.equal(chip.cap, lanternRoom(state), `${label}: HUD hollow cap == save`);
   assert.equal(elements['hud-hollow'].textContent, formatHollowChip(state));
   assert.match(elements['hud-hollow'].textContent, /^Hollow \d+\/\d+$/);
+  const known = hollowChip(elements['hud-known']);
+  assert.ok(known, `${label}: known chip painted`);
+  assert.equal(elements['hud-known'].textContent, formatKnownChip(state));
+  assert.match(elements['hud-known'].textContent, /^Known \d+\/\d+$/);
 }
 
 await import('../src/ui/app.js?same-eval');
@@ -163,15 +168,17 @@ test('claim + kindling path: persist-then-paint matches deserialize in one shot'
   const hudLumen = new FakeNode('span');
   const hudFlame = new FakeNode('span');
   const hudRadiance = new FakeNode('span');
+  const hudKnown = new FakeNode('span');
   const hudHollow = new FakeNode('span');
   const unspent = new FakeNode('span');
   const raw = serializeSave(s, s.savedAt ?? 1);
-  paintHud(hudLumen, hudFlame, s, hudRadiance, { unspentRadiance: unspent, hudHollow });
+  paintHud(hudLumen, hudFlame, s, hudRadiance, { unspentRadiance: unspent, hudKnown, hudHollow });
   const env = JSON.parse(raw);
   assert.equal(hudNum(hudLumen), env.state.lumen);
   assert.equal(hudNum(hudRadiance), env.state.radiance ?? 0);
   assert.equal(hudNum(unspent), env.state.radiance ?? 0);
   assert.match(unspent.textContent, /Radiance unspent/);
+  assert.equal(hudKnown.textContent, formatKnownChip(s));
   assert.equal(hudHollow.textContent, formatHollowChip(s));
 });
 

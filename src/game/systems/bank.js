@@ -4,7 +4,7 @@
 
 import { ITEMS, ITEMS_BY_ID, BANK_TABS } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
-import { recordSell, recordItemFound } from './stats.js';
+import { recordSell, recordItemFound, isItemKnown } from './stats.js';
 import { markDiscovered, isDiscovered } from './discovered.js';
 import {
   BASE_LANTERN_ROOM, SATCHEL_ROOM_PER_TIER, PACK_FULL_MSG,
@@ -168,29 +168,29 @@ export function isCatalogueTab(tab) {
   return tab === 'all' || tab === 'catalogue';
 }
 
-/** Category chips that currently hold at least one owned stack. */
-export function stockedCategoryTabs(bank) {
+/** Category chips that currently hold a known stack (found or occupied). */
+export function stockedCategoryTabs(bank, state) {
   return BANK_TABS.filter(([id]) => {
     if (CORE_TAB_IDS.has(id)) return false;
-    return filterItems({ items: ITEMS, bank, tab: id, query: '' }).length > 0;
+    return filterItems({ items: ITEMS, bank, tab: id, query: '', state }).length > 0;
   });
 }
 
-/** Owned / Pinned / Catalogue, plus only categories with stock. */
-export function visibleBankTabs(bank) {
+/** Owned / Pinned / Catalogue, plus categories with a known (or held) stack. */
+export function visibleBankTabs(bank, state) {
   const core = BANK_TABS.filter(([id]) => id === 'owned' || id === 'pinned' || id === 'all');
-  return [...core, ...stockedCategoryTabs(bank)];
+  return [...core, ...stockedCategoryTabs(bank, state)];
 }
 
-export function filterItems({ items = ITEMS, bank = {}, tab = 'owned', query = '', pins = [] } = {}) {
+export function filterItems({ items = ITEMS, bank = {}, tab = 'owned', query = '', pins = [], state } = {}) {
   let list = items;
   if (tab === 'pinned') list = list.filter((i) => pins.includes(i.id));
   else if (tab === 'owned') list = list.filter((i) => (bank[i.id] ?? 0) > 0);
   else if (tab === 'candle') list = list.filter((i) => i.category === 'candle' || i.category === 'oil');
   else if (!isCatalogueTab(tab)) list = list.filter((i) => i.category === tab);
-  // Category / Owned grids are the working pack — unowned ghosts stay in Catalogue.
-  if (!isCatalogueTab(tab) && tab !== 'pinned') {
-    list = list.filter((i) => (bank[i.id] ?? 0) > 0);
+  // Owned is occupancy. Category tabs keep known-empty stacks; ghosts stay in Catalogue.
+  if (!isCatalogueTab(tab) && tab !== 'pinned' && tab !== 'owned') {
+    list = list.filter((i) => (bank[i.id] ?? 0) > 0 || isItemKnown(state, i.id));
   }
   if (query) list = list.filter((i) => matchesQuery(i, query));
   const pinSet = new Set(pins);

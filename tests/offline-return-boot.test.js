@@ -23,6 +23,7 @@ const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
+  'hud-known': new FakeNode('span'),
   'hud-hollow': new FakeNode('span'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
@@ -31,6 +32,7 @@ const elements = {
   'boot-fallback': bootFallback,
 };
 elements['hud-lumen'].textContent = '✦ 20';
+elements['hud-known'].textContent = 'Known 0/137';
 elements['hud-hollow'].textContent = '0 / 12 hollow';
 
 const docEl = new FakeNode('html');
@@ -108,5 +110,6 @@ test('3h rewind first paint is Camp + recap, never the candle overlay', () => {
 });
 
 test('HUD hollow chip carries a noun after the rewind boot', () => {
+  assert.match(elements['hud-known'].textContent ?? '', /Known\s+\d+\/\d+/);
   assert.match(elements['hud-hollow'].textContent ?? '', /Hollow\s+\d+\/\d+/);
 });

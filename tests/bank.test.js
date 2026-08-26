@@ -9,7 +9,7 @@ import {
 import { createState, STARTER_BANK } from '../src/game/state.js';
 import { itemTimesFound, isItemKnown } from '../src/game/systems/stats.js';
 import { knownItemCount, logCategoryStats } from '../src/game/systems/completion.js';
-import { formatHollowChip } from '../src/ui/hud.js';
+import { formatHollowChip, formatKnownChip } from '../src/ui/hud.js';
 import { applyGains } from '../src/game/systems/action-runner.js';
 import { buyFromStore } from '../src/game/systems/store.js';
 
@@ -106,6 +106,7 @@ test('dumping a unique starter decrements occupancy, not known', () => {
   assert.equal(s.bank['lantern-loaf'], undefined);
   assert.equal(uniqueStackCount(s.bank), 5);
   assert.equal(formatHollowChip(s), 'Hollow 5/12');
+  assert.equal(formatKnownChip(s), 'Known 6/137');
   assert.equal(knownItemCount(s), 6);
   assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, 6);
   assert.equal(itemTimesFound(s, 'lantern-loaf'), found);

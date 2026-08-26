@@ -22,6 +22,7 @@ const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
+  'hud-known': new FakeNode('span'),
   'hud-hollow': new FakeNode('span'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
@@ -30,6 +31,7 @@ const elements = {
   'boot-fallback': bootFallback,
 };
 elements['hud-lumen'].textContent = '✦ 20';
+elements['hud-known'].textContent = 'Known 0/137';
 elements['hud-hollow'].textContent = 'Hollow 0/12';
 
 const docEl = new FakeNode('html');
