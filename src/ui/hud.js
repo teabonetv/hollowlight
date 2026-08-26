@@ -14,7 +14,8 @@ import { knownItemCount } from '../game/systems/completion.js';
 /**
  * Persistent HUD chip — Melvor pins `Bank N/MAX` on every screen.
  * The noun is visible text, not title/aria only. Bank is the workplace;
- * this chip names the lantern's hollow (unique-stack cap).
+ * this chip names the lantern's hollow (unique-stack cap). It is a door
+ * to the owned grid, not wallpaper.
  */
 export function formatHollowChip(state) {
   return `Hollow ${uniqueStackCount(state?.bank)}/${lanternRoom(state)}`;
@@ -23,6 +24,7 @@ export function formatHollowChip(state) {
 /**
  * Persistent HUD chip — Melvor pins Completion Log % beside Bank N/MAX.
  * Known is ever-found (`itemFound > 0` or discovered), not occupancy.
+ * It is a door to Bank Catalogue (the item log), not wallpaper.
  */
 export function formatKnownChip(state) {
   return `Known ${knownItemCount(state)}/${ITEMS.length}`;

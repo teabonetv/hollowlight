@@ -7,7 +7,7 @@ import { ITEMS, ITEM_CATEGORIES, DEFAULT_BANK_TAB } from '../../game/data/items.
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import {
   bankCount, bankSellValue, filterItems, isPinned, isLocked, isCatalogueTab, visibleBankTabs,
-  needsSellConfirm, uniqueStackCount, lanternRoom, sellQtyForMode,
+  needsSellConfirm, uniqueStackCount, lanternRoom, sellQtyForMode, resolveBankTab,
 } from '../../game/systems/bank.js';
 import { formatNumber } from '../../core/format.js';
 import { liveSellUnit } from '../../game/systems/store.js';
@@ -86,7 +86,7 @@ const SELL_QTY_MODES = new Set(['1', '10', 'keep1', 'dump']);
 
 export function renderBankScreen(ctx) {
   const headerSub = el('p', { class: 'screen-sub' });
-  const filter = { tab: DEFAULT_BANK_TAB, query: '' };
+  const filter = { tab: resolveBankTab(ctx.bankTab ?? DEFAULT_BANK_TAB), query: '' };
   let selectedId = null;
   let docked = null;
   let sellMode = !!ctx.sellMode;
@@ -128,6 +128,7 @@ export function renderBankScreen(ctx) {
         'aria-selected': on ? 'true' : 'false',
         onclick: () => {
           filter.tab = id;
+          if (id === 'owned' || id === 'pinned' || isCatalogueTab(id)) ctx.setBankTab?.(id);
           paintTabs();
           syncGrid();
         },

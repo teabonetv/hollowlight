@@ -2,7 +2,7 @@
 // game state. Payments are atomic: either every cost is affordable or nothing
 // is taken — no partial pays, ever.
 
-import { ITEMS, ITEMS_BY_ID, BANK_TABS } from '../data/items.js';
+import { ITEMS, ITEMS_BY_ID, BANK_TABS, DEFAULT_BANK_TAB } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
 import { recordSell, recordItemFound, isItemKnown } from './stats.js';
 import { markDiscovered, isDiscovered } from './discovered.js';
@@ -166,6 +166,13 @@ export function toggleLock(state, itemId) {
 /** Working bank hides ghosts; Catalogue (`all`) is the opt-in atlas. */
 export function isCatalogueTab(tab) {
   return tab === 'all' || tab === 'catalogue';
+}
+
+/** HUD Known opens Catalogue (`all`); Hollow opens Owned. Category chips stay local. */
+export function resolveBankTab(tab) {
+  if (isCatalogueTab(tab)) return 'all';
+  if (tab === 'pinned') return 'pinned';
+  return DEFAULT_BANK_TAB;
 }
 
 /** Category chips that currently hold a known stack (found or occupied). */

@@ -4,7 +4,7 @@ import { ITEMS } from '../src/game/data/items.js';
 import {
   bankCount, bankAdd, canAfford, bankPay, bankSellValue, sellItems,
   tryBankAdd, uniqueStackCount, lanternRoom, canAcceptStack,
-  BASE_LANTERN_ROOM, PACK_FULL_MSG,
+  BASE_LANTERN_ROOM, PACK_FULL_MSG, resolveBankTab,
 } from '../src/game/systems/bank.js';
 import { createState, STARTER_BANK } from '../src/game/state.js';
 import { itemTimesFound, isItemKnown } from '../src/game/systems/stats.js';
@@ -112,6 +112,9 @@ test('dumping a unique starter decrements occupancy, not known', () => {
   assert.equal(itemTimesFound(s, 'lantern-loaf'), found);
   assert.equal(isItemKnown(s, 'lantern-loaf'), true);
   assert.equal(isItemKnown(s, 'palecap'), false);
+  assert.equal(resolveBankTab('all'), 'all');
+  assert.equal(resolveBankTab('catalogue'), 'all');
+  assert.equal(resolveBankTab(undefined), 'owned');
 });
 
 test('unique-stack cap blocks a new kind when full; existing stacks still grow', () => {
