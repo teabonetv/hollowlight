@@ -568,6 +568,8 @@ body {
 .bank-tile:active { transform: scale(0.96); border-color: var(--gold-lo); }
 .bank-tile.owned { border-color: rgba(217, 164, 65, 0.35); }
 .bank-tile.unowned { opacity: 0.52; }
+.bank-tile.known-empty { opacity: 0.88; border-color: rgba(217, 164, 65, 0.22); }
+.bank-tile.known-empty .bank-qty { color: var(--muted); }
 .bank-tile.selected { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.45); }
 .bank-inspector { display: none; }
 .bank-tile:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
@@ -664,7 +666,9 @@ body {
   letter-spacing: -0.01em;
   pointer-events: none;
   max-width: 100%;
+  flex-shrink: 0;
 }
+.bank-stall-pip:not(.visually-hidden) { display: block; }
 .bank-tile-dense {
   min-height: 96px;
   aspect-ratio: auto;
@@ -1288,6 +1292,7 @@ html.reduced-motion *::after {
 
 .bank-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   overflow-x: auto;
   overscroll-behavior-x: contain;

@@ -109,6 +109,16 @@ export function itemTimesFound(state, itemId) {
   return state?.stats?.itemFound?.[itemId] ?? 0;
 }
 
+/**
+ * Completion-known: Times Found > 0 or stamped discovered. Occupancy
+ * (unique stacks in the hollow) is a different number — dumping never
+ * un-knows a line.
+ */
+export function isItemKnown(state, itemId) {
+  if (!itemId) return false;
+  return itemTimesFound(state, itemId) > 0 || !!state?.discovered?.[itemId];
+}
+
 export function itemTimesSold(state, itemId) {
   return state?.stats?.itemSold?.[itemId] ?? 0;
 }

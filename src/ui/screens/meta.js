@@ -476,7 +476,7 @@ function renderLogItems(ctx) {
       el('span', { class: 'empty-icon', html: icon('book') }),
       el('h2', { class: 'empty-title' }, 'Nothing found in play'),
       el('p', { class: 'empty-text' },
-        'The starter pack does not count. Gather, hunt, or buy — the first pickup writes the line. Spending the last stack never erases it.'));
+        'Times Found writes the line. Gather, hunt, or buy — dumping a stack never un-knows it.'));
   const missingBlock = missing.length
     ? el('div', { class: 'log-tile-grid log-missing', 'data-log-drill': 'items-missing' },
       missing.map((r) => logTile({
@@ -490,7 +490,7 @@ function renderLogItems(ctx) {
 
   return {
     node: el('section', { class: 'screen almanac' },
-      ...logHero(ctx, 'items', 'Items', 'found in play, never un-completed'),
+      ...logHero(ctx, 'items', 'Items', 'known by Times Found, never un-completed'),
       el('h2', { class: 'section-title' }, `Found · ${found.length}`),
       foundBlock,
       el('h2', { class: 'section-title' }, `Still in the dark · ${missing.length}`),

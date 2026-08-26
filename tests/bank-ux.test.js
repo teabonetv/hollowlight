@@ -33,6 +33,8 @@ const modals = await import('../src/ui/modals.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { itemTimesFound } = await import('../src/game/systems/stats.js');
 const { formatNumber } = await import('../src/core/format.js');
+const { knownItemCount, logCategoryStats } = await import('../src/game/systems/completion.js');
+const { renderAlmanacScreen } = await import('../src/ui/screens/meta.js');
 
 function makeCtx(state, overrides = {}) {
   return {
@@ -580,6 +582,99 @@ test('grid sell with a feat unlock is one toast, not sell + feat competing', () 
   assert.match(toasts[0], /Sold Tinderscrap ×1 for ✦1/);
   assert.match(toasts[0], /Feat: A Fair Trade/);
   assert.equal(toasts.filter((m) => /^Sold /.test(m)).length, 1, 'do not double the same sell');
+});
+
+test('dump a unique starter stack decrements Hollow occupancy, not known', () => {
+  const s = createState({ rngSeed: 1 });
+  const loafId = 'lantern-loaf';
+  const priorFound = itemTimesFound(s, loafId);
+  const beforeKnown = knownItemCount(s);
+  const beforeOcc = uniqueStackCount(s.bank);
+  assert.equal(priorFound, STARTER_BANK[loafId]);
+  assert.equal(beforeKnown, Object.keys(STARTER_BANK).length);
+  assert.equal(beforeOcc, Object.keys(STARTER_BANK).length);
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, beforeKnown);
+
+  const dumped = sellItems(s, loafId, priorFound);
+  assert.equal(dumped.ok, true);
+  assert.equal(s.bank[loafId], undefined);
+  assert.equal(itemTimesFound(s, loafId), priorFound, 'Times Found is not un-counted');
+  assert.equal(uniqueStackCount(s.bank), beforeOcc - 1);
+  assert.equal(formatHollowChip(s), `Hollow ${beforeOcc - 1}/${lanternRoom(s)}`);
+  assert.equal(knownItemCount(s), beforeKnown);
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, beforeKnown,
+    'Almanac items found stays known after a dump');
+
+  const opened = [];
+  const toasts = [];
+  const scr = tabs.renderBankScreen(makeCtx(s, {
+    openSellSheet: (id) => opened.push(id),
+    toast: (m) => toasts.push(m),
+  }));
+  const header = scr.node.querySelector('.screen-sub').textContent ?? '';
+  assert.match(header, new RegExp(`${beforeKnown} of ${ITEMS.length} known`));
+  assert.match(header, new RegExp(`${beforeOcc - 1} / ${lanternRoom(s)}`));
+  assert.equal(scr.node.querySelectorAll('.bank-tile').length, beforeOcc - 1,
+    'dumped loaf leaves the working pack');
+
+  const cat = scr.node.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
+  cat.click();
+  const loaf = tileByName(scr.node, 'Lantern-loaf');
+  assert.ok(loaf, 'catalogue still names a dumped known stack');
+  assert.equal(loaf.classList.contains('unowned'), false, 'not a never-found ghost');
+  assert.ok(loaf.classList.contains('known-empty'));
+  assert.equal(loaf.querySelector('.bank-qty').textContent, '0');
+  assert.doesNotMatch(loaf.querySelector('.bank-qty').textContent ?? '', /—/);
+  loaf.click();
+  assert.deepEqual(opened, [loafId], 'known-empty inspects; does not toast never-found');
+  assert.equal(toasts.some((m) => /not yet found/.test(m)), false);
+
+  const almanac = renderAlmanacScreen({
+    state: s,
+    toast() {},
+    almanacView: () => 'log-items',
+    openAlmanac() {},
+    ensureDailies() {},
+    rerollDailies() {},
+    claimDaily() {},
+  });
+  const found = almanac.node.querySelector('[data-log-drill="items-found"]');
+  const missing = almanac.node.querySelector('[data-log-drill="items-missing"]');
+  assert.match(found.textContent ?? '', /Lantern-loaf/);
+  assert.match(found.textContent ?? '', /Found/);
+  assert.equal((missing?.textContent ?? '').includes('Lantern-loaf'), false);
+  assert.equal((missing?.textContent ?? '').includes('?'), true);
+});
+
+test('stall pip paints when catalog ≠ stall on owned and Catalogue tiles', () => {
+  const s = createState({ rngSeed: 1 });
+  addSellPressure(s, 'lantern-loaf', 20);
+  const live = liveSellUnit(s, 'lantern-loaf');
+  const catalog = ITEMS_BY_ID['lantern-loaf'].sell;
+  assert.ok(live < catalog, 'pressure drops loaf below catalog ✦4');
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const loaf = tileByName(scr.node, 'Lantern-loaf');
+  const pip = loaf.querySelector('.bank-stall-pip');
+  assert.equal(pip.classList.contains('visually-hidden'), false);
+  assert.equal(pip.textContent, `stall ✦${live}`);
+  assert.ok(loaf.classList.contains('stall-divergent'));
+
+  const cat = scr.node.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
+  cat.click();
+  const catLoaf = tileByName(scr.node, 'Lantern-loaf');
+  const catPip = catLoaf.querySelector('.bank-stall-pip');
+  assert.equal(catPip.classList.contains('visually-hidden'), false,
+    'catalogue must not hide a divergent stall pip');
+  assert.equal(catPip.textContent, `stall ✦${live}`);
+});
+
+test('Food tab stays on the starter row; tab chips wrap instead of dropping', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const labels = scr.node.querySelectorAll('.bank-tab').map((t) => t.textContent);
+  assert.ok(labels.includes('Food'), 'Lantern-loaf keeps Food on the chip row');
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.bank-tabs\s*\{[^}]*flex-wrap:\s*wrap/s);
 });
 
 

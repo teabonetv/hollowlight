@@ -10,6 +10,7 @@ import { taskProgress } from './dailies.js';
 import { ACTIONS, ACTIONS_BY_ID } from '../data/actions.js';
 import { SKILLS, SKILL_BY_ID } from '../data/skills.js';
 import { ITEMS } from '../data/items.js';
+import { isItemKnown } from './stats.js';
 import { MILESTONE_LEVEL } from '../../core/xp.js';
 import { ENEMIES } from '../data/enemies/index.js';
 import { ZONE_BY_ID } from '../data/combat/zones.js';
@@ -142,7 +143,7 @@ function masteryLogRow(state) {
 }
 
 function itemsLogRow(state) {
-  const have = discoveredItemIds(state).length;
+  const have = knownItemCount(state);
   const total = ITEMS.length;
   return { id: 'items', name: 'Items', done: have, total, pct: clampRatio(have, total) };
 }
@@ -154,6 +155,22 @@ export function discoveredItemIds(state) {
     if (state.discovered?.[item.id]) found.push(item.id);
   }
   return found;
+}
+
+/**
+ * Catalogue / Almanac “known”: Times Found > 0 or discovered.
+ * Occupancy (Hollow N/MAX) is unique held stacks — a different number.
+ */
+export function knownItemIds(state) {
+  const found = [];
+  for (const item of ITEMS) {
+    if (isItemKnown(state, item.id)) found.push(item.id);
+  }
+  return found;
+}
+
+export function knownItemCount(state) {
+  return knownItemIds(state).length;
 }
 
 export function skillLogDetails(state) {
@@ -201,11 +218,12 @@ export function itemsLogDetails(state) {
   const found = [];
   const missing = [];
   for (const item of ITEMS) {
+    const known = isItemKnown(state, item.id);
     const row = {
       id: item.id,
       name: item.name,
-      found: !!state.discovered?.[item.id],
-      mystery: !state.discovered?.[item.id],
+      found: known,
+      mystery: !known,
     };
     (row.found ? found : missing).push(row);
   }

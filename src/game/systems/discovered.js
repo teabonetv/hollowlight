@@ -1,5 +1,6 @@
-// Unique items found in play. The starter pack is a boot grant and does
-// not count; spending the last stack never un-completes a line.
+// Unique items found in play. The starter pack is a boot grant and is not
+// written here; Times Found still counts held starter qty. Known (Almanac /
+// catalogue) is itemFound > 0 or this stamp — dumping never un-completes.
 
 import { ITEMS_BY_ID } from '../data/items.js';
 

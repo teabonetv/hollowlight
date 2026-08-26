@@ -2,12 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { ITEMS } from '../src/game/data/items.js';
 import {
-  bankCount, bankAdd, canAfford, bankPay, bankSellValue,
+  bankCount, bankAdd, canAfford, bankPay, bankSellValue, sellItems,
   tryBankAdd, uniqueStackCount, lanternRoom, canAcceptStack,
   BASE_LANTERN_ROOM, PACK_FULL_MSG,
 } from '../src/game/systems/bank.js';
 import { createState, STARTER_BANK } from '../src/game/state.js';
-import { itemTimesFound } from '../src/game/systems/stats.js';
+import { itemTimesFound, isItemKnown } from '../src/game/systems/stats.js';
+import { knownItemCount, logCategoryStats } from '../src/game/systems/completion.js';
+import { formatHollowChip } from '../src/ui/hud.js';
 import { applyGains } from '../src/game/systems/action-runner.js';
 import { buyFromStore } from '../src/game/systems/store.js';
 
@@ -79,6 +81,7 @@ test('Times Found is never 0 for a held stack — starter Rushwick is 5', () => 
   assert.equal(s.bank.rushwick, STARTER_BANK.rushwick);
   assert.equal(itemTimesFound(s, 'rushwick'), STARTER_BANK.rushwick);
   assert.equal(s.discovered.rushwick, undefined, 'starter is not Almanac-discovered');
+  assert.equal(isItemKnown(s, 'rushwick'), true, 'Times Found still makes it known');
   for (const [id, qty] of Object.entries(STARTER_BANK)) {
     assert.equal(itemTimesFound(s, id), qty, `${id} starter Times Found matches held`);
   }
@@ -88,6 +91,26 @@ test('Times Found is never 0 for a held stack — starter Rushwick is 5', () => 
   assert.equal(itemTimesFound(s, 'palecap'), 0);
   tryBankAdd(s, 'palecap', 10);
   assert.equal(itemTimesFound(s, 'palecap'), 10);
+});
+
+test('dumping a unique starter decrements occupancy, not known', () => {
+  const s = createState({ rngSeed: 1 });
+  const found = itemTimesFound(s, 'lantern-loaf');
+  const known = knownItemCount(s);
+  const occ = uniqueStackCount(s.bank);
+  assert.equal(found, STARTER_BANK['lantern-loaf']);
+  assert.equal(known, 6);
+  assert.equal(occ, 6);
+  const sold = sellItems(s, 'lantern-loaf', found);
+  assert.equal(sold.ok, true);
+  assert.equal(s.bank['lantern-loaf'], undefined);
+  assert.equal(uniqueStackCount(s.bank), 5);
+  assert.equal(formatHollowChip(s), 'Hollow 5/12');
+  assert.equal(knownItemCount(s), 6);
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, 6);
+  assert.equal(itemTimesFound(s, 'lantern-loaf'), found);
+  assert.equal(isItemKnown(s, 'lantern-loaf'), true);
+  assert.equal(isItemKnown(s, 'palecap'), false);
 });
 
 test('unique-stack cap blocks a new kind when full; existing stacks still grow', () => {
