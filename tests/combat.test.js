@@ -453,6 +453,9 @@ test('auto-continue chains the next moth while the lantern is fed', () => {
   assert.equal(s.combat.fighting, true);
   assert.equal(s.combat.foe?.id, 'pale-moth');
   assert.ok(combat.lanternIsFed(s));
+  assert.ok(s.combat.log.some((l) => l.kind === 'kill' && /Loot:/.test(l.text)),
+    'Keep hunting must keep the kill loot line into the next fight');
+  assert.ok(s.combat.log.some((l) => l.kind === 'start' && /You meet Pale Moth/.test(l.text)));
 });
 
 test('selected food skips empty stacks and lastStation snapshots a kill', () => {
