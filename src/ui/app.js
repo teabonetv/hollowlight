@@ -56,6 +56,8 @@ import { shouldRebuildScreen } from './live-paint.js';
 const AUTOSAVE_MS = 30_000;
 const UI_KEY = 'hollowlight.ui';
 const UI_TABS = new Set(['camp', 'skills', 'bank', 'map', 'journal']);
+const SELL_QTY_MODES = new Set(['1', '10', 'dump']);
+const PACK_FULL_TOAST_MS = 8000;
 
 function boot() {
   // ── persistent pieces ──────────────────────────────────────────
@@ -70,10 +72,11 @@ function boot() {
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
-  const ui = { tab: 'camp', skillId: null, almanac: 'overview', campView: null };
+  const ui = { tab: 'camp', skillId: null, almanac: 'overview', campView: null, sellMode: false, sellQtyMode: '1' };
   let liveUpdate = () => {};
   let sheetRepaint = null;
   let rng = createRng(1);
+  let lastPackFullToastAt = 0;
 
   // ── save / load / adopt ────────────────────────────────────────
   function persist({ stamp = true } = {}) {
@@ -185,6 +188,12 @@ function boot() {
     toaster.push(`Vigil complete. ✦${lumen} for the lantern.`, 'success');
     pushLog(game, `A Vigil against ${category} is fulfilled.`, game.stats.playtimeMs);
   });
+  bus.on('pack-full', () => {
+    const now = Date.now();
+    if (now - lastPackFullToastAt < PACK_FULL_TOAST_MS) return;
+    lastPackFullToastAt = now;
+    toaster.push("The lantern's hollow is full. Sell a stack to make room.", 'warn');
+  });
 
   function flushAchievementsQuiet() {
     if (!game) return 0;
@@ -250,6 +259,8 @@ function boot() {
         skillId: ui.skillId,
         almanac: ui.almanac,
         campView: ui.campView,
+        sellMode: !!ui.sellMode,
+        sellQtyMode: SELL_QTY_MODES.has(ui.sellQtyMode) ? ui.sellQtyMode : '1',
       }));
     } catch { /* quota / private mode */ }
   }
@@ -275,6 +286,8 @@ function boot() {
       : null;
     ui.almanac = typeof saved.almanac === 'string' ? saved.almanac : 'overview';
     ui.campView = saved.tab === 'camp' && saved.campView === 'store' ? 'store' : null;
+    ui.sellMode = !!saved.sellMode;
+    ui.sellQtyMode = SELL_QTY_MODES.has(saved.sellQtyMode) ? saved.sellQtyMode : '1';
     return true;
   }
 
@@ -319,6 +332,13 @@ function boot() {
       const res = sellItems(game, itemId, qty);
       if (res.ok) afterMutation();
       return res;
+    },
+    get sellMode() { return ui.sellMode; },
+    setSellMode(on) { ui.sellMode = !!on; writeUiRoute(); },
+    get sellQtyMode() { return ui.sellQtyMode; },
+    setSellQtyMode(mode) {
+      if (SELL_QTY_MODES.has(mode)) ui.sellQtyMode = mode;
+      writeUiRoute();
     },
     openSellSheet(itemId) {
       const ref = showSellSheet(modalRoot, ctx, itemId);
@@ -526,6 +546,8 @@ function boot() {
       ui.tab = 'camp';
       ui.skillId = null;
       ui.campView = null;
+      ui.sellMode = false;
+      ui.sellQtyMode = '1';
       adopt(freshGame());
       paintTabChrome('camp');
       writeUiRoute();

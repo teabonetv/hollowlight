@@ -497,7 +497,7 @@ body {
 .bank-grids { width: 100%; }
 .bank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; width: 100%; }
 .bank-grid-owned {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 6px;
 }
 .bank-tile {
@@ -545,16 +545,33 @@ body {
 .bank-tile-catalogue .bank-qty { position: static; font-size: 15px; }
 .bank-tile.unowned .bank-qty { color: var(--faint); }
 .bank-name { font-size: 12px; line-height: 1.25; }
+.bank-name-dense {
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
 .bank-glyph {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
   color: var(--gold-hi);
   pointer-events: none;
+  background: rgba(0, 0, 0, 0.42);
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06);
 }
-.bank-glyph svg { width: 24px; height: 24px; }
+.bank-glyph svg { width: 32px; height: 32px; display: block; }
 .bank-glyph.glyph-moss { color: #7fa56d; }
 .bank-glyph.glyph-leaf { color: #8fbc78; }
 .bank-glyph.glyph-mushroom { color: #b7c48a; }
@@ -585,14 +602,14 @@ body {
   white-space: nowrap;
 }
 .bank-tile-dense {
-  min-height: 64px;
+  min-height: 76px;
   aspect-ratio: auto;
-  padding: 10px 3px 5px;
-  gap: 1px;
+  padding: 8px 3px 5px;
+  gap: 2px;
   justify-content: flex-end;
 }
-.bank-tile-dense .bank-glyph { width: 26px; height: 26px; }
-.bank-tile-dense .bank-glyph svg { width: 22px; height: 22px; }
+.bank-tile-dense .bank-glyph { width: 32px; height: 32px; min-width: 32px; min-height: 32px; }
+.bank-tile-dense .bank-glyph svg { width: 32px; height: 32px; }
 
 .bank-head-row {
   display: flex;
@@ -845,8 +862,26 @@ body {
 .sheet-panel .modal-body {
   min-height: 0;
   flex: 1 1 auto;
-  overflow-y: auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   padding-bottom: calc(12px + env(safe-area-inset-bottom));
+}
+.sheet-panel .item-inspector-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+.sheet-panel .sell-catalog,
+.sheet-panel .sell-primary {
+  flex: 0 0 auto;
+}
+.sheet-panel .item-inspector-lore {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
 }
 .modal-head {
   display: flex;
@@ -953,10 +988,17 @@ html.reduced-motion *::after {
 /* ── Bank sell sheet ───────────────────────────────────────── */
 .sell-flavor { margin: 0 0 10px; font-style: italic; color: var(--muted); line-height: 1.5; }
 .sell-uses { margin-bottom: 10px; }
-.sell-line { margin: 0 0 14px; line-height: 1.7; }
+.sell-line { margin: 0 0 8px; line-height: 1.45; }
 .sell-qty { color: var(--text); }
 .sell-worth { font-size: 14px; }
 .gold { color: var(--gold-hi); }
+.sell-primary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.sell-primary .btn { width: 100%; min-height: 44px; }
 .sell-actions { display: flex; gap: 8px; margin-bottom: 8px; }
 .sell-actions .btn { flex: 1; min-height: 46px; }
 .sell-custom {
@@ -1201,8 +1243,9 @@ html.reduced-motion *::after {
     color: var(--gold-hi);
     letter-spacing: 0.04em;
   }
-  .bank-grid-owned { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); }
-  .bank-tile-dense { min-height: 72px; }
+  .bank-grid-owned { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
+  .bank-tile-dense { min-height: 88px; }
+  .bank-tile-dense .bank-name-dense { font-size: 11px; }
   .bank-tile-catalogue { min-height: 72px; }
   .bank-sell-toggle { min-width: 132px; }
   .sheet-overlay { display: none; }

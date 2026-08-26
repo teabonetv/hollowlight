@@ -1,9 +1,13 @@
-// Inline SVG icon set — stroke-based, currentColor-tinted, consistent at any
-// size. Kept geometric and hand-writable rather than pulling in an icon font.
+// Inline SVG icon set — stroke-based for chrome, filled silhouettes for the
+// owned bank grid. Kept geometric and hand-writable rather than an icon font.
 
 const svg = (inner, extra = '') =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" ${extra}>${inner}</svg>`;
+
+const svgFill = (inner, extra = '') =>
+  `<svg viewBox="0 0 24 24" width="32" height="32" fill="currentColor" stroke="none"
+        aria-hidden="true" ${extra}>${inner}</svg>`;
 
 export const ICONS = {
   flame: svg('<path d="M12 3.5c2.2 2.8 4.8 4.4 4.8 7.9a4.8 4.8 0 0 1-9.6 0c0-1.9.9-3.2 1.9-4.6.4 1.3 1.1 2 2.2 2.1-.3-1.9-.1-3.7.7-5.4z"/><path d="M12 21v-2"/>'),
@@ -32,7 +36,40 @@ export const ICONS = {
   drop: svg('<path d="M12 4.5c2.8 3.6 5.2 6.2 5.2 9.2a5.2 5.2 0 1 1-10.4 0C6.8 10.7 9.2 8.1 12 4.5z"/>'),
 };
 
+/** High-contrast packed silhouettes for the owned bank grid (≥32px). */
+export const FILLED_ICONS = {
+  flame: svgFill('<path d="M12 2.4c2.4 3.1 5.4 5 5.4 9.2a5.4 5.4 0 1 1-10.8 0c0-2.2 1-3.7 2.2-5.3.4 1.5 1.3 2.4 2.6 2.6-.4-2.2-.2-4.3.6-6.5z"/><rect x="11" y="19.2" width="2" height="2.6" rx="0.4"/>'),
+  moss: svgFill('<path d="M3.2 18.4c.8-4.8 3.2-9.4 8.8-10.6 5.6 1.2 8 5.8 8.8 10.6-1.6 2.4-16 2.4-17.6 0z"/><circle cx="7.6" cy="16.2" r="2.3"/><circle cx="12" cy="14.4" r="2.8"/><circle cx="16.5" cy="16.4" r="2.2"/>'),
+  leaf: svgFill('<path d="M20 3.8C10.6 3.8 4.2 9.4 4.2 17.2c0 1.3.2 2.4.6 3.4 9.4-.6 15.4-6.6 15.2-16.8z"/>'),
+  pick: svgFill('<path d="M13.4 3.6c3.8.4 6.2 2.6 6.8 6.6-2.8.2-5.2-1-7.2-2.8z"/><path d="M4.2 9.6l10.4 10.6 2.4-2.7c1.9-2 3.2-4.4 3.6-7.2-3.6.2-6.6-1.2-8.8-3.4L4.2 9.6z"/>'),
+  hook: svgFill('<path d="M14.6 2.8c.8 0 1.5.7 1.5 1.5V13a5.4 5.4 0 0 1-10.8 0v-2.6h3.2V13a2.2 2.2 0 0 0 4.4 0V4.3c0-.8.7-1.5 1.7-1.5z"/><path d="M14.6 2.8l-2.4 2.8h4.8z"/><circle cx="8" cy="19.2" r="1.8"/>'),
+  candle: svgFill('<path d="M9 11h6v9.2a1.2 1.2 0 0 1-1.2 1.2h-3.6A1.2 1.2 0 0 1 9 20.2z"/><path d="M12 4.2c1.8 1.4 2.2 3.2.8 5.2-.6-.6-1.2-1.2-1.2-2.1 0-1.2 1-1.6 1.6-2.4.2-.3-.4-.9-1.2-.7z"/><rect x="6.5" y="20.6" width="11" height="1.6" rx="0.4"/>'),
+  anvil: svgFill('<path d="M3.8 7.4h9.2c4.2 0 6.4-2.1 7.6-3.8.4 2.6-.5 5.4-3.2 6.6l-1.2.6v3.2H8.2v-3.2l-1.6-.9C5 9.3 4.2 8.5 3.8 7.4z"/><rect x="6" y="17.4" width="12" height="3.4" rx="0.4"/><rect x="8.6" y="14.6" width="6.8" height="3"/>'),
+  star: svgFill('<path d="M12 2.6l2.5 5.4 5.8.7-4.3 4 1.2 5.7L12 15.2 6.8 18.4l1.2-5.7-4.3-4 5.8-.7z"/>'),
+  sword: svgFill('<path d="M4.4 18.8L16.2 7.2l3.6-4.6-4.6 3.6L3.6 17.8z"/><path d="M3.4 19.4l-1.2 1.4 1.6 1.4 1.4-1.2z"/><path d="M6.8 14.2l3.4 3.4 1.2-1.2-3.4-3.4z"/>'),
+  chest: svgFill('<rect x="3.6" y="7" width="16.8" height="13.2" rx="2"/><rect x="3.6" y="10.6" width="16.8" height="2.2"/><circle cx="12" cy="15.4" r="1.5"/>'),
+  map: svgFill('<path d="M9 3.6L3.6 5.8v14.6l5.4-2.2 6 2.2 5.4-2.2V3.6l-5.4 2.2-6-2.2z"/>'),
+  book: svgFill('<path d="M12 5.4C10.4 4 8.2 3.4 5.2 3.4v14.6c3 0 5.2.6 6.8 2.2 1.6-1.6 3.8-2.2 6.8-2.2V3.4c-3 0-5.2.6-6.8 2z"/>'),
+  gear: svgFill('<rect x="3.6" y="6" width="9.2" height="2.2" rx="0.6"/><rect x="16.2" y="6" width="4.2" height="2.2" rx="0.6"/><rect x="3.6" y="11" width="3.2" height="2.2" rx="0.6"/><rect x="10.4" y="11" width="10" height="2.2" rx="0.6"/><rect x="3.6" y="16" width="13.4" height="2.2" rx="0.6"/><circle cx="15.2" cy="7.1" r="2.1"/><circle cx="8.8" cy="12.1" r="2.1"/><circle cx="19" cy="17.1" r="2.1"/>'),
+  back: svgFill('<path d="M15.2 4.4L7.4 12l7.8 7.6v-3.2H20V7.6h-4.8z"/>'),
+  close: svgFill('<path d="M6.2 4.8L4.8 6.2 10.6 12l-5.8 5.8 1.4 1.4L12 13.4l5.8 5.8 1.4-1.4L13.4 12l5.8-5.8-1.4-1.4L12 10.6z"/>'),
+  camp: svgFill('<path d="M3.6 20.4L12 6.6l8.4 13.8H3.6z"/><path d="M8.2 20.4l3.8-6.4 3.8 6.4z"/>'),
+  spark: svgFill('<polygon points="12,2 13.6,10.4 22,12 13.6,13.6 12,22 10.4,13.6 2,12 10.4,10.4"/>'),
+  brick: svgFill('<rect x="3.2" y="6.6" width="8.2" height="5.2" rx="0.7"/><rect x="12.6" y="6.6" width="8.2" height="5.2" rx="0.7"/><rect x="7.6" y="13.2" width="8.8" height="5.2" rx="0.7"/>'),
+  wood: svgFill('<path d="M5.4 19.4L11.2 3.8l2.8 1.1-5.8 15.6z"/><path d="M10.6 19.4l5.6-13 2.6 1-5.6 13.2z"/>'),
+  reed: svgFill('<rect x="7.1" y="6.4" width="1.8" height="14.2" rx="0.8"/><rect x="11.1" y="4" width="1.8" height="16.6" rx="0.8"/><rect x="15.1" y="8.4" width="1.8" height="12.2" rx="0.8"/><path d="M8 6.4l-2.2-3.2 1.6-.8 1.8 3.4z"/><path d="M12 4l1.4-2.4 1.4.8-1.4 2.2z"/><path d="M16 8.4l2.2-2.8 1.4.9-2 2.6z"/>'),
+  loaf: svgFill('<path d="M4.2 13.4C4.2 8.8 7.5 5.8 12 5.8s7.8 3 7.8 7.6v4.4A2 2 0 0 1 17.8 20H6.2A2 2 0 0 1 4.2 17.8z"/>'),
+  vial: svgFill('<rect x="9" y="3.4" width="6" height="3.4" rx="0.5"/><path d="M9 6.8h6l1.3 3.6V18a2.2 2.2 0 0 1-2.2 2.2h-4.2A2.2 2.2 0 0 1 7.7 18V10.4z"/>'),
+  mushroom: svgFill('<path d="M4.6 11.2C4.6 6.6 7.8 3.4 12 3.4s7.4 3.2 7.4 7.8H4.6z"/><rect x="9.6" y="11" width="4.8" height="8.6" rx="1"/>'),
+  drop: svgFill('<path d="M12 3.4c3 3.8 5.6 6.6 5.6 9.8a5.6 5.6 0 1 1-11.2 0C6.4 10 9 7.2 12 3.4z"/>'),
+};
+
 export function icon(name, cls = '') {
   const s = ICONS[name] ?? ICONS.star;
+  return cls ? s.replace('<svg ', `<svg class="${cls}" `) : s;
+}
+
+export function filledIcon(name, cls = '') {
+  const s = FILLED_ICONS[name] ?? FILLED_ICONS.star;
   return cls ? s.replace('<svg ', `<svg class="${cls}" `) : s;
 }

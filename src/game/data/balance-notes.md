@@ -278,3 +278,19 @@ kept. Walk back (open that stretch) to recover.
 | Later zones | beacon + Combat level (8…80) | Listed on the stretch. Unkindled copy is the lock, not a greyed mystery. |
 
 Starter combat kit (on top of F1/S2 bank): 8 lantern-loaf, 6 wick-oil, 1 wick-knife. Lumen still 20 — dying on the fog-line is a walk-back, not a wipe.
+
+## Lantern hollow (S2e unique-stack cap)
+
+The working pack is weightless but not infinite: it holds a finite number of
+**kinds**, not a count of items. Existing stacks still grow. A new unique is
+refused (gather / buy / loot / offline) until you sell a stack out of the
+hollow or the Keeper's Satchel widens it. Grid-sell is the pressure valve.
+This is not Melvor's Extra Bank Slot shop — room comes from bags you already
+stitch at camp.
+
+| Constant | Value | Where | Why |
+|---|---|---|---|
+| Base hollow | 12 unique stacks | `lantern-room.js BASE_LANTERN_ROOM` | Starter pack is 6 kinds. First foraging/mining loops fit; then you sell to make room. Visible as `N / MAX` beside catalog worth. |
+| Satchel room | +2 / tier | `SATCHEL_ROOM_PER_TIER` on Keeper's Satchel | Same sink as bonus-find. Six tiers → 24 hollow. Yield math is unchanged. |
+| Over-cap saves | keep extras, block new kinds | `canAcceptStack` | Pre-S2e banks with more than 12 kinds are not truncated. |
+

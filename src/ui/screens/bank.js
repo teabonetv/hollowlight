@@ -2,12 +2,12 @@
 // Catalogue stays opt-in; desktop docks an inspector; phone uses a sheet.
 
 import { el, clear } from '../dom.js';
-import { icon } from '../icons.js';
+import { filledIcon } from '../icons.js';
 import { ITEMS, ITEM_CATEGORIES, DEFAULT_BANK_TAB } from '../../game/data/items.js';
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import {
   bankCount, bankSellValue, filterItems, isPinned, isCatalogueTab, visibleBankTabs,
-  needsSellConfirm,
+  needsSellConfirm, uniqueStackCount, lanternRoom,
 } from '../../game/systems/bank.js';
 import { formatNumber } from '../../core/format.js';
 import { createItemInspector } from '../item-inspector.js';
@@ -39,13 +39,15 @@ export function itemTileChrome(item, qty) {
   return `✦${item.sell} · ×${formatNumber(qty)}`;
 }
 
+const SELL_QTY_MODES = new Set(['1', '10', 'dump']);
+
 export function renderBankScreen(ctx) {
   const headerSub = el('p', { class: 'screen-sub' });
   const filter = { tab: DEFAULT_BANK_TAB, query: '' };
   let selectedId = null;
   let docked = null;
-  let sellMode = false;
-  let sellQtyMode = '1'; // '1' | '10' | 'dump'
+  let sellMode = !!ctx.sellMode;
+  let sellQtyMode = SELL_QTY_MODES.has(ctx.sellQtyMode) ? ctx.sellQtyMode : '1';
 
   const theme = ctx.state.cosmetics?.bankTheme ?? 'default';
   const workspace = el('div', { class: 'bank-workspace' });
@@ -139,12 +141,14 @@ export function renderBankScreen(ctx) {
 
   sellToggle.addEventListener('click', () => {
     sellMode = !sellMode;
+    ctx.setSellMode?.(sellMode);
     paintSellBar();
     syncGrid();
   });
   for (const [btn, mode] of [[qty1Btn, '1'], [qty10Btn, '10'], [dumpBtn, 'dump']]) {
     btn.addEventListener('click', () => {
       sellQtyMode = mode;
+      ctx.setSellQtyMode?.(mode);
       paintSellBar();
       syncGrid();
     });
@@ -255,11 +259,11 @@ export function renderBankScreen(ctx) {
     chromeEl.textContent = qty > 0 ? itemTileChrome(it, qty) : '';
     chromeEl.className = dense && qty > 0 ? 'bank-chrome' : 'bank-chrome visually-hidden';
     pinMark.textContent = pinned ? '★' : '';
-    glyphEl.className = `bank-glyph glyph-${glyph}`;
-    glyphEl.innerHTML = icon(glyph);
+    glyphEl.className = `bank-glyph bank-glyph-fill glyph-${glyph}`;
+    glyphEl.innerHTML = filledIcon(glyph);
     if (!glyphEl.innerHTML) glyphEl.textContent = itemTileInitials(it);
     nameEl.textContent = it.name;
-    nameEl.className = dense ? 'bank-name visually-hidden' : 'bank-name';
+    nameEl.className = dense ? 'bank-name bank-name-dense' : 'bank-name';
   }
 
   function syncGrid() {
@@ -376,8 +380,10 @@ export function renderBankScreen(ctx) {
   function update() {
     let discovered = 0;
     for (const it of ITEMS) if (bankCount(ctx.state.bank, it.id) > 0) discovered++;
+    const used = uniqueStackCount(ctx.state.bank);
+    const cap = lanternRoom(ctx.state);
     headerSub.textContent =
-      `${discovered} of ${ITEMS.length} items known · catalog worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
+      `${discovered} of ${ITEMS.length} known · ${used} / ${cap} · catalog worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
     paintTabs();
     paintSellBar();
     syncGrid();

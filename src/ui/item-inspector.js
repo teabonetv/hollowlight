@@ -41,7 +41,7 @@ export function createItemInspector(ctx, itemId, {
   const qtyLabel = el('span', { class: 'sell-qty' });
   const worthLabel = el('span', { class: 'sell-worth gold' });
   const confirmBtn = el('button', {
-    class: 'btn btn-danger btn-wide',
+    class: 'btn btn-wide sell-all-btn',
     'aria-live': 'assertive',
   });
 
@@ -56,12 +56,14 @@ export function createItemInspector(ctx, itemId, {
     worthLabel.textContent = `stack worth ✦${formatNumber(qty * unit)} at today’s stall`;
 
     sell1Btn.textContent = 'Sell 1';
+    sell1Btn.disabled = qty < 1;
+    sell1Btn.setAttribute('aria-disabled', qty < 1 ? 'true' : 'false');
     sell10Btn.textContent = 'Sell 10';
     sell100Btn.textContent = 'Sell 100';
     clear(sellActions);
-    if (qty >= 1) sellActions.append(sell1Btn);
     if (qty >= 10) sellActions.append(sell10Btn);
     if (qty >= 100) sellActions.append(sell100Btn);
+    sellActions.style.display = sellActions.children.length ? '' : 'none';
 
     sellQtyInput.setAttribute('max', String(Math.max(1, qty)));
     const typed = Math.floor(Number(sellQtyInput.value));
@@ -73,18 +75,18 @@ export function createItemInspector(ctx, itemId, {
 
     if (qty <= 0) {
       clearSellConfirm(itemId);
-      confirmBtn.className = 'btn btn-ghost btn-wide btn-disabled';
+      confirmBtn.className = 'btn btn-ghost btn-wide btn-disabled sell-all-btn';
       confirmBtn.textContent = 'None left in the bank';
       confirmBtn.setAttribute('aria-disabled', 'true');
       return;
     }
 
     if (awaitingConfirm()) {
-      confirmBtn.className = 'btn btn-danger btn-wide';
+      confirmBtn.className = 'btn btn-danger btn-wide sell-all-btn';
       confirmBtn.textContent = `Tap again — sell all ${formatNumber(qty)} for ✦${formatNumber(qty * unit)}`;
       confirmBtn.setAttribute('aria-disabled', 'false');
     } else {
-      confirmBtn.className = 'btn btn-wide ' + (qty > 0 ? 'btn-ghost' : 'btn-ghost btn-disabled');
+      confirmBtn.className = 'btn btn-wide sell-all-btn ' + (qty > 0 ? 'btn-ghost' : 'btn-ghost btn-disabled');
       confirmBtn.textContent = `Sell All — ✦${formatNumber(qty * unit)}`;
       confirmBtn.setAttribute('aria-disabled', qty > 0 ? 'false' : 'true');
     }
@@ -100,7 +102,7 @@ export function createItemInspector(ctx, itemId, {
     if (ownedQty() <= 0) onEmpty?.();
   }
 
-  const sell1Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(1) }, '');
+  const sell1Btn = el('button', { class: 'btn btn-primary sell-1-btn', onclick: () => doSell(1) }, '');
   const sell10Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(10) }, '');
   const sell100Btn = el('button', { class: 'btn btn-primary', onclick: () => doSell(100) }, '');
   const sellQtyInput = el('input', {
@@ -175,19 +177,24 @@ export function createItemInspector(ctx, itemId, {
     if (ownedQty() <= 0) onEmpty?.();
   });
 
-  const node = el('div', { class: 'item-inspector-body' },
+  const catalogLine = el('p', { class: 'sell-line sell-catalog' },
+    el('span', {}, `Sells for ✦${item.sell} each (catalog) · `),
+    qtyLabel,
+    el('br'),
+    worthLabel);
+  const sellPrimary = el('div', { class: 'sell-primary' }, sell1Btn, confirmBtn);
+  const lore = el('div', { class: 'item-inspector-lore' },
     el('p', { class: 'sell-flavor' }, `“${item.flavor}”`),
     pinBtn,
     useChips,
-    el('p', { class: 'sell-line' },
-      el('span', {}, `Sells for ✦${item.sell} each (catalog) · `),
-      qtyLabel,
-      el('br'),
-      worthLabel),
     sellActions,
     sellCustomRow,
-    confirmBtn,
     offerBtn);
+
+  const node = el('div', { class: 'item-inspector-body' },
+    catalogLine,
+    sellPrimary,
+    lore);
 
   paintButtons();
   paintPin();

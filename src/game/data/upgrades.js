@@ -43,7 +43,7 @@ export const TRACKS = [
   {
     id: 'foraging-satchel',
     name: "Keeper's Satchel",
-    desc: 'Roomier bags mean fewer things left behind at the fog-line.',
+    desc: 'Roomier bags mean fewer things left behind at the fog-line, and a little more room in the lantern\'s hollow.',
     glyph: 'leaf',
     effect: 'yield',
     perTier: 0.04, cap: 0.35, // +4% bonus-unit chance/tier, capped at +35%

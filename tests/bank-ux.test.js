@@ -16,12 +16,13 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
 
 const { createState } = await import('../src/game/state.js');
 const { DEFAULT_BANK_TAB, ITEMS, ITEMS_BY_ID } = await import('../src/game/data/items.js');
-const { filterItems, sellItems, bankCount, bankSellValue } = await import('../src/game/systems/bank.js');
+const { filterItems, sellItems, bankCount, bankSellValue, uniqueStackCount, lanternRoom } = await import('../src/game/systems/bank.js');
 const { itemGlyph } = await import('../src/game/data/item-glyphs.js');
-const { ICONS } = await import('../src/ui/icons.js');
+const { ICONS, FILLED_ICONS, filledIcon } = await import('../src/ui/icons.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const { prefersDockedInspector, itemTileGlyph, itemTileChrome } = await import('../src/ui/screens/bank.js');
 const modals = await import('../src/ui/modals.js');
+const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { formatNumber } = await import('../src/core/format.js');
 
 function makeCtx(state, overrides = {}) {
@@ -91,12 +92,17 @@ test('owned grid tiles are dense glyphs with catalog chrome ✦n · ×qty', () =
     const chrome = t.querySelector('.bank-chrome').textContent ?? '';
     assert.match(chrome, /✦\d+ · ×/);
     assert.ok(t.querySelector('.bank-qty'), 'qty still in the DOM for live-number reads');
-    assert.ok(t.querySelector('.bank-name')?.className.includes('visually-hidden'),
-      'owned stays a glyph grid, not named cards');
+    const name = t.querySelector('.bank-name');
+    assert.ok(name, 'owned tiles keep a readable name under the glyph');
+    assert.equal(name.classList.contains('visually-hidden'), false);
+    assert.ok(name.classList.contains('bank-name-dense'));
+    assert.ok((name.textContent ?? '').length > 1);
   }
   const tinder = tiles.find((t) => /Tinderscrap/.test(t.textContent ?? ''));
   assert.equal(tinder.querySelector('.bank-chrome').textContent, itemTileChrome(ITEMS_BY_ID.tinderscrap, 30));
-  assert.match(scr.node.querySelector('.screen-sub').textContent ?? '', /catalog worth ✦/);
+  const header = scr.node.querySelector('.screen-sub').textContent ?? '';
+  assert.match(header, /catalog worth ✦/);
+  assert.match(header, new RegExp(`${uniqueStackCount(s.bank)} / ${lanternRoom(s)}`));
 });
 
 test('owned tab chips are core tabs plus only categories that hold stock', () => {
@@ -120,6 +126,7 @@ test('every registry glyph exists and Fuel items are unique', () => {
   for (const it of ITEMS) {
     const g = itemGlyph(it);
     assert.ok(ICONS[g], `${it.id} uses missing glyph ${g}`);
+    assert.ok(FILLED_ICONS[g], `${it.id} uses missing filled glyph ${g}`);
   }
   const fuels = ITEMS.filter((it) => it.category === 'fuel');
   const glyphs = fuels.map((it) => itemTileGlyph(it));
@@ -128,7 +135,7 @@ test('every registry glyph exists and Fuel items are unique', () => {
   assert.equal(itemTileGlyph(ITEMS_BY_ID.bogmoss), 'moss');
 });
 
-test('starter Fuel tiles are not two gold flames', () => {
+test('starter Fuel tiles are filled ≥32px silhouettes, not two gold strokes', () => {
   const s = createState({ rngSeed: 1 });
   s.bank.bogmoss = 4;
   const scr = tabs.renderBankScreen(makeCtx(s));
@@ -137,9 +144,21 @@ test('starter Fuel tiles are not two gold flames', () => {
   assert.ok(tinder && moss);
   assert.ok(tinder.classList.contains('glyph-flame'));
   assert.ok(moss.classList.contains('glyph-moss'));
-  assert.notEqual(
-    tinder.querySelector('.bank-glyph').className,
-    moss.querySelector('.bank-glyph').className);
+  const tinderMark = tinder.querySelector('.bank-glyph');
+  const mossMark = moss.querySelector('.bank-glyph');
+  assert.notEqual(tinderMark.className, mossMark.className);
+  const tinderSvg = tinderMark.innerHTML ?? '';
+  const mossSvg = mossMark.innerHTML ?? '';
+  assert.match(tinderSvg, /fill="currentColor"/);
+  assert.match(mossSvg, /fill="currentColor"/);
+  assert.doesNotMatch(tinderSvg, /fill="none"/);
+  assert.doesNotMatch(mossSvg, /fill="none"/);
+  assert.match(tinderSvg, /width="32"/);
+  assert.match(tinderSvg, /height="32"/);
+  assert.match(mossSvg, /width="32"/);
+  assert.notEqual(tinderSvg, mossSvg, 'flame vs moss silhouettes stay distinct');
+  assert.match(filledIcon('flame'), /fill="currentColor"/);
+  assert.match(filledIcon('moss'), /fill="currentColor"/);
 });
 
 test('Sell Mode sells from the grid without opening the inspector', () => {
@@ -228,6 +247,22 @@ test('phone inspect is a bottom sheet; settings stay a centered modal', () => {
   assert.ok(sheet.classList.contains('modal-overlay'));
   assert.ok(sheetPanel.querySelector('.sheet-handle'), 'sheet has a grab handle');
 
+  const panelKids = sheetPanel.children;
+  assert.ok(panelKids[0].classList.contains('sheet-handle'), 'first paint: handle');
+  assert.match(panelKids[1].textContent ?? '', /Tinderscrap/, 'first paint: name');
+  const inspector = sheetPanel.querySelector('.item-inspector-body');
+  assert.ok(inspector);
+  assert.match(inspector.children[0].textContent ?? '', /catalog/, 'first paint: catalog line');
+  assert.match(inspector.children[1].textContent ?? '', /Sell 1/, 'first paint: Sell 1');
+  assert.match(inspector.children[1].textContent ?? '', /Sell All/, 'first paint: Sell All');
+  const lore = inspector.querySelector('.sell-flavor')?.textContent ?? '';
+  assert.match(lore, /Shaved splinters/);
+  const inspectorText = inspector.children.map?.((c) => c.textContent).join('\n')
+    ?? inspector.textContent;
+  const sellAt = inspectorText.indexOf('Sell 1');
+  const loreAt = inspectorText.indexOf('Shaved splinters');
+  assert.ok(sellAt >= 0 && loreAt > sellAt, 'lore sits below sell controls');
+
   const settingsMount = globalThis.document.createElement('div');
   modals.showSettingsModal(settingsMount, {
     isReducedMotion: () => false,
@@ -243,5 +278,45 @@ test('phone inspect is a bottom sheet; settings stay a centered modal', () => {
   assert.equal(settingsMount.querySelector('.sheet-panel'), null);
 
   globalThis.window = prev;
+});
+
+test('Sell Mode and qty survive a feat-unlocking grid sell remount', () => {
+  const s = createState({ rngSeed: 9 });
+  const ui = { sellMode: false, sellQtyMode: '1' };
+  let scr;
+  const ctx = {
+    get state() { return s; },
+    toast() {},
+    openSellSheet() {},
+    get sellMode() { return ui.sellMode; },
+    setSellMode(v) { ui.sellMode = !!v; },
+    get sellQtyMode() { return ui.sellQtyMode; },
+    setSellQtyMode(v) { ui.sellQtyMode = v; },
+    sell(id, qty) {
+      const res = sellItems(s, id, qty);
+      cascadeAchievements(s);
+      // afterMutation({redraw:true}) remounts the bank when A Fair Trade lights.
+      scr = tabs.renderBankScreen(ctx);
+      return res;
+    },
+  };
+  scr = tabs.renderBankScreen(ctx);
+  scr.node.querySelector('.bank-sell-toggle').click();
+  const qty10 = scr.node.querySelectorAll('.bank-sell-qty-btn')
+    .find((b) => /×10/.test(b.textContent ?? ''));
+  qty10.click();
+  assert.equal(ui.sellMode, true);
+  assert.equal(ui.sellQtyMode, '10');
+
+  tileByName(scr.node, 'Tinderscrap').click();
+  assert.ok(s.achievements.unlocked['e-sell-1'], 'A Fair Trade lights on the first sell');
+  const toggle = scr.node.querySelector('.bank-sell-toggle');
+  assert.equal(toggle.getAttribute('aria-pressed'), 'true');
+  assert.match(toggle.textContent ?? '', /Selling/);
+  assert.equal(scr.node.classList.contains('bank-selling'), true);
+  const activeQty = scr.node.querySelectorAll('.bank-sell-qty-btn')
+    .find((b) => b.classList.contains('active'));
+  assert.match(activeQty.textContent ?? '', /×10/);
+  assert.equal(bankCount(s.bank, 'tinderscrap'), 20, '×10 sold from the grid');
 });
 
