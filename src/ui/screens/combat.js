@@ -21,7 +21,7 @@ import * as combat from '../../game/systems/combat.js';
 export const COMBAT_360 = {
   viewportH: 640,
   topbarH: 52,
-  tabbarH: 62,
+    tabbarH: 63, // --tab-h 62 + 1px border → tab top 577 at vh=640
   screenPadTop: 8,
   screenPadBottom: 8,
   lobbyPadTop: 18,
@@ -44,32 +44,45 @@ export const COMBAT_360 = {
   zoneChips: 44,
   huntCardAboveBtn: 140,
   logLine: 15,
+  logGap: 1,
   logPadY: 6,
   logLinesLeftover: 4,
+  logWrapFight: 64,
+  /** 72px+ so a wrapping kill line still fits four leftover rows. */
+  logWrapLeftover: 88,
+  leftoverKillWrapRows: 2,
 };
 
 /** Log box vs tab bar on a 360×640 fight or leftover cockpit (flex-pinned). */
 export function cockpitLogVsTab(kind = 'leftover') {
   const C = COMBAT_360;
-  const screenTop = C.topbarH + C.screenPadTop;
   const tabTop = C.viewportH - C.tabbarH;
   const screenBottom = tabTop - C.screenPadBottom;
-  const cockpitTop = screenTop + C.detailHead + 4;
-  const rows = kind === 'leftover'
-    ? [C.kicker, C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.loot]
-    : [C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.keep];
-  const chrome = rows.reduce((a, b) => a + b, 0) + C.gap * Math.max(0, rows.length - 1);
-  const logTop = cockpitTop + chrome;
-  const lines = kind === 'leftover' ? C.logLinesLeftover : 6;
-  const logH = C.logPadY + lines * C.logLine;
+  const wrapH = kind === 'leftover' ? C.logWrapLeftover : C.logWrapFight;
   const logBottom = screenBottom;
+  const logTop = logBottom - wrapH;
+  const padTop = C.logPadY / 2;
+  const n = kind === 'leftover' ? C.logLinesLeftover : 4;
+  const lines = [];
+  let y = logTop + padTop;
+  for (let i = 0; i < n; i++) {
+    const rows = kind === 'leftover' && i === 0 ? C.leftoverKillWrapRows : 1;
+    const top = y;
+    const bottom = y + rows * C.logLine + (rows - 1) * C.logGap;
+    lines.push({ top, bottom, index: i + 1 });
+    y = bottom + C.logGap;
+  }
+  const line4 = lines[3] ?? lines[lines.length - 1];
+  const leftoverFits = kind !== 'leftover'
+    || (lines.every((l) => l.bottom < tabTop && l.bottom <= logBottom) && line4.bottom < tabTop);
   return {
     logTop,
     logBottom,
     tabTop,
-    chrome,
-    logH,
-    fits: logTop + logH <= screenBottom && logBottom < tabTop,
+    wrapH,
+    lines,
+    line4Bottom: line4?.bottom ?? logBottom,
+    fits: logBottom < tabTop && leftoverFits,
   };
 }
 
@@ -136,30 +149,27 @@ function buildHub(ctx, st, paint) {
   if (leftover) {
     const wrap = el('div', { class: 'combat-hub leftover-hub' });
     wrap.append(leftover);
-    wrap.append(buildLobby(ctx, st, paint, { afterLeftover: true }));
     return wrap;
   }
-  return buildLobby(ctx, st, paint, { afterLeftover: false });
+  return buildLobby(ctx, st, paint);
 }
 
-function buildLobby(ctx, st, paint, { afterLeftover = false } = {}) {
-  const wrap = el('div', { class: `combat-lobby${afterLeftover ? ' combat-lobby-after' : ''}` });
-  if (!afterLeftover) wrap.append(soulsLine(ctx, st));
+function buildLobby(ctx, st, paint) {
+  const wrap = el('div', { class: 'combat-lobby' });
+  wrap.append(soulsLine(ctx, st));
   const spilled = deathBanner(ctx, st, paint);
   if (spilled) wrap.append(spilled);
   const dry = combat.oilSipsRemaining(ctx.state) <= 0;
-  if (!afterLeftover && dry) {
+  if (dry) {
     wrap.append(el('p', { class: 'oil-line danger lobby-oil' }, 'Need oil'));
   }
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
   wrap.append(zonePicker(ctx, zoneId, paint, { heading: false }));
   wrap.append(huntList(ctx, zoneId, paint));
-  if (!afterLeftover) {
-    wrap.append(el('p', { class: 'combat-intro muted' },
-      'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
-  }
+  wrap.append(el('p', { class: 'combat-intro muted' },
+    'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
   wrap.append(vigilCard(ctx, st, paint));
-  if (!afterLeftover) wrap.append(handSlot(ctx, st, paint));
+  wrap.append(handSlot(ctx, st, paint));
   wrap.append(zoneFlavor(ctx, zoneId));
   return wrap;
 }
@@ -700,6 +710,7 @@ function leftoverHunt(ctx, last, dry, paint) {
   const name = last.enemyName ?? enemy?.name ?? 'this foe';
   return el('button', {
     class: `btn leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    disabled: dry ? true : undefined,
     'aria-disabled': dry ? 'true' : 'false',
     onclick: () => {
       if (!last.enemyId) return;

@@ -20,6 +20,7 @@ export class FakeNode {
     this._html = '';
     this.scrollTop = 0;
     this.scrollLeft = 0;
+    this.disabled = false;
     const self = this;
     this.classList = {
       add: (...cs) => cs.forEach((c) => self._classSet.add(c)),
@@ -63,14 +64,24 @@ export class FakeNode {
   }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
   contains(n) { return n !== null && this._walk((m) => m === n); }
-  setAttribute(k, v) { this.attrs[k] = String(v); if (k === 'value') this.value = v; }
+  setAttribute(k, v) {
+    this.attrs[k] = String(v);
+    if (k === 'value') this.value = v;
+    if (k === 'disabled') this.disabled = true;
+  }
   getAttribute(k) { return this.attrs[k] ?? null; }
-  removeAttribute(k) { delete this.attrs[k]; }
+  removeAttribute(k) {
+    delete this.attrs[k];
+    if (k === 'disabled') this.disabled = false;
+  }
   addEventListener(type, fn) { (this._listeners[type] ??= []).push(fn); }
   removeEventListener(type, fn) {
     this._listeners[type] = (this._listeners[type] ?? []).filter((f) => f !== fn);
   }
-  click() { for (const fn of this._listeners.click ?? []) fn({ target: this }); }
+  click() {
+    if (this.disabled) return;
+    for (const fn of this._listeners.click ?? []) fn({ target: this });
+  }
   _walk(fn) {
     fn(this);
     for (const c of this.children) if (c._walk) c._walk(fn);

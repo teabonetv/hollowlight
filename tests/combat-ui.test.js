@@ -1,6 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { FakeNode, FakeText } from './helpers/fake-node.mjs';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const screenStub = new FakeNode('main');
 screenStub.setAttribute('id', 'screen');
@@ -17,7 +22,7 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 */ }
 const { createState } = await import('../src/game/state.js');
 const { serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { renderSkillDetail, renderSkillsScreen } = await import('../src/ui/screens/skills.js');
-const { cockpitLogVsTab, lobbyFirstHuntBottom } = await import('../src/ui/screens/combat.js');
+const { cockpitLogVsTab, lobbyFirstHuntBottom, COMBAT_360 } = await import('../src/ui/screens/combat.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const combat = await import('../src/game/systems/combat.js');
 
@@ -259,6 +264,8 @@ test('Hunt at 0 lantern sips is not a normal pull', () => {
   assert.ok(hunts.length >= 1, 'stretch Hunt stays labelled Hunt');
   assert.equal(hunts[0].classList.contains('btn-primary'), false);
   assert.equal(hunts[0].getAttribute('aria-disabled'), 'true');
+  assert.equal(hunts[0].disabled, false, 'stretch Hunt is not HTML-disabled');
+  assert.equal(hunts[0].getAttribute('disabled'), null);
   const needBtns = scr.node.querySelectorAll('button').filter((b) => /Need oil/.test(b.textContent ?? ''));
   assert.equal(needBtns.length, 0, 'Need oil is not a Hunt label');
   assert.equal((scr.node.textContent.match(/Need oil/g) ?? []).length, 1, 'one Need oil CTA');
@@ -476,6 +483,8 @@ test('leftover station states Need oil in-frame at 0 sips', () => {
   assert.match(hunt.textContent ?? '', /Hunt Pale Moth/);
   assert.equal(/Need oil/.test(hunt.textContent ?? ''), false);
   assert.equal(hunt.getAttribute('aria-disabled'), 'true');
+  assert.equal(hunt.disabled, true);
+  assert.ok(hunt.getAttribute('disabled') != null, 'leftover Hunt uses HTML disabled');
   assert.equal((leftover.textContent.match(/Need oil/g) ?? []).length, 1, 'Need oil once in leftover');
   const stretchNeed = scr.node.querySelectorAll('button').filter((b) => /Need oil/.test(b.textContent ?? ''));
   assert.equal(stretchNeed.length, 0);
@@ -538,6 +547,9 @@ test('leftover hub is leftover-live and has no duplicate souls chips', () => {
   const leftover = scr.node.querySelector('.leftover-station');
   assert.match(leftover?.querySelector('.leftover-loot')?.textContent ?? leftover?.textContent ?? '', /✦|soul/);
   assert.match(leftover?.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
+  assert.equal(scr.node.querySelector('.hunt-list'), null, 'hunt list is unmounted from leftover-live');
+  assert.equal(scr.node.querySelector('.vigil-card'), null);
+  assert.equal(scr.node.querySelector('.zone-chips'), null);
   assert.ok(Array.isArray(state.combat.lastStation.log));
   assert.ok(state.combat.lastStation.log.length >= 1);
 });
@@ -564,8 +576,14 @@ test('leftover after kill is a 360 cockpit with You/foe/Eat/Knife/log above the 
   const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
   assertLeftoverCockpit(leftover, { kicker: /Pale Moth fell/ });
   const box = cockpitLogVsTab('leftover');
-  assert.ok(box.fits, `log ${box.logTop}+${box.logH} vs tab ${box.tabTop}`);
+  assert.ok(box.fits, `log ${box.logTop}+${box.wrapH} vs tab ${box.tabTop}`);
   assert.ok(box.logBottom < box.tabTop, `log bottom ${box.logBottom} >= tab ${box.tabTop}`);
+  assert.equal(box.tabTop, 577);
+  assert.ok(box.wrapH >= 72, `leftover wrap ${box.wrapH}px must be 72px+`);
+  assert.ok(box.line4Bottom < box.tabTop, `line 4 bottom ${box.line4Bottom} vs tab ${box.tabTop}`);
+  for (const line of box.lines.slice(0, 4)) {
+    assert.ok(line.bottom < box.tabTop, `line ${line.index} bottom ${line.bottom} vs tab ${box.tabTop}`);
+  }
 });
 
 test('leftover after Fall back is the same 360 cockpit, not a lobby kicker', () => {
@@ -576,9 +594,10 @@ test('leftover after Fall back is the same 360 cockpit, not a lobby kicker', () 
   const leftover = scr.node.querySelector('.leftover-station');
   assertLeftoverCockpit(leftover, { kicker: /Fell back from Pale Moth/ });
   assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
-  const lobby = scr.node.querySelector('.combat-lobby-after');
-  assert.ok(lobby, 'Vigil/Stretches wait below the cockpit');
-  assert.ok(lobby.querySelector('.vigil-card'));
+  assert.equal(scr.node.querySelector('.combat-lobby'), null, 'lobby is unmounted from leftover-live');
+  assert.equal(scr.node.querySelector('.combat-lobby-after'), null);
+  assert.equal(scr.node.querySelector('.hunt-list'), null);
+  assert.equal(scr.node.querySelector('.vigil-card'), null);
   const box = cockpitLogVsTab('leftover');
   assert.ok(box.fits);
   assert.ok(box.logBottom < box.tabTop);
@@ -604,6 +623,49 @@ test('first Hunt Pale Moth is above the 360 fold on the combat lobby', () => {
 
 test('fight log budget sits above the 360 tab bar', () => {
   const box = cockpitLogVsTab('fight');
-  assert.ok(box.fits, `fight log ${box.logTop}+${box.logH} vs tab ${box.tabTop}`);
+  assert.ok(box.fits, `fight log ${box.logTop}+${box.wrapH} vs tab ${box.tabTop}`);
   assert.ok(box.logBottom < box.tabTop);
+  assert.equal(box.wrapH, 64);
+  assert.ok(box.logBottom <= 569);
+});
+
+test('leftover-after-kill four log line bottoms sit above tab 577', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  const leftover = scr.node.querySelector('.leftover-station');
+  const logLines = leftover.querySelectorAll('.log-line');
+  assert.ok(logLines.length >= 1);
+  assert.ok(logLines.length <= 4);
+  assert.ok(logLines.some((n) => /falls/.test(n.textContent ?? '')), 'kill line is in leftover log');
+  assert.equal(scr.node.querySelector('.hunt-list'), null, 'hunt list not in leftover-live DOM');
+  assert.equal(scr.node.querySelector('.combat-lobby'), null);
+  assert.equal(scr.node.querySelector('.vigil-card'), null);
+  assert.equal(scr.node.querySelector('.zone-chips'), null);
+  assert.equal(scr.node.querySelector('.combat-h'), null);
+
+  const box = cockpitLogVsTab('leftover');
+  assert.equal(box.tabTop, 577);
+  assert.ok(box.logBottom < box.tabTop, `logWrap.bottom ${box.logBottom} vs tab ${box.tabTop}`);
+  assert.ok(box.wrapH >= 72, `wrap ${box.wrapH}px`);
+  assert.equal(box.lines.length, COMBAT_360.logLinesLeftover);
+  for (const line of box.lines) {
+    assert.ok(line.bottom < 577, `line ${line.index} bottom ${line.bottom} vs tab 577`);
+  }
+  assert.ok(box.line4Bottom < 577, `line 4 bottom ${box.line4Bottom} vs tab 577`);
+  assert.ok(box.fits);
+});
+
+test('leftover log-wrap CSS is 72px+ and leftover-live does not scroll the lobby', () => {
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  const blocks = [...css.matchAll(/\.leftover-station\s+\.log-wrap\s*\{([^}]+)\}/g)];
+  assert.ok(blocks.length >= 1, 'leftover log-wrap rule');
+  const minHeights = blocks.flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  const maxHeights = blocks.flatMap((m) => [...m[1].matchAll(/max-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(minHeights.some((h) => h >= 72), `min-height ${minHeights.join(',')} must include 72px+`);
+  assert.ok(maxHeights.some((h) => h >= 72), `max-height ${maxHeights.join(',')} must include 72px+`);
+  assert.match(css, /\.leftover-station \.log-wrap[\s\S]*overflow:\s*hidden/);
+  assert.match(css, /#screen:has\(\.leftover-live\)\s*\{\s*overflow:\s*hidden/);
+  assert.match(css, /\.screen\.leftover-live\s*\{\s*overflow:\s*hidden/);
 });
