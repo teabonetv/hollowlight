@@ -7,10 +7,10 @@ import { icon } from '../icons.js';
 import { formatNumber, formatSeconds, formatNoun } from '../../core/format.js';
 import { ZONES, ZONE_BY_ID } from '../../game/data/combat/zones.js';
 import { STYLES, STYLE_BY_ID } from '../../game/data/combat/styles.js';
-import { FOOD, FOOD_ORDER } from '../../game/data/combat/consumables.js';
+import { FOOD } from '../../game/data/combat/consumables.js';
 import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vigils.js';
 import { ITEMS_BY_ID } from '../../game/data/items.js';
-import { enemiesInZone, bossOfZone } from '../../game/data/enemies/index.js';
+import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemies/index.js';
 import { bankCount } from '../../game/systems/bank.js';
 import * as combat from '../../game/systems/combat.js';
 
@@ -75,6 +75,7 @@ function buildHub(ctx, st, paint) {
   if (spilled) wrap.append(spilled);
   wrap.append(vigilCard(ctx, st, paint));
   wrap.append(leftover ? handChip(ctx, st, paint) : handSlot(ctx, st, paint));
+  if (leftover) wrap.append(styleRow(ctx, st, paint));
 
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
   wrap.append(zonePicker(ctx, zoneId, paint));
@@ -408,6 +409,18 @@ function handChip(ctx, st, paint) {
   return row;
 }
 
+function styleRow(ctx, st, paint) {
+  const styles = el('div', { class: 'style-row' });
+  for (const s of STYLES) {
+    styles.append(el('button', {
+      class: `btn style-btn ${st.style === s.id ? 'btn-primary on' : 'btn-ghost'}`,
+      onclick: () => { ctx.setCombatStyle(s.id); paint(); },
+      'aria-pressed': st.style === s.id ? 'true' : 'false',
+    }, s.name));
+  }
+  return styles;
+}
+
 function buildFight(ctx, st, paint) {
   const enemy = st.enemy;
   const foe = st.foe;
@@ -454,15 +467,7 @@ function buildFight(ctx, st, paint) {
 
   wrap.append(handChip(ctx, st, paint));
 
-  const styles = el('div', { class: 'style-row' });
-  for (const s of STYLES) {
-    styles.append(el('button', {
-      class: `btn style-btn ${st.style === s.id ? 'btn-primary on' : 'btn-ghost'}`,
-      onclick: () => { ctx.setCombatStyle(s.id); paint(); },
-      'aria-pressed': st.style === s.id ? 'true' : 'false',
-    }, s.name));
-  }
-  wrap.append(styles);
+  wrap.append(styleRow(ctx, st, paint));
 
   const keep = el('label', { class: 'auto-toggle combat-keep' });
   const input = el('input', { type: 'checkbox' });
@@ -505,7 +510,7 @@ function fighterBlock({ title, sub, hp, max, next, speed, fillClass, compact = f
       el('span', { class: 'bar-time' }, next > 0 ? formatSeconds(next) : 'now')));
 }
 
-function eatRow(ctx, st, paint, { alts = true } = {}) {
+function eatRow(ctx, st, paint) {
   const row = el('div', { class: 'eat-row' });
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
@@ -514,32 +519,35 @@ function eatRow(ctx, st, paint, { alts = true } = {}) {
   }
   const n = bankCount(ctx.state.bank, id);
   const food = FOOD[id];
-  const pending = combat.eatHealAmount(ctx.state, id);
+  const heal = combat.foodHeal(id);
+  const full = st.playerHp >= st.playerMaxHp;
+  const owned = combat.ownedFoodIds(ctx.state);
   const slot = el('div', { class: 'eat-slot' });
-  slot.append(el('span', { class: 'eat-name' }, `${food.name} +${pending} · ${n}`));
   slot.append(el('button', {
-    class: 'btn btn-primary eat-btn',
+    class: 'btn btn-ghost eat-pick',
+    type: 'button',
+    'aria-label': owned.length > 1 ? `Cycle food, ${food.name} +${heal}` : `${food.name} +${heal}`,
     onclick: () => {
+      if (owned.length < 2) return;
+      if (ctx.cycleFood) ctx.cycleFood();
+      else combat.cycleFood(ctx.state);
+      paint();
+    },
+  }, `${food.name} +${heal} · ${n}`));
+  slot.append(el('button', {
+    class: `btn eat-btn ${full ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    'aria-disabled': full ? 'true' : 'false',
+    onclick: () => {
+      if (full) {
+        ctx.toast?.('Already whole.', 'info');
+        return;
+      }
       const res = ctx.eatFood(id);
       if (!res.ok) ctx.toast(res.error, 'warn');
       paint();
     },
   }, 'Eat'));
   row.append(slot);
-  if (!alts) return row;
-  for (const other of FOOD_ORDER) {
-    if (other === id) continue;
-    const count = bankCount(ctx.state.bank, other);
-    if (count <= 0) continue;
-    row.append(el('button', {
-      class: 'btn btn-ghost eat-alt',
-      onclick: () => {
-        if (ctx.selectFood) ctx.selectFood(other);
-        else combat.selectFood(ctx.state, other);
-        paint();
-      },
-    }, FOOD[other].name));
-  }
   return row;
 }
 
@@ -547,8 +555,7 @@ function leftoverStation(ctx, st, paint) {
   const last = st.lastStation;
   if (!last) return null;
   const wrap = el('article', { class: 'card leftover-station', 'aria-label': 'After the hunt' });
-  wrap.append(el('p', { class: 'leftover-kicker' },
-    last.enemyName ? `${last.enemyName} fell` : 'After the hunt'));
+  wrap.append(el('p', { class: 'leftover-kicker' }, combat.leftoverKicker(last)));
   wrap.append(fighterBlock({
     title: 'You',
     hp: st.playerHp,
@@ -558,18 +565,13 @@ function leftoverStation(ctx, st, paint) {
     fillClass: 'hp-you',
     compact: true,
   }));
-  wrap.append(accStation({
-    hitPct: last.hitPct,
-    foeHitPct: last.foeHitPct,
-    playerMinHit: last.playerMinHit,
-    playerMaxHit: last.playerMaxHit,
-    foeMinHit: last.foeMinHit,
-    foeMaxHit: last.foeMaxHit,
-  }));
+  const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
+  wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
   const sips = combat.oilSipsRemaining(ctx.state);
-  wrap.append(el('p', { class: `oil-line ${sips > 0 ? 'muted' : 'danger'}` },
-    sips > 0 ? `${formatNoun(sips, 'lantern sip')} remaining` : '0 lantern sips'));
-  wrap.append(eatRow(ctx, st, paint, { alts: false }));
+  const dry = sips <= 0;
+  wrap.append(el('p', { class: `oil-line ${dry ? 'danger leftover-dry' : 'muted'}` },
+    dry ? 'Need oil' : `${formatNoun(sips, 'lantern sip')} remaining`));
+  wrap.append(eatRow(ctx, st, paint));
   return wrap;
 }
 

@@ -498,6 +498,11 @@ function boot() {
       if (res.ok) afterMutation();
       return res;
     },
+    cycleFood() {
+      const res = combat.cycleFood(game);
+      if (res.ok) afterMutation();
+      return res;
+    },
     recoverLumen(zoneId) {
       const res = combat.recoverLumen(game, zoneId);
       if (res.ok) afterMutation();

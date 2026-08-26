@@ -36,6 +36,7 @@ function makeCtx(state) {
     resumeCombat: () => combat.resumeCombat(state),
     setCombatAutoContinue: (on) => { state.combat.autoContinue = !!on; },
     selectFood: (id) => combat.selectFood(state, id),
+    cycleFood: () => combat.cycleFood(state),
   };
 }
 
@@ -125,6 +126,31 @@ test('0 oil never paints Lantern fed; hub chip is dry not ready', () => {
   assert.match(fightText, /Lantern dry/);
 });
 
+test('in-fight Acc chip moves when Knife is dropped or style shifts', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const ctx = makeCtx(state);
+  const scr = renderSkillDetail(ctx, 'combat');
+  const accOf = () => {
+    const line = scr.node.querySelector('.combat-fight')?.querySelector('.acc-station')?.textContent ?? '';
+    const m = line.match(/Acc (\d+)% · (\d+)–(\d+)/);
+    assert.ok(m, line);
+    return { pct: Number(m[1]), min: Number(m[2]), max: Number(m[3]), line };
+  };
+  const knife = accOf();
+  const unarmedBtn = scr.node.querySelector('.hand-chip')?.querySelectorAll('button')
+    .find((b) => /Unarmed/.test(b.textContent ?? '') && b.getAttribute('aria-pressed') !== 'true');
+  unarmedBtn.click();
+  const bare = accOf();
+  assert.ok(bare.pct < knife.pct || bare.max < knife.max, `${knife.line} → ${bare.line}`);
+  const rite = scr.node.querySelector('.combat-fight')?.querySelectorAll('button')
+    .find((b) => (b.textContent ?? '') === 'Rite');
+  rite.click();
+  const riteAcc = accOf();
+  assert.ok(riteAcc.line !== bare.line, `${bare.line} → ${riteAcc.line}`);
+  assert.match(riteAcc.line, /Acc \d+% · \d+–\d+ \/ they \d+% · \d+–\d+/);
+});
+
 test('hand card hit % changes when the wick-knife is unequipped', () => {
   const armed = createState({ rngSeed: 4 });
   const aText = renderSkillDetail(makeCtx(armed), 'combat').node.textContent ?? '';
@@ -168,14 +194,32 @@ test('hub HTML does not print null when deathSite is empty', () => {
   assert.match(text, /Wick-knife/);
 });
 
-test('eat button heal matches the integer that will land on HP', () => {
+test('eat row always prints the food heal constant, never pending +0', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const max = combat.playerMaxHp(state);
+  state.combat.player.hp = max;
+  assert.equal(combat.eatHealAmount(state, 'lantern-loaf'), 0);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const eat = scr.node.querySelector('.eat-row')?.textContent ?? '';
+  assert.match(eat, /Lantern-loaf \+14 · 8/);
+  assert.equal(/\+0/.test(eat), false, 'owned food never paints +0');
+  const btn = scr.node.querySelector('.eat-btn');
+  assert.ok(btn);
+  assert.equal(btn.getAttribute('aria-disabled'), 'true');
+  assert.ok(btn.classList.contains('btn-disabled'));
+});
+
+test('eat button label is the food constant even when pending heal is smaller', () => {
   const state = createState({ rngSeed: 4 });
   combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
   state.combat.player.hp = 32;
   const pending = combat.eatHealAmount(state, 'lantern-loaf');
-  const scr = renderSkillDetail(makeCtx(state), 'combat');
-  assert.match(scr.node.textContent ?? '', new RegExp(`Lantern-loaf \\+${pending}`));
   assert.equal(pending, 8);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const eat = scr.node.querySelector('.eat-row')?.textContent ?? '';
+  assert.match(eat, /Lantern-loaf \+14 · 8/);
+  assert.equal(new RegExp(`Lantern-loaf \\+${pending}`).test(eat), false);
 });
 
 test('mid-fight deserialize stays paused until Resume; paint does not auto-resume', () => {
@@ -311,9 +355,12 @@ test('eat row has no +0 · 0 primary', () => {
   const eat = scr.node.querySelector('.eat-row')?.textContent ?? '';
   assert.equal(/\+0 · 0/.test(eat), false);
   assert.equal(/Pale-cap/.test(eat), false, 'empty foods stay out of the primary slot');
-  assert.match(eat, /Lantern-loaf \+\d+ · \d+/);
+  assert.equal(scr.node.querySelectorAll('.eat-alt').length, 0, 'no ghost Fogwort alt under the slot');
+  assert.equal(/Fogwort/.test(eat), false, 'Fogwort is cycled, not listed as a second row');
+  assert.match(eat, /Lantern-loaf \+14 · 8/);
   assert.match(eat, /Eat/);
   assert.ok(scr.node.querySelector('.eat-btn'));
+  assert.ok(scr.node.querySelector('.eat-pick'));
 });
 
 test('hub after kill still shows compact fight chrome', () => {
@@ -329,9 +376,88 @@ test('hub after kill still shows compact fight chrome', () => {
   assert.match(text, /You/);
   assert.match(text, /Acc \d+%/);
   assert.match(text, /they \d+%/);
-  assert.match(text, /sip/);
-  assert.match(text, /Lantern-loaf|Eat|No food/);
-  assert.equal(/\+0 · 0/.test(text), false);
+  assert.match(text, /sip|Need oil/);
+  assert.match(text, /Lantern-loaf \+14 · 8|Eat|No food/);
+  assert.equal(/\+0/.test(leftover.querySelector('.eat-row')?.textContent ?? ''), false);
+  assert.match(leftover.querySelector('.leftover-kicker')?.textContent ?? '', /Pale Moth fell/);
   assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
   assert.ok(scr.node.querySelector('.hand-chip'));
+});
+
+test('leftover kicker after flee is not the previous kill headline', () => {
+  const state = createState({ rngSeed: 4 });
+  killMoth(state);
+  combat.startFight(state, 'pale-moth', { encounterSeed: 9 });
+  combat.fleeFight(state);
+  const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
+  const kicker = leftover?.querySelector('.leftover-kicker')?.textContent ?? '';
+  assert.match(kicker, /Fell back from Pale Moth|After the hunt/);
+  assert.equal(/Pale Moth fell/.test(kicker), false);
+});
+
+test('new Hunt log does not carry eat/kill/flee from the last encounter', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  state.combat.player.hp = 10;
+  combat.eatFood(state, 'lantern-loaf');
+  combat.fleeFight(state);
+  assert.ok(state.combat.log.some((l) => l.kind === 'eat' || l.kind === 'flee'));
+  combat.startFight(state, 'pale-moth', { encounterSeed: 2 });
+  const log = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.combat-log')?.textContent ?? '';
+  assert.equal(/You eat/.test(log), false);
+  assert.equal(/fall back/.test(log), false);
+  assert.equal(/falls\./.test(log), false);
+  assert.match(log, /You meet Pale Moth/);
+});
+
+test('leftover Acc moves when Knife is unequipped or style shifts to Rite', () => {
+  const state = createState({ rngSeed: 4 });
+  killMoth(state);
+  const ctx = makeCtx(state);
+  const scr = renderSkillDetail(ctx, 'combat');
+  const accOf = () => {
+    const line = scr.node.querySelector('.leftover-station')?.querySelector('.acc-station')?.textContent ?? '';
+    const m = line.match(/Acc (\d+)% · (\d+)–(\d+)/);
+    assert.ok(m, line);
+    return { pct: Number(m[1]), min: Number(m[2]), max: Number(m[3]), line };
+  };
+  const armed = accOf();
+  const unarmedBtn = scr.node.querySelector('.hand-chip')?.querySelectorAll('button')
+    .find((b) => /Unarmed/.test(b.textContent ?? '') && b.getAttribute('aria-pressed') !== 'true');
+  assert.ok(unarmedBtn);
+  unarmedBtn.click();
+  const bare = accOf();
+  assert.ok(bare.pct < armed.pct || bare.max < armed.max, `${armed.line} → ${bare.line}`);
+
+  const rite = scr.node.querySelectorAll('button')
+    .find((b) => (b.textContent ?? '') === 'Rite');
+  assert.ok(rite);
+  rite.click();
+  const riteAcc = accOf();
+  assert.ok(riteAcc.line !== bare.line, `style must move Acc: ${bare.line} → ${riteAcc.line}`);
+  assert.match(riteAcc.line, /Acc \d+% · \d+–\d+ \/ they \d+% · \d+–\d+/);
+});
+
+test('leftover station states Need oil in-frame at 0 sips', () => {
+  const state = createState({ rngSeed: 4 });
+  killMoth(state);
+  state.bank['wick-oil'] = 0;
+  state.bank['lamp-oil'] = 0;
+  const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
+  assert.ok(leftover);
+  const oil = leftover.querySelector('.leftover-dry')?.textContent ?? leftover.querySelector('.oil-line')?.textContent ?? '';
+  assert.match(oil, /Need oil/);
+  assert.equal(/Need oil/.test(leftover.textContent ?? ''), true);
+});
+
+test('one-slot eat picker cycles lantern-loaf to fogwort', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const pick = scr.node.querySelector('.eat-pick');
+  assert.ok(pick);
+  assert.match(pick.textContent ?? '', /Lantern-loaf \+14 · 8/);
+  pick.click();
+  const next = scr.node.querySelector('.eat-pick')?.textContent ?? '';
+  assert.match(next, /Fogwort \+5 · 4/);
 });
