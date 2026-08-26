@@ -5,6 +5,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { SAVE_VERSION } from '../src/core/save.js';
 
 // ── browser env stubs (installed BEFORE importing app.js) ──────────
 const { FakeNode } = await import('./helpers/fake-node.mjs');
@@ -61,7 +62,7 @@ test('boot() persisted a versioned save envelope', () => {
   const raw = storage.getItem('hollowlight.save');
   assert.ok(raw, 'save written during boot');
   const parsed = JSON.parse(raw);
-  assert.equal(parsed.version, 5);
+  assert.equal(parsed.version, SAVE_VERSION);
   assert.ok(parsed.state.skills.emberkeeping, 'skills state present');
 });
 

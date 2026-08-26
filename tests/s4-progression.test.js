@@ -279,6 +279,28 @@ test('S4-only v3 saves keep Radiance and gain a combat blob (v3→v4)', () => {
   assert.equal(state.souls, 0);
 });
 
+test('v4 combat saves keep the hunt and gain leftover-station fields (v4→v5)', () => {
+  const json = JSON.stringify({
+    version: 4,
+    savedAt: 1,
+    state: {
+      lumen: 40,
+      souls: 3,
+      beacons: { kindled: ['hearthway'] },
+      combat: { fighting: false, zoneId: 'hearthway', kills: { 'pale-moth': 2 } },
+      radiance: 1,
+      perks: { owned: [], respecs: 0 },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(state.souls, 3);
+  assert.equal(state.combat.kills['pale-moth'], 2);
+  assert.equal(state.combat.foodId, null);
+  assert.equal(state.combat.lastStation, null);
+  assert.deepEqual(state.discovered, {});
+  assert.equal(state.radiance, 1);
+});
+
 test('fresh save still round-trips through serialize/deserialize', () => {
   const s = createState({ nowMs: 42, rngSeed: 11 });
   const { state } = deserializeSave(serializeSave(s, 99));
@@ -430,6 +452,8 @@ test('v4 saves gain an empty discovered map (v4→v5)', () => {
   const { state } = deserializeSave(json);
   assert.equal(SAVE_VERSION, 5);
   assert.deepEqual(state.discovered, {});
+  assert.equal(state.combat.foodId, null);
+  assert.equal(state.combat.lastStation, null);
   assert.equal(logCategoryStats(state).find((r) => r.id === 'items').done, 0);
   assert.equal(state.radiance, 3);
   assert.equal(state.bank.tinderscrap, 12);

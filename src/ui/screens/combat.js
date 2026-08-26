@@ -14,20 +14,44 @@ import { enemiesInZone, bossOfZone } from '../../game/data/enemies/index.js';
 import { bankCount } from '../../game/systems/bank.js';
 import * as combat from '../../game/systems/combat.js';
 
+/** Zero #screen and fight-adjacent scrollers so the cockpit is the first 360 frame. */
+export function resetHuntScrollers(root) {
+  const zero = (node) => {
+    if (!node) return;
+    if (typeof node.scrollTop === 'number') node.scrollTop = 0;
+    if (typeof node.scrollLeft === 'number') node.scrollLeft = 0;
+  };
+  const doc = typeof document !== 'undefined' ? document : null;
+  const screen = doc?.getElementById?.('screen') ?? null;
+  zero(screen);
+  const take = (list) => {
+    if (!list) return;
+    for (const n of list) zero(n);
+  };
+  try { take(doc?.querySelectorAll?.('.combat-log')); } catch { /* shim */ }
+  try { take(doc?.querySelectorAll?.('.zone-chips')); } catch { /* shim */ }
+  try { take(screen?.querySelectorAll?.('.combat-log')); } catch { /* shim */ }
+  try { take(screen?.querySelectorAll?.('.zone-chips')); } catch { /* shim */ }
+  try { take(root?.querySelectorAll?.('.combat-log')); } catch { /* shim */ }
+  try { take(root?.querySelectorAll?.('.zone-chips')); } catch { /* shim */ }
+}
+
 export function renderCombatPanel(ctx) {
   combat.ensureCombat(ctx.state);
   const root = el('div', { class: 'combat-root' });
-  const refs = { paint: () => {} };
+  let wasFighting = false;
 
   function paint() {
+    const st = combat.combatStatus(ctx.state);
+    const enteringFight = !!st.fighting && !wasFighting;
+    const leavingFight = !st.fighting && wasFighting;
     clear(root);
     // Do not resumeCombat() here — reload pause must stay visible until Resume.
-    const st = combat.combatStatus(ctx.state);
     if (st.fighting) root.append(buildFight(ctx, st, paint));
     else root.append(buildHub(ctx, st, paint));
+    if (enteringFight || leavingFight) resetHuntScrollers(root);
+    wasFighting = !!st.fighting;
   }
-  let wasFighting = !!ctx.state.combat?.fighting;
-  refs.paint = paint;
   paint();
 
   return {
@@ -35,22 +59,22 @@ export function renderCombatPanel(ctx) {
     update() {
       const fighting = !!ctx.state.combat?.fighting;
       if (fighting || wasFighting) paint();
-      wasFighting = fighting;
     },
   };
 }
 
 function buildHub(ctx, st, paint) {
   const wrap = el('div', { class: 'combat-hub' });
-
-  wrap.append(el('p', { class: 'combat-intro muted' },
+  const leftover = leftoverStation(ctx, st, paint);
+  if (leftover) wrap.append(leftover);
+  else wrap.append(el('p', { class: 'combat-intro muted' },
     'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
 
   wrap.append(soulsLine(ctx, st));
   const spilled = deathBanner(ctx, st, paint);
   if (spilled) wrap.append(spilled);
   wrap.append(vigilCard(ctx, st, paint));
-  wrap.append(handSlot(ctx, st, paint));
+  wrap.append(leftover ? handChip(ctx, st, paint) : handSlot(ctx, st, paint));
 
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
   wrap.append(zonePicker(ctx, zoneId, paint));
@@ -68,9 +92,29 @@ function chipRow(className, chips) {
   return row;
 }
 
-function cockpitLine(kit) {
-  if (!kit) return 'Acc — / they — · your max — · foe max —';
-  return `Acc ${kit.hitPct}% / they ${kit.foeHitPct}% · your max ${kit.playerMaxHit} · foe max ${kit.foeMaxHit}`;
+function rangeLabel(min, max) {
+  if (min == null || max == null) return '—';
+  return `${min}–${max}`;
+}
+
+function accStation(kit, extraClass = '') {
+  const row = el('div', { class: `acc-station fight-cockpit ${extraClass}`.trim() });
+  if (!kit) {
+    row.append(
+      el('span', { class: 'chip acc-chip' }, 'Acc —'),
+      el('span', { class: 'chip-sep', 'aria-hidden': 'true' }, ' / '),
+      el('span', { class: 'chip they-chip' }, 'they —'),
+    );
+    return row;
+  }
+  const you = rangeLabel(kit.playerMinHit, kit.playerMaxHit);
+  const they = rangeLabel(kit.foeMinHit, kit.foeMaxHit);
+  row.append(
+    el('span', { class: 'chip acc-chip' }, `Acc ${kit.hitPct}% · ${you}`),
+    el('span', { class: 'chip-sep', 'aria-hidden': 'true' }, ' / '),
+    el('span', { class: 'chip they-chip' }, `they ${kit.foeHitPct}% · ${they}`),
+  );
+  return row;
 }
 
 function weaponToggleLabel(weapon) {
@@ -93,7 +137,7 @@ function handSlot(ctx, st, paint) {
     held
       ? `${ITEMS_BY_ID[held.id]?.name ?? held.id} — ${STYLE_BY_ID[held.style]?.name ?? held.style} ${held.minDmg}–${held.maxDmg} · ${formatSeconds(held.speedMs)} / blow · +${held.accuracy} acc.`
       : `Unarmed ${STYLE_BY_ID[st.style]?.name ?? st.style} ${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow.`));
-  card.append(el('p', { class: 'kit-line' }, cockpitLine(kit)));
+  card.append(accStation(kit, 'kit-line'));
 
   if (held && held.style !== st.style) {
     card.append(el('p', { class: 'muted small' },
@@ -322,29 +366,43 @@ function lanternCopy(st, state) {
   return `Lantern fed · ${formatNoun(sips, 'sip')} · next in ${formatSeconds(st.oilMs)}`;
 }
 
-function handChip(ctx, st, paint) {
+function handRing(ctx) {
   const held = combat.heldWeapon(ctx.state);
   const owned = combat.ownedWeapons(ctx.state);
-  const name = held ? (ITEMS_BY_ID[held.id]?.name ?? held.id) : 'Unarmed';
+  const ring = [
+    { id: 'unarmed', label: 'Unarmed' },
+    ...owned.map((w) => ({
+      id: w.id,
+      label: w.id === (held?.id ?? null)
+        ? (ITEMS_BY_ID[w.id]?.name ?? w.id)
+        : weaponToggleLabel(w),
+    })),
+  ];
+  const currentId = held?.id ?? 'unarmed';
+  const idx = Math.max(0, ring.findIndex((o) => o.id === currentId));
+  const selected = ring[idx];
+  const alt = ring.length > 1 ? ring[(idx + 1) % ring.length] : null;
+  return { selected, alt };
+}
+
+function handChip(ctx, st, paint) {
+  const { selected, alt } = handRing(ctx);
   const row = el('div', { class: 'hand-chip' });
-  row.append(el('span', { class: 'hand-chip-name' }, name));
   const toggles = el('div', { class: 'hand-chip-toggles' });
   toggles.append(el('button', {
-    class: `btn ${held ? 'btn-ghost' : 'btn-primary on'}`,
-    onclick: () => {
-      ctx.equipWeapon?.('unarmed');
-      paint();
-    },
-  }, 'Unarmed'));
-  for (const w of owned) {
-    const on = held?.id === w.id;
+    class: 'btn btn-primary on',
+    'aria-pressed': 'true',
+    onclick: () => {},
+  }, selected.label));
+  if (alt) {
     toggles.append(el('button', {
-      class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
+      class: 'btn btn-ghost',
+      'aria-pressed': 'false',
       onclick: () => {
-        ctx.equipWeapon?.(w.id);
+        ctx.equipWeapon?.(alt.id);
         paint();
       },
-    }, weaponToggleLabel(w)));
+    }, alt.label));
   }
   row.append(toggles);
   return row;
@@ -387,7 +445,7 @@ function buildFight(ctx, st, paint) {
     fillClass: 'hp-foe',
   }));
 
-  wrap.append(el('p', { class: 'kit-line fight-cockpit' }, cockpitLine(st.cockpit)));
+  wrap.append(accStation(st.cockpit));
 
   wrap.append(el('p', { class: `oil-line ${st.lanternFed ? 'muted' : 'danger'}` },
     lanternCopy(st, ctx.state)));
@@ -431,17 +489,17 @@ function buildFight(ctx, st, paint) {
   return wrap;
 }
 
-function fighterBlock({ title, sub, hp, max, next, speed, fillClass }) {
+function fighterBlock({ title, sub, hp, max, next, speed, fillClass, compact = false }) {
   const frac = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 0;
   const tFrac = speed > 0 ? Math.max(0, Math.min(1, 1 - next / speed)) : 0;
-  return el('div', { class: 'fighter' },
+  return el('div', { class: `fighter ${compact ? 'fighter-compact' : ''}`.trim() },
     el('div', { class: 'fighter-head' },
       el('strong', {}, title),
       el('span', { class: 'muted' }, `${hp} / ${max}`)),
     sub ? el('p', { class: 'muted small' }, sub) : null,
     el('div', { class: `bar bar-lg hp-bar`, role: 'progressbar', 'aria-label': `${title} vitality` },
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })),
-    el('div', { class: 'action-barline' },
+    compact ? null : el('div', { class: 'action-barline' },
       el('div', { class: 'bar', role: 'progressbar', 'aria-label': `${title} next blow` },
         el('span', { class: 'bar-fill atk-fill', style: `width:${(tFrac * 100).toFixed(1)}%` })),
       el('span', { class: 'bar-time' }, next > 0 ? formatSeconds(next) : 'now')));
@@ -449,20 +507,69 @@ function fighterBlock({ title, sub, hp, max, next, speed, fillClass }) {
 
 function eatRow(ctx, st, paint) {
   const row = el('div', { class: 'eat-row' });
-  for (const id of FOOD_ORDER) {
-    const n = bankCount(ctx.state.bank, id);
-    const food = FOOD[id];
-    const pending = n > 0 ? combat.eatHealAmount(ctx.state, id) : 0;
+  const id = combat.selectedFoodId(ctx.state);
+  if (!id) {
+    row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
+    return row;
+  }
+  const n = bankCount(ctx.state.bank, id);
+  const food = FOOD[id];
+  const pending = combat.eatHealAmount(ctx.state, id);
+  const slot = el('div', { class: 'eat-slot' });
+  slot.append(el('span', { class: 'eat-name' }, `${food.name} +${pending} · ${n}`));
+  slot.append(el('button', {
+    class: 'btn btn-primary eat-btn',
+    onclick: () => {
+      const res = ctx.eatFood(id);
+      if (!res.ok) ctx.toast(res.error, 'warn');
+      paint();
+    },
+  }, 'Eat'));
+  row.append(slot);
+  for (const other of FOOD_ORDER) {
+    if (other === id) continue;
+    const count = bankCount(ctx.state.bank, other);
+    if (count <= 0) continue;
     row.append(el('button', {
-      class: `btn ${n > 0 && pending > 0 ? 'btn-primary' : 'btn-ghost'} eat-btn`,
+      class: 'btn btn-ghost eat-alt',
       onclick: () => {
-        const res = ctx.eatFood(id);
-        if (!res.ok) ctx.toast(res.error, 'warn');
+        if (ctx.selectFood) ctx.selectFood(other);
+        else combat.selectFood(ctx.state, other);
         paint();
       },
-    }, `${food.name} +${pending} · ${n}`));
+    }, FOOD[other].name));
   }
   return row;
+}
+
+function leftoverStation(ctx, st, paint) {
+  const last = st.lastStation;
+  if (!last) return null;
+  const wrap = el('article', { class: 'card leftover-station', 'aria-label': 'After the hunt' });
+  wrap.append(el('p', { class: 'leftover-kicker' },
+    last.enemyName ? `${last.enemyName} fell` : 'After the hunt'));
+  wrap.append(fighterBlock({
+    title: 'You',
+    hp: st.playerHp,
+    max: st.playerMaxHp,
+    next: 0,
+    speed: 1,
+    fillClass: 'hp-you',
+    compact: true,
+  }));
+  wrap.append(accStation({
+    hitPct: last.hitPct,
+    foeHitPct: last.foeHitPct,
+    playerMinHit: last.playerMinHit,
+    playerMaxHit: last.playerMaxHit,
+    foeMinHit: last.foeMinHit,
+    foeMaxHit: last.foeMaxHit,
+  }));
+  const sips = combat.oilSipsRemaining(ctx.state);
+  wrap.append(el('p', { class: `oil-line ${sips > 0 ? 'muted' : 'danger'}` },
+    sips > 0 ? `${formatNoun(sips, 'lantern sip')} remaining` : '0 lantern sips'));
+  wrap.append(eatRow(ctx, st, paint));
+  return wrap;
 }
 
 function logPanel(log) {

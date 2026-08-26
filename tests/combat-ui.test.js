@@ -2,9 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FakeNode, FakeText } from './helpers/fake-node.mjs';
 
+const screenStub = new FakeNode('main');
+screenStub.setAttribute('id', 'screen');
+
 globalThis.document = {
   createElement: (t) => new FakeNode(t),
   createTextNode: (s) => new FakeText(s),
+  getElementById: (id) => (id === 'screen' ? screenStub : null),
+  querySelectorAll: (sel) => screenStub.querySelectorAll(sel),
 };
 globalThis.requestAnimationFrame = () => 0;
 try { globalThis.navigator = {}; } catch { /* node ≥21 */ }
@@ -30,6 +35,7 @@ function makeCtx(state) {
     equipWeapon: (id) => combat.equipWeapon(state, id),
     resumeCombat: () => combat.resumeCombat(state),
     setCombatAutoContinue: (on) => { state.combat.autoContinue = !!on; },
+    selectFood: (id) => combat.selectFood(state, id),
   };
 }
 
@@ -64,12 +70,13 @@ test('a live fight paints HP, styles, eat, flee, weapon, cockpit, and a log', ()
   assert.match(text, /Wick-knife/);
   assert.match(text, /Fall back/);
   assert.match(text, /Lantern-loaf/);
-  assert.match(text, /Acc \d+% \/ they \d+%/);
-  assert.match(text, /your max \d+/);
-  assert.match(text, /foe max \d+/);
+  assert.match(text, /Acc \d+%/);
+  assert.match(text, /they \d+%/);
+  assert.match(text, /\d+–\d+/);
   assert.equal((text.match(/Acc \d+%/g) ?? []).length, 1, 'one kit line, not Hand + cockpit');
   assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
   assert.ok(scr.node.querySelector('.hand-chip'));
+  assert.ok(scr.node.querySelector('.acc-station'));
   assert.ok(scr.node.querySelector('.combat-log'));
   scr.update();
 });
@@ -82,7 +89,7 @@ test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
   assert.ok(fight);
   const classes = fight.children.map((c) => c.className);
   const iFighter = classes.findIndex((c) => /\bfighter\b/.test(c));
-  const iKit = classes.findIndex((c) => /\bkit-line\b/.test(c));
+  const iKit = classes.findIndex((c) => /\bacc-station\b/.test(c) || /\bfight-cockpit\b/.test(c));
   const iOil = classes.findIndex((c) => /\boil-line\b/.test(c));
   const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
   const iHand = classes.findIndex((c) => /\bhand-chip\b/.test(c));
@@ -92,10 +99,12 @@ test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
   assert.match(fight.textContent ?? '', /You/);
   assert.match(fight.textContent ?? '', /Pale Moth/);
   assert.match(fight.textContent ?? '', /Lantern-loaf/);
-  assert.equal(/\bHand\b/.test(fight.querySelector('.hand-chip')?.textContent ?? ''), false);
-  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Wick-knife/);
-  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Unarmed/);
-  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Knife/);
+  const hand = fight.querySelector('.hand-chip')?.textContent ?? '';
+  assert.equal(/\bHand\b/.test(hand), false);
+  assert.match(hand, /Wick-knife/);
+  assert.match(hand, /Unarmed/);
+  assert.equal((hand.match(/Unarmed/g) ?? []).length, 1, 'never Unarmed Unarmed Knife');
+  assert.equal(fight.querySelector('.hand-chip')?.querySelectorAll('button').length, 2);
 });
 
 test('0 oil never paints Lantern fed; hub chip is dry not ready', () => {
@@ -226,7 +235,103 @@ test('foe chance-to-hit sits on the same kit line as yours', () => {
   combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
   const kit = combat.fightCockpit(state);
   const scr = renderSkillDetail(makeCtx(state), 'combat');
-  const line = scr.node.querySelector('.fight-cockpit')?.textContent ?? '';
-  assert.equal(line, `Acc ${kit.hitPct}% / they ${kit.foeHitPct}% · your max ${kit.playerMaxHit} · foe max ${kit.foeMaxHit}`);
+  const line = scr.node.querySelector('.acc-station')?.textContent ?? '';
+  assert.match(line, new RegExp(`Acc ${kit.hitPct}%`));
+  assert.match(line, new RegExp(`they ${kit.foeHitPct}%`));
+  assert.match(line, new RegExp(`${kit.playerMinHit}–${kit.playerMaxHit}`));
+  assert.match(line, new RegExp(`${kit.foeMinHit}–${kit.foeMaxHit}`));
+  assert.match(line, /Acc \d+%.*\/.*they \d+%/);
   assert.ok(kit.foeHitPct > 0 && kit.foeHitPct < 100);
+});
+
+function killMoth(state) {
+  state.combat.autoContinue = false;
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (state.combat.foe) state.combat.foe.hp = 1;
+    state.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(state, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  return kill;
+}
+
+test('hunt-from-scrolled-hub first paint contains You / Acc / they / oil / eat', () => {
+  const state = createState({ rngSeed: 4 });
+  while (screenStub.firstChild) screenStub.removeChild(screenStub.firstChild);
+  screenStub.scrollTop = 455;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  screenStub.append(scr.node);
+  screenStub.scrollTop = 455;
+  assert.equal(state.combat.fighting, false);
+  const hunt = scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Hunt');
+  assert.ok(hunt, 'a Hunt tap exists on the hub');
+  hunt.click();
+  assert.equal(state.combat.fighting, true);
+  assert.equal(screenStub.scrollTop, 0, 'startFight / fight paint zeros #screen');
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.ok(fight);
+  const first = fight.textContent ?? '';
+  assert.match(first, /You/);
+  assert.match(first, /Acc \d+%/);
+  assert.match(first, /they \d+%/);
+  assert.match(first, /Lantern fed|Lantern dry|sip/);
+  assert.match(first, /Eat/);
+  assert.match(first, /Lantern-loaf/);
+  const classes = fight.children.map((c) => c.className);
+  const iYou = classes.findIndex((c) => /\bfighter\b/.test(c));
+  const iAcc = classes.findIndex((c) => /\bacc-station\b/.test(c));
+  const iOil = classes.findIndex((c) => /\boil-line\b/.test(c));
+  const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
+  assert.ok(iYou === 0 || iYou === 1, 'You/Foe HP open the fight');
+  assert.ok(iAcc > iYou && iOil > iAcc && iEat > iOil);
+});
+
+test('hand-chip text does not contain Unarmed twice', () => {
+  const armed = createState({ rngSeed: 4 });
+  combat.startFight(armed, 'pale-moth', { encounterSeed: 1 });
+  const armedChip = renderSkillDetail(makeCtx(armed), 'combat').node.querySelector('.hand-chip')?.textContent ?? '';
+  assert.equal((armedChip.match(/Unarmed/g) ?? []).length, 1);
+  assert.equal(/Unarmed\s*Unarmed/.test(armedChip), false);
+
+  const bare = createState({ rngSeed: 4 });
+  combat.equipWeapon(bare, 'unarmed');
+  combat.startFight(bare, 'pale-moth', { encounterSeed: 1 });
+  const bareChip = renderSkillDetail(makeCtx(bare), 'combat').node.querySelector('.hand-chip')?.textContent ?? '';
+  assert.equal((bareChip.match(/Unarmed/g) ?? []).length, 1);
+  assert.equal(/Unarmed\s*Unarmed/.test(bareChip), false);
+  assert.match(bareChip, /Knife|Wick-knife/);
+});
+
+test('eat row has no +0 · 0 primary', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const eat = scr.node.querySelector('.eat-row')?.textContent ?? '';
+  assert.equal(/\+0 · 0/.test(eat), false);
+  assert.equal(/Pale-cap/.test(eat), false, 'empty foods stay out of the primary slot');
+  assert.match(eat, /Lantern-loaf \+\d+ · \d+/);
+  assert.match(eat, /Eat/);
+  assert.ok(scr.node.querySelector('.eat-btn'));
+});
+
+test('hub after kill still shows compact fight chrome', () => {
+  const state = createState({ rngSeed: 4 });
+  const kill = killMoth(state);
+  assert.ok(kill);
+  assert.equal(state.combat.fighting, false);
+  assert.ok(state.combat.lastStation);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover, 'cockpit leftover stays after the moth');
+  const text = leftover.textContent ?? '';
+  assert.match(text, /You/);
+  assert.match(text, /Acc \d+%/);
+  assert.match(text, /they \d+%/);
+  assert.match(text, /sip/);
+  assert.match(text, /Lantern-loaf|Eat|No food/);
+  assert.equal(/\+0 · 0/.test(text), false);
+  assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
+  assert.ok(scr.node.querySelector('.hand-chip'));
 });

@@ -380,6 +380,10 @@ test('wick-knife accuracy raises shown hit % and max-hit vs unarmed', () => {
   const off = combat.playerOffense(armed, 'strike');
   assert.equal(knife.foeHitPct, Math.round(hitChance(moth.accuracy, off.avoidance) * 100));
   assert.equal(knife.hitPct, Math.round(hitChance(off.accuracy, moth.avoidance) * 100));
+  assert.equal(knife.playerMinHit, Math.max(1, Math.round(off.minDmg * WEAKNESS_MULT)));
+  assert.equal(knife.playerMaxHit, Math.max(1, Math.round(off.maxDmg * WEAKNESS_MULT)));
+  assert.equal(knife.foeMinHit, moth.minDmg);
+  assert.equal(knife.foeMaxHit, moth.maxDmg);
 });
 
 test('after combat ticks, deserialize HP matches live HP without pagehide', () => {
@@ -449,4 +453,31 @@ test('auto-continue chains the next moth while the lantern is fed', () => {
   assert.equal(s.combat.fighting, true);
   assert.equal(s.combat.foe?.id, 'pale-moth');
   assert.ok(combat.lanternIsFed(s));
+});
+
+test('selected food skips empty stacks and lastStation snapshots a kill', () => {
+  const s = createState({ rngSeed: 5 });
+  s.bank.palecap = 0;
+  assert.equal(combat.selectedFoodId(s), 'lantern-loaf');
+  combat.selectFood(s, 'fogwort');
+  assert.equal(combat.selectedFoodId(s), 'fogwort');
+  s.bank.fogwort = 0;
+  assert.equal(combat.selectedFoodId(s), 'lantern-loaf');
+
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  const kit = combat.fightCockpit(s);
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (s.combat.foe) s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.ok(kill);
+  assert.equal(s.combat.fighting, false);
+  assert.equal(s.combat.lastStation?.enemyId, 'pale-moth');
+  assert.equal(s.combat.lastStation?.hitPct, kit.hitPct);
+  assert.equal(s.combat.lastStation?.foeHitPct, kit.foeHitPct);
+  assert.equal(s.combat.lastStation?.playerMinHit, kit.playerMinHit);
 });
