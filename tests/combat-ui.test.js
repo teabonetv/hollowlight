@@ -389,7 +389,13 @@ test('hub after kill still shows compact fight chrome', () => {
   assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth|Need oil/);
   assert.equal(scr.node.querySelectorAll('.combat-meta').length, 0, 'no duplicate souls/dry/sips row under leftover');
   assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
-  assert.ok(scr.node.querySelector('.hand-chip'));
+  assert.ok(leftover.querySelector('.hand-chip'), 'Knife/Unarmed sits in leftover, not under Vigil');
+  assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
+  assert.ok(leftover.querySelector('.style-row'));
+  const logLines = leftover.querySelectorAll('.log-line');
+  assert.ok(logLines.length >= 1, 'leftover fight log is not empty');
+  assert.ok(logLines.length <= 4);
+  assert.equal(/The fog holds its breath/.test(leftover.querySelector('.combat-log')?.textContent ?? ''), false);
 });
 
 test('leftover kicker after flee is not the previous kill headline', () => {
@@ -401,6 +407,9 @@ test('leftover kicker after flee is not the previous kill headline', () => {
   const kicker = leftover?.querySelector('.leftover-kicker')?.textContent ?? '';
   assert.match(kicker, /Fell back from Pale Moth|After the hunt/);
   assert.equal(/Pale Moth fell/.test(kicker), false);
+  const log = leftover?.querySelector('.combat-log')?.textContent ?? '';
+  assert.match(log, /fall back|You meet/i);
+  assert.equal(/The fog holds its breath/.test(log), false);
 });
 
 test('new Hunt log does not carry eat/kill/flee from the last encounter', () => {
@@ -474,18 +483,18 @@ test('one-slot eat picker cycles lantern-loaf to fogwort', () => {
   assert.match(next, /Fogwort \+5 · 4/);
 });
 
-test('fight-live first frame is a compact cockpit with an XP chip, not Combat skill chrome', () => {
+test('fight-live first frame hides title, XP bar, and XP chip', () => {
   const state = createState({ rngSeed: 4 });
   combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   assert.ok(scr.node.classList.contains('fight-live'));
-  const chip = scr.node.querySelector('.fight-xp-chip');
-  assert.ok(chip);
-  assert.match(chip.textContent ?? '', /Lv \d+ · .+ XP/);
+  assert.equal(scr.node.querySelector('.fight-xp-chip'), null);
   const fight = scr.node.querySelector('.combat-fight');
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
   assert.match(fight.querySelector('.acc-station')?.textContent ?? '', /Acc \d+% · \d+–\d+ · [\d.]+s \/ they \d+% · \d+–\d+ · [\d.]+s/);
   assert.equal(fight.querySelector('.flee-btn')?.classList.contains('btn-wide'), false);
+  assert.ok(fight.querySelector('.hand-chip'));
+  assert.match(fight.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
 });
 
 test('eat-pick is not armed when only one food is owned', () => {
@@ -513,8 +522,11 @@ test('leftover hub is leftover-live and has no duplicate souls chips', () => {
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   assert.ok(scr.node.classList.contains('leftover-live'));
   assert.equal(scr.node.classList.contains('fight-live'), false);
+  assert.equal(scr.node.querySelector('.fight-xp-chip'), null);
   assert.equal(scr.node.querySelectorAll('.combat-meta').length, 0);
   const leftover = scr.node.querySelector('.leftover-station');
   assert.match(leftover?.querySelector('.leftover-loot')?.textContent ?? leftover?.textContent ?? '', /✦|soul/);
   assert.match(leftover?.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
+  assert.ok(Array.isArray(state.combat.lastStation.log));
+  assert.ok(state.combat.lastStation.log.length >= 1);
 });

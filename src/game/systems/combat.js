@@ -21,8 +21,19 @@ import * as camp from './upgrades.js';
 import { recordKill, recordDeath } from './stats.js';
 
 export const COMBAT_LOG_CAP = 48;
+export const LEFTOVER_LOG_LINES = 4;
+/** First blow waits at least this long so Hunt’s opening 360 is a live fight. */
+export const OPENING_WINDUP_MS = 1200;
 export const BASE_MAX_HP = 36;
 export const HP_PER_LEVEL = 4;
+
+function copyLogTail(log, n = LEFTOVER_LOG_LINES) {
+  return (Array.isArray(log) ? log : []).slice(-n).map((l) => ({
+    t: l.t,
+    text: l.text,
+    kind: l.kind,
+  }));
+}
 
 export function createCombatState() {
   return {
@@ -75,6 +86,9 @@ export function ensureCombat(state) {
   if (c.autoContinue == null) c.autoContinue = false;
   if (c.foodId === undefined) c.foodId = null;
   if (c.lastStation === undefined) c.lastStation = null;
+  if (c.lastStation && !Array.isArray(c.lastStation.log)) {
+    c.lastStation.log = copyLogTail(c.log);
+  }
   return c;
 }
 
@@ -323,6 +337,7 @@ function snapshotLastStation(state, ended = 'kill', extra = {}) {
     foeMaxHit: kit?.foeMaxHit ?? null,
     souls: extra.souls ?? 0,
     loot,
+    log: copyLogTail(c.log),
   };
 }
 
@@ -539,14 +554,14 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
   state.combat.dryAnnounced = dry;
   state.combat.oilMs = OIL_CHECK_MS;
   state.combat.fogMs = dry ? FOG_GRACE_MS : FOG_BITE_MS;
-  state.combat.player.nextActMs = off.speedMs;
+  state.combat.player.nextActMs = Math.max(OPENING_WINDUP_MS, off.speedMs);
   const phase0 = activePhase(enemy, enemy.hp, enemy.hp).phase;
   state.combat.foe = {
     id: enemy.id,
     name: enemy.name,
     hp: enemy.hp,
     maxHp: enemy.hp,
-    nextActMs: foeSpeedMs(enemy, phase0),
+    nextActMs: Math.max(OPENING_WINDUP_MS, foeSpeedMs(enemy, phase0)),
     phaseIndex: 0,
   };
   pushCombatLog(state, `You meet ${enemy.name} on ${ZONE_BY_ID[enemy.zoneId]?.stretch ?? 'the road'}.`, 'start');
@@ -560,8 +575,8 @@ export function fleeFight(state) {
   ensureCombat(state);
   if (!state.combat.fighting) return { ok: false, error: 'No fight to leave.' };
   const name = state.combat.foe?.name ?? 'the dark';
-  snapshotLastStation(state, 'flee');
   pushCombatLog(state, `You fall back from ${name} to the lantern-light.`, 'flee');
+  snapshotLastStation(state, 'flee');
   state.combat.fighting = false;
   state.combat.foe = null;
   state.combat.enemyId = null;
@@ -695,8 +710,8 @@ function onDeath(state) {
   }
   state.lumen = 0;
   recordDeath(state);
-  snapshotLastStation(state, 'death');
   pushCombatLog(state, `You fall. ✦${carried} Lumen spills at ${ZONE_BY_ID[zoneId]?.settlement ?? zoneId}. Walk back to gather it.`, 'death');
+  snapshotLastStation(state, 'death');
   c.fighting = false;
   c.foe = null;
   c.enemyId = null;

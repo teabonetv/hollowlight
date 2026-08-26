@@ -69,10 +69,6 @@ export function renderSkillDetail(ctx, skillId) {
     class: `screen${fighting ? ' fight-live' : ''}${leftover ? ' leftover-live' : ''}`,
   });
 
-  const fightXpChip = skillId === 'combat'
-    ? el('span', { class: 'chip chip-xp fight-xp-chip' }, compactXpLabel(progFor(sk)))
-    : null;
-
   root.append(el('header', { class: 'detail-head' },
     el('button', {
       class: 'icon-btn', 'aria-label': 'Back to skills',
@@ -81,7 +77,6 @@ export function renderSkillDetail(ctx, skillId) {
     el('div', { class: 'detail-title' },
       el('h1', { class: 'screen-title' }, skill.name),
       el('p', { class: 'screen-sub' }, skill.tagline)),
-    fightXpChip,
   ));
 
   const prog = progFor(sk);
@@ -112,7 +107,6 @@ export function renderSkillDetail(ctx, skillId) {
         const after = !live && !!ctx.state.combat?.lastStation;
         root.classList.toggle('fight-live', live);
         root.classList.toggle('leftover-live', after);
-        if (fightXpChip) fightXpChip.textContent = compactXpLabel(p);
         panel.update();
       },
     };
@@ -145,10 +139,6 @@ export function renderSkillDetail(ctx, skillId) {
 
 function progFor(sk) {
   return levelProgress(sk.xp);
-}
-
-function compactXpLabel(prog) {
-  return `Lv ${prog.level} · ${formatNumber(prog.into)} XP`;
 }
 
 function comingSoon(root, skill) {

@@ -41,26 +41,24 @@
   font-size: 12px;
 }
 
-/* First 360 owns the fight: strip Combat title / tagline / Level XP bar. */
+/* First 360 owns the fight: strip Combat title / tagline / Level XP bar / XP chip. */
 .fight-xp-chip { display: none; }
 .screen.fight-live,
-.screen.leftover-live { gap: 8px; }
+.screen.leftover-live { gap: 4px; }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
 .screen.fight-live .xp-block,
-.screen.leftover-live .xp-block { display: none; }
+.screen.leftover-live .xp-block,
 .screen.fight-live .fight-xp-chip,
-.screen.leftover-live .fight-xp-chip {
-  display: inline-flex;
-  align-self: center;
-  margin: 0;
-}
+.screen.leftover-live .fight-xp-chip { display: none; }
 .screen.fight-live .detail-head,
 .screen.leftover-live .detail-head {
   align-items: center;
   min-height: 44px;
+  margin-bottom: 0;
 }
-.screen.fight-live .combat-root { gap: 0; }
+.screen.fight-live .combat-root,
+.screen.leftover-live .combat-root { gap: 0; }
 #screen:has(.fight-live),
 #screen:has(.leftover-live) { padding-top: 8px; }
 
@@ -93,7 +91,7 @@
   padding: 8px 6px;
   font-size: 13px;
 }
-.combat-fight { display: flex; flex-direction: column; gap: 4px; }
+.combat-fight { display: flex; flex-direction: column; gap: 3px; }
 .fighter { display: flex; flex-direction: column; gap: 2px; }
 .fighter-head { display: flex; justify-content: space-between; gap: 8px; }
 .fighter-head strong { font-size: 14px; }
@@ -146,7 +144,16 @@
   padding: 8px 4px 8px 2px;
 }
 .eat-empty { margin: 0; }
-.leftover-station { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; }
+.leftover-station { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; }
+.leftover-station .hand-chip { margin: 0; }
+.leftover-station .style-row { margin: 0; }
+.leftover-station .log-h { margin: 4px 0 0; }
+.leftover-station .combat-log {
+  max-height: none;
+  padding: 6px 8px;
+  gap: 2px;
+}
+.leftover-station .log-line { font-size: 12px; line-height: 1.35; }
 .leftover-kicker {
   margin: 0;
   font-size: 11.5px;

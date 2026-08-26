@@ -510,6 +510,45 @@ test('startFight clears the previous encounter log', () => {
   assert.match(s.combat.log[0].text, /You meet Pale Moth/);
 });
 
+test('first Hunt waits the opening windup; Pale Moth is still up at 400ms', () => {
+  const s = createState({ rngSeed: 4 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  assert.ok(s.combat.player.nextActMs >= combat.OPENING_WINDUP_MS);
+  assert.equal(s.combat.foe.hp, 16);
+  assert.equal(s.combat.foe.hp, s.combat.foe.maxHp);
+  combat.tickCombat(s, 400);
+  assert.equal(s.combat.fighting, true);
+  assert.ok(s.combat.foe);
+  assert.equal(s.combat.foe.hp, 16);
+  assert.equal(s.combat.log.some((l) => l.kind === 'hit' || l.kind === 'hurt'), false);
+  assert.equal(s.combat.log.some((l) => l.kind === 'kill'), false);
+});
+
+test('kill and flee pin a leftover fight log (not log: [])', () => {
+  const s = createState({ rngSeed: 4 });
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (s.combat.foe) s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.ok(kill);
+  assert.ok(Array.isArray(s.combat.lastStation.log));
+  assert.ok(s.combat.lastStation.log.length >= 1);
+  assert.ok(s.combat.lastStation.log.length <= combat.LEFTOVER_LOG_LINES);
+  assert.ok(s.combat.lastStation.log.some((l) => l.kind === 'kill' || /falls/.test(l.text)));
+
+  combat.startFight(s, 'pale-moth', { encounterSeed: 9 });
+  combat.fleeFight(s);
+  assert.ok(Array.isArray(s.combat.lastStation.log));
+  assert.ok(s.combat.lastStation.log.length >= 1);
+  assert.ok(s.combat.lastStation.log.some((l) => l.kind === 'flee'));
+  assert.equal(s.combat.lastStation.log.some((l) => l.kind === 'kill'), false);
+});
+
 test('cycleFood walks owned foods in FOOD_ORDER', () => {
   const s = createState({ rngSeed: 5 });
   assert.equal(combat.selectedFoodId(s), 'lantern-loaf');
