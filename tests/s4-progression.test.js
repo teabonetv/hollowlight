@@ -458,3 +458,21 @@ test('v4 saves gain an empty discovered map (v4→v5)', () => {
   assert.equal(state.radiance, 3);
   assert.equal(state.bank.tinderscrap, 12);
 });
+
+test('S4d-only v5 saves keep discovered and gain eat/station defaults without v6', () => {
+  const json = JSON.stringify({
+    version: 5,
+    savedAt: 1,
+    state: {
+      lumen: 18,
+      discovered: { 'pall-fang': true },
+      combat: { fighting: false, zoneId: 'hearthway', kills: { 'pale-moth': 1 } },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(SAVE_VERSION, 5);
+  assert.equal(state.discovered['pall-fang'], true);
+  assert.equal(state.combat.foodId, null);
+  assert.equal(state.combat.lastStation, null);
+  assert.equal(state.combat.kills['pale-moth'], 1);
+});
