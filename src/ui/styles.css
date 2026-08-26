@@ -921,6 +921,7 @@ button.pill:active {
   max-height: 86dvh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
@@ -929,6 +930,10 @@ button.pill:active {
   transition: transform 180ms ease;
 }
 .modal-overlay.open .modal-panel { transform: translateY(0); }
+.modal-panel:not(.sheet-panel) {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
 
 /* Phone item inspector: bottom sheet. Padding-top keeps the glyph row in view. */
 .sheet-overlay {

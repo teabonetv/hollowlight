@@ -375,6 +375,8 @@ test('360 feat expand keeps feat names above Claim', () => {
   const css = readFileSync(join(here, '../src/ui/styles.css'), 'utf8');
   assert.match(css, /\.offline-feat-block\s*\{[^}]*flex-direction:\s*column/s);
   assert.match(css, /\.offline-feat-list\s*\{[^}]*max-height:\s*min\(36vh,\s*220px\)/s);
+  assert.match(css, /\.modal-panel\s*\{[^}]*overflow:\s*hidden/s);
+  assert.match(css, /\.modal-panel:not\(\.sheet-panel\)\s*\{[^}]*grid-template-rows:\s*auto minmax\(0,\s*1fr\) auto/s);
   assert.match(css, /\.modal-actions\s*\{[^}]*z-index:\s*1/s);
 });
 
