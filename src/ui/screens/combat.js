@@ -505,7 +505,7 @@ function fighterBlock({ title, sub, hp, max, next, speed, fillClass, compact = f
       el('span', { class: 'bar-time' }, next > 0 ? formatSeconds(next) : 'now')));
 }
 
-function eatRow(ctx, st, paint) {
+function eatRow(ctx, st, paint, { alts = true } = {}) {
   const row = el('div', { class: 'eat-row' });
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
@@ -526,6 +526,7 @@ function eatRow(ctx, st, paint) {
     },
   }, 'Eat'));
   row.append(slot);
+  if (!alts) return row;
   for (const other of FOOD_ORDER) {
     if (other === id) continue;
     const count = bankCount(ctx.state.bank, other);
@@ -568,7 +569,7 @@ function leftoverStation(ctx, st, paint) {
   const sips = combat.oilSipsRemaining(ctx.state);
   wrap.append(el('p', { class: `oil-line ${sips > 0 ? 'muted' : 'danger'}` },
     sips > 0 ? `${formatNoun(sips, 'lantern sip')} remaining` : '0 lantern sips'));
-  wrap.append(eatRow(ctx, st, paint));
+  wrap.append(eatRow(ctx, st, paint, { alts: false }));
   return wrap;
 }
 
