@@ -34,6 +34,14 @@ export const ICONS = {
   vial: svg('<path d="M9 7V4h6v3"/><path d="M9 7h6l1.2 3.5V18a2 2 0 0 1-2 2h-4.4a2 2 0 0 1-2-2V10.5z"/><path d="M10.2 14h3.6"/>'),
   mushroom: svg('<path d="M5 11c0-4 3-7.2 7-7.2S19 7 19 11H5z"/><path d="M10 11v8h4v-8"/><path d="M8.2 8.2c.4.6 1.1.9 1.8.6"/>'),
   drop: svg('<path d="M12 4.5c2.8 3.6 5.2 6.2 5.2 9.2a5.2 5.2 0 1 1-10.4 0C6.8 10.7 9.2 8.1 12 4.5z"/>'),
+  sage: svg('<path d="M12 4.5v16"/><path d="M12 7.2l-3.2-1.2M12 7.2l3.2-1.2M12 11l-3.6-1M12 11l3.6-1M12 14.8l-3.2-.8M12 14.8l3.2-.8"/>'),
+  thyme: svg('<path d="M12 20v-6"/><path d="M6.5 15.5c1.4-3 3.2-5 5.5-5s4.1 2 5.5 5"/><circle cx="8.2" cy="13.2" r="0.8"/><circle cx="12" cy="11.4" r="0.8"/><circle cx="15.8" cy="13.4" r="0.8"/>'),
+  nettle: svg('<path d="M12 3.6c2 3.2 6.2 6.6 6.2 10.6 0 3.2-2.6 5.6-6.2 6-3.6-.4-6.2-2.8-6.2-6 0-4 4.2-7.4 6.2-10.6z"/><path d="M7.6 9.2l-2-1.6M16.4 9.2l2-1.6M6.8 13.6l-2.2.4M17.2 13.6l2.2.4"/>'),
+  mint: svg('<path d="M12 5.5v14"/><path d="M12 12c-3.2-3.4-7.2-2.4-7.2.8 0 2.4 2.2 3.6 7.2 6.4 5-2.8 7.2-4 7.2-6.4 0-3.2-4-4.2-7.2-.8z"/>'),
+  clover: svg('<path d="M12 12c-2.8-2.6-6.2-.8-6.2 2.2 0 1.6 1.2 2.6 6.2 5.2 5-2.6 6.2-3.6 6.2-5.2 0-3-3.4-4.8-6.2-2.2z"/><path d="M12 12c-2.6 2.8-.8 6.2 2.2 6.2 1.6 0 2.6-1.2 5.2-6.2-2.6-5-3.6-6.2-5.2-6.2-3 0-4.8 3.4-2.2 6.2z"/>'),
+  parsley: svg('<path d="M12 21v-7"/><path d="M12 11.2c-2.4-3.2-5.6-3.6-6.4-1.2-.8 2.4 1.4 3.6 4.2 2.8"/><path d="M12 11.2c2.4-3.2 5.6-3.6 6.4-1.2.8 2.4-1.4 3.6-4.2 2.8"/><path d="M12 8.4c-1-3.2.4-5.4 2.4-5.2"/>'),
+  lanternleaf: svg('<path d="M12 3.4c3.8 0 6.6 3.6 6.6 8.2S15.8 20 12 20 5.4 16.2 5.4 11.6 8.2 3.4 12 3.4z"/><path d="M10 9h4v1.4h1v6.2H9V10.4h1z"/>'),
+  myrrh: svg('<path d="M12 20.5V11L7 5.2M12 11l5-5.8"/><circle cx="6.4" cy="4.8" r="1.2"/><circle cx="17.6" cy="4.8" r="1.2"/><circle cx="12" cy="10.6" r="1"/>'),
 };
 
 /** High-contrast packed silhouettes for the owned bank grid (≥32px). */
@@ -62,6 +70,14 @@ export const FILLED_ICONS = {
   vial: svgFill('<rect x="9" y="3.4" width="6" height="3.4" rx="0.5"/><path d="M9 6.8h6l1.3 3.6V18a2.2 2.2 0 0 1-2.2 2.2h-4.2A2.2 2.2 0 0 1 7.7 18V10.4z"/>'),
   mushroom: svgFill('<path d="M4.6 11.2C4.6 6.6 7.8 3.4 12 3.4s7.4 3.2 7.4 7.8H4.6z"/><rect x="9.6" y="11" width="4.8" height="8.6" rx="1"/>'),
   drop: svgFill('<path d="M12 3.4c3 3.8 5.6 6.6 5.6 9.8a5.6 5.6 0 1 1-11.2 0C6.4 10 9 7.2 12 3.4z"/>'),
+  sage: svgFill('<rect x="11.1" y="3.6" width="1.8" height="16.8" rx="0.8"/><ellipse cx="8" cy="7.2" rx="3" ry="1.6"/><ellipse cx="16" cy="7.2" rx="3" ry="1.6"/><ellipse cx="7.4" cy="11.2" rx="3.2" ry="1.7"/><ellipse cx="16.6" cy="11.2" rx="3.2" ry="1.7"/><ellipse cx="8.2" cy="15.2" rx="2.8" ry="1.5"/><ellipse cx="15.8" cy="15.2" rx="2.8" ry="1.5"/>'),
+  thyme: svgFill('<ellipse cx="12" cy="16.8" rx="8.6" ry="4.4"/><circle cx="7" cy="14" r="1.7"/><circle cx="9.6" cy="11.8" r="1.6"/><circle cx="12" cy="10.8" r="1.8"/><circle cx="14.6" cy="12" r="1.6"/><circle cx="17.2" cy="14.2" r="1.7"/><circle cx="10.4" cy="14.6" r="1.4"/><circle cx="13.8" cy="14.4" r="1.4"/><rect x="11.2" y="16.4" width="1.6" height="4.8" rx="0.7"/>'),
+  nettle: svgFill('<path d="M12 2.4l1.6 4.6 4.6-.4-1.8 4.4 3.8 2.8-4.8 1.4.6 4.6L12 17.4 7.2 19.8l.6-4.6-4.8-1.4 3.8-2.8-1.8-4.4 4.6.4z"/>'),
+  mint: svgFill('<ellipse cx="7.2" cy="12.2" rx="5.4" ry="6.6"/><ellipse cx="16.8" cy="12.2" rx="5.4" ry="6.6"/><rect x="11.1" y="4.8" width="1.8" height="15.2" rx="0.8"/>'),
+  clover: svgFill('<circle cx="12" cy="7.4" r="3.6"/><circle cx="12" cy="16.6" r="3.6"/><circle cx="7.4" cy="12" r="3.6"/><circle cx="16.6" cy="12" r="3.6"/><circle cx="12" cy="12" r="1.8"/>'),
+  parsley: svgFill('<path d="M12 3.6c2.4 1.4 3.6 3.6 3.2 6.4 2.8-1.4 5.8.4 5.6 3.6-.2 2.6-2.4 3.8-5.4 3.4.8 2.6 0 5.4-3.4 6.6-3.4-1.2-4.2-4-3.4-6.6-3 .4-5.2-.8-5.4-3.4-.2-3.2 2.8-5 5.6-3.6C8.4 7.2 9.6 5 12 3.6z"/><rect x="11.1" y="16.8" width="1.8" height="4.4" rx="0.8"/>'),
+  lanternleaf: svgFill('<path fill-rule="evenodd" d="M12 2.4c5 0 8.4 4.6 8.4 10s-3.4 10-8.4 10S3.6 17.8 3.6 12.4 7 2.4 12 2.4zM10 8.2h4v1.4h1.2v7.2H8.8V9.6H10zm1.4 3.2v3.4h1.2v-3.4z"/>'),
+  myrrh: svgFill('<path d="M11.1 20.6V11.4L6 5.2l1.8-1.6 4.2 5.2 4.2-5.2 1.8 1.6-5.1 6.2v9.2z"/><circle cx="6.2" cy="4.6" r="2"/><circle cx="17.8" cy="4.6" r="2"/><circle cx="12" cy="10.4" r="1.8"/>'),
 };
 
 export function icon(name, cls = '') {

@@ -20,7 +20,7 @@ export const CAT_GLYPH = {
   cosmetic: 'spark',
 };
 
-/** Distinct marks for fuels and the starter pack — the working-grid lookalikes. */
+/** Distinct marks for fuels, herbs, and the starter pack — glanceable, not caption-gated. */
 export const ITEM_GLYPH = {
   tinderscrap: 'flame',
   bogmoss: 'moss',
@@ -34,6 +34,15 @@ export const ITEM_GLYPH = {
   'saints-kindling': 'star',
 
   fogwort: 'leaf',
+  'bitter-sage': 'sage',
+  'night-thyme': 'thyme',
+  'ash-nettle': 'nettle',
+  'pilgrim-mint': 'mint',
+  'veil-clover': 'clover',
+  'dusk-parsley': 'parsley',
+  'lantern-leaf': 'lanternleaf',
+  'myrrh-weed': 'myrrh',
+
   rushwick: 'reed',
   'lantern-loaf': 'loaf',
   'wick-oil': 'vial',

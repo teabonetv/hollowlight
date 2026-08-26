@@ -7,6 +7,12 @@
 // the pills equal hollowlight.save without a remount, so we snap.
 
 import { formatNumber } from '../core/format.js';
+import { uniqueStackCount, lanternRoom } from '../game/systems/bank.js';
+
+/** Persistent HUD chip — Melvor pins slots on every screen, not only Bank. */
+export function formatHollowChip(state) {
+  return `${uniqueStackCount(state?.bank)} / ${lanternRoom(state)}`;
+}
 
 export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
   const radiance = formatNumber(state.radiance ?? 0);
@@ -15,4 +21,11 @@ export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
   if (hudRadiance) hudRadiance.textContent = `✧ ${radiance}`;
   const unspent = extras.unspentRadiance;
   if (unspent) unspent.textContent = `${radiance} Radiance unspent`;
+  const hollow = extras.hudHollow;
+  if (hollow) {
+    const chip = formatHollowChip(state);
+    hollow.textContent = chip;
+    hollow.setAttribute?.('title', `Lantern hollow ${chip}`);
+    hollow.setAttribute?.('aria-label', `Lantern hollow ${chip}`);
+  }
 }

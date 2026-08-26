@@ -69,6 +69,7 @@ function boot() {
   const hudLumen = document.getElementById('hud-lumen');
   const hudFlame = document.getElementById('hud-flame');
   const hudRadiance = document.getElementById('hud-radiance');
+  const hudHollow = document.getElementById('hud-hollow');
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
@@ -209,7 +210,10 @@ function boot() {
 
   function updateHud() {
     const unspent = document.getElementById('almanac-radiance-unspent');
-    paintHud(hudLumen, hudFlame, game, hudRadiance, { unspentRadiance: unspent });
+    paintHud(hudLumen, hudFlame, game, hudRadiance, {
+      unspentRadiance: unspent,
+      hudHollow,
+    });
   }
 
   // Evaluate feats, write hollowlight.save, then snap the HUD — never paint

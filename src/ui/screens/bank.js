@@ -17,6 +17,40 @@ import {
 
 const DESKTOP_INSPECTOR_MQ = '(min-width: 900px)';
 
+/** Phone-360 owned-grid geometry. CSS must match — names wrap, never ellipsize. */
+export const OWNED_NAME_LAYOUT = {
+  phoneMaxWidth: 400,
+  phoneColumns: 3,
+  screenPadX: 16,
+  gap: 6,
+  tilePadX: 3,
+  fontPx: 12,
+  lines: 2,
+  glyphPx: 32,
+  /** Worst-case system-ui advance in ems (covers W/M). */
+  worstCharEm: 0.72,
+};
+
+/** Inner width of a dense tile name at `viewportWidth`, matching styles.css. */
+export function ownedNameClientWidth(viewportWidth = 360) {
+  const { phoneMaxWidth, phoneColumns, screenPadX, gap, tilePadX } = OWNED_NAME_LAYOUT;
+  const cols = viewportWidth < phoneMaxWidth ? phoneColumns : 4;
+  const grid = viewportWidth - screenPadX * 2;
+  const tile = (grid - gap * (cols - 1)) / cols;
+  return tile - tilePadX * 2;
+}
+
+/**
+ * Two-line wrap budget: `scrollWidth` of a nowrap name would exceed `clientWidth`,
+ * so CSS wraps instead of ellipsizing. Conservative character-width model.
+ */
+export function ownedNameFits(name, viewportWidth = 360) {
+  const { fontPx, lines, worstCharEm } = OWNED_NAME_LAYOUT;
+  const client = ownedNameClientWidth(viewportWidth);
+  const scroll = String(name).length * fontPx * worstCharEm;
+  return scroll <= client * lines;
+}
+
 export function prefersDockedInspector() {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'

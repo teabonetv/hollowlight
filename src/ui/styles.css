@@ -146,6 +146,12 @@ body {
 }
 .pill.gold { color: var(--gold-hi); border-color: rgba(217, 164, 65, 0.35); }
 .pill.flame { color: #e8b48a; }
+.pill.hollow {
+  color: var(--gold-hi);
+  border-color: rgba(217, 164, 65, 0.35);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
 
 .icon-btn {
   display: inline-flex;
@@ -497,8 +503,12 @@ body {
 .bank-grids { width: 100%; }
 .bank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; width: 100%; }
 .bank-grid-owned {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* 3-col under 400px so Rushwick Reed / Driwood Splinters wrap fully at 360. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+}
+@media (min-width: 400px) {
+  .bank-grid-owned { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 .bank-tile {
   appearance: none;
@@ -546,15 +556,16 @@ body {
 .bank-tile.unowned .bank-qty { color: var(--faint); }
 .bank-name { font-size: 12px; line-height: 1.25; }
 .bank-name-dense {
-  font-size: 10px;
-  line-height: 1.15;
+  font-size: 12px;
+  line-height: 1.2;
   font-weight: 600;
   letter-spacing: -0.02em;
   color: var(--text);
   max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   pointer-events: none;
 }
 .bank-glyph {
@@ -574,6 +585,14 @@ body {
 .bank-glyph svg { width: 32px; height: 32px; display: block; }
 .bank-glyph.glyph-moss { color: #7fa56d; }
 .bank-glyph.glyph-leaf { color: #8fbc78; }
+.bank-glyph.glyph-sage { color: #9caf7a; }
+.bank-glyph.glyph-thyme { color: #6a8f62; }
+.bank-glyph.glyph-nettle { color: #8aa070; }
+.bank-glyph.glyph-mint { color: #7ebf9a; }
+.bank-glyph.glyph-clover { color: #a8c090; }
+.bank-glyph.glyph-parsley { color: #6f9a58; }
+.bank-glyph.glyph-lanternleaf { color: #d4c070; }
+.bank-glyph.glyph-myrrh { color: #c4a060; }
 .bank-glyph.glyph-mushroom { color: #b7c48a; }
 .bank-glyph.glyph-reed { color: #c4b07a; }
 .bank-glyph.glyph-loaf { color: #d4a574; }
@@ -602,7 +621,7 @@ body {
   white-space: nowrap;
 }
 .bank-tile-dense {
-  min-height: 76px;
+  min-height: 96px;
   aspect-ratio: auto;
   padding: 8px 3px 5px;
   gap: 2px;
@@ -1303,9 +1322,9 @@ html.reduced-motion *::after {
     color: var(--gold-hi);
     letter-spacing: 0.04em;
   }
-  .bank-grid-owned { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); }
-  .bank-tile-dense { min-height: 88px; }
-  .bank-tile-dense .bank-name-dense { font-size: 11px; }
+  .bank-grid-owned { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+  .bank-tile-dense { min-height: 104px; }
+  .bank-tile-dense .bank-name-dense { font-size: 12px; }
   .bank-tile-catalogue { min-height: 72px; }
   .bank-sell-toggle { min-width: 132px; }
   .sheet-overlay { display: none; }
