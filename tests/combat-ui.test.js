@@ -718,5 +718,6 @@ test('leftover log-wrap CSS is 96px+ and leftover-live does not scroll the lobby
   assert.match(css, /\.screen\.leftover-live\s*\{\s*overflow:\s*hidden/);
   assert.match(css, /\.leftover-station\s*\{[^}]*min-height:\s*0/);
   assert.match(css, /\.leftover-station\s*\{[^}]*height:\s*100%/);
+  assert.match(css, /\.screen\.leftover-live\s*\{[^}]*flex:\s*1 1 0/);
   assert.match(css, /\.cockpit-fill\s*\{[^}]*flex:\s*1/);
 });

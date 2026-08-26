@@ -30,10 +30,12 @@ export const COMBAT_360 = {
   xpBlock: 40,
   lobbyHead: 50,
   gap: 3,
-  kicker: 16,
-  fighter: 30,
-  acc: 28,
-  oil: 16,
+  leftoverGap: 2,
+  leftoverStationTop: 161, // 360 wrapped topbar 105 + pad 8 + detail-head 44 + gap 4
+  kicker: 14,
+  fighter: 26,
+  acc: 26,
+  oil: 14,
   eat: 44,
   hand: 44,
   styles: 44,
@@ -98,11 +100,11 @@ export function cockpitLogVsTab(kind = 'leftover') {
 export function leftoverLogVsTab({ loot = true } = {}) {
   const C = COMBAT_360;
   const box = cockpitLogVsTab('leftover');
-  const stationTop = C.topbarH + C.screenPadTop + C.detailHead + 4;
+  const stationTop = C.leftoverStationTop;
   const lootH = loot ? C.loot : 0;
   const chromeItems = 8 + (loot ? 1 : 0);
   const chrome = C.kicker + 2 * C.fighter + C.acc + C.oil + C.eat + C.hand + C.styles + lootH;
-  const chromeGaps = C.gap * chromeItems;
+  const chromeGaps = (C.leftoverGap ?? C.gap) * chromeItems;
   const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
   return {
     ...box,

@@ -54,7 +54,13 @@
   flex-direction: column;
   overflow: hidden;
 }
-.screen.leftover-live { overflow: hidden; }
+.screen.leftover-live {
+  overflow: hidden;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+}
+.screen.leftover-live .combat-root { flex: 1 1 0; }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
 .screen.fight-live .xp-block,
@@ -127,9 +133,10 @@
 .leftover-hub {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   overflow: hidden;
 }
 .fighter { display: flex; flex-direction: column; gap: 2px; }
@@ -187,7 +194,7 @@
 .leftover-station {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   padding: 0;
   border: 0;
   background: none;
@@ -196,6 +203,26 @@
   height: 100%;
   max-height: 100%;
   overflow: hidden;
+}
+.leftover-station > * { min-width: 0; }
+.leftover-station .leftover-kicker { line-height: 1.2; }
+.leftover-station .fighter { gap: 0; }
+.leftover-station .fighter-head { line-height: 1.15; }
+.leftover-station .fighter-head strong { font-size: 12px; }
+.leftover-station .bar.bar-lg { height: 8px; }
+.leftover-station .fight-cockpit { padding: 2px 6px; }
+.leftover-station .acc-station .chip {
+  min-height: 22px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.leftover-station .oil-line { font-size: 12px; line-height: 1.2; }
+.leftover-station .eat-pick {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  padding: 8px 8px;
 }
 .cockpit-fill {
   flex: 1 1 0;
@@ -266,7 +293,8 @@
   min-height: 44px;
   min-width: 84px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 .fighter-compact { gap: 2px; }
 .weapon-card { margin: 0; }
