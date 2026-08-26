@@ -48,7 +48,9 @@ Plus two **meta-progressions**:
 11. **Offline & mobile UX:** offline gains modal, push-style notification log, touch-first controls, one-hand reach layout, haptics hooks.
 12. **Narrative layer:** journal entries on milestones, settlement stories, NPC voices — short, well-written, skippable.
 
-## 12 systems, 8 skills, 12 settlements, ~120 items, 40+ enemies, 12 bosses at v1.0 scope.
+## 12 systems, 8 skills, 12 settlements, ~400–500 live-use items, 40+ enemies, 12 bosses at v1.0 scope.
+
+**Live-use (law):** an item counts toward the budget only if it has a use in play — wear, eat, fuel, recipe input/output, or a hunt drop that feeds a slot. Flavour-only and empty registry rows do not count. Skills stay eight; places stay twelve. Owner amend 26 Aug 2026 (was ~120). The lattice fills across later phases; do not dump the full count into Wave 1 or Phase A.
 
 ## 5. Non-negotiables
 
