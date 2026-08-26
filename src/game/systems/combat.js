@@ -211,6 +211,7 @@ export function planningEnemy(state) {
   ensureCombat(state);
   const c = state.combat;
   if (c.fighting && c.foe) return ENEMIES_BY_ID[c.foe.id] ?? null;
+  if (c.lastStation?.enemyId) return ENEMIES_BY_ID[c.lastStation.enemyId] ?? null;
   const zoneId = c.zoneId || 'hearthway';
   return enemiesInZone(zoneId, { bosses: false })[0] ?? null;
 }
@@ -273,13 +274,37 @@ export function selectFood(state, itemId) {
   return { ok: true, foodId: itemId };
 }
 
-function snapshotLastStation(state) {
+export function ownedFoodIds(state) {
+  ensureCombat(state);
+  return FOOD_ORDER.filter((id) => foodOwned(state, id));
+}
+
+/** Cycle the one-slot eat picker through owned foods (FOOD_ORDER). */
+export function cycleFood(state) {
+  const owned = ownedFoodIds(state);
+  if (!owned.length) {
+    selectFood(state, null);
+    return { ok: false, foodId: null };
+  }
+  const cur = selectedFoodId(state);
+  const i = Math.max(0, owned.indexOf(cur));
+  const next = owned[(i + 1) % owned.length];
+  return selectFood(state, next);
+}
+
+/** Food's inherent heal constant — never the pending (HP-capped) amount. */
+export function foodHeal(itemId) {
+  return FOOD[itemId]?.heal ?? 0;
+}
+
+function snapshotLastStation(state, ended = 'kill') {
   const c = ensureCombat(state);
   const kit = fightCockpit(state);
   const enemy = c.foe ? ENEMIES_BY_ID[c.foe.id] : (c.enemyId ? ENEMIES_BY_ID[c.enemyId] : null);
   c.lastStation = {
     enemyId: enemy?.id ?? c.foe?.id ?? c.enemyId ?? null,
     enemyName: c.foe?.name ?? enemy?.name ?? null,
+    ended,
     hitPct: kit?.hitPct ?? null,
     foeHitPct: kit?.foeHitPct ?? null,
     playerMinHit: kit?.playerMinHit ?? null,
@@ -287,6 +312,15 @@ function snapshotLastStation(state) {
     foeMinHit: kit?.foeMinHit ?? null,
     foeMaxHit: kit?.foeMaxHit ?? null,
   };
+}
+
+/** Leftover kicker: kill vs flee vs death — never reuse a kill headline after a fall-back. */
+export function leftoverKicker(last) {
+  if (!last) return 'After the hunt';
+  const name = last.enemyName;
+  if (last.ended === 'flee') return name ? `Fell back from ${name}` : 'After the hunt';
+  if (last.ended === 'death') return name ? `Fell to ${name}` : 'You fell';
+  return name ? `${name} fell` : 'After the hunt';
 }
 
 export function pushCombatLog(state, text, kind = 'info') {
@@ -471,6 +505,9 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
   }
   if (state.combat.fighting) return { ok: false, error: 'Already in a fight.' };
 
+  // Fight-scoped log: a new Hunt must not paint eat/kill/flee from the last encounter.
+  state.combat.log = [];
+
   const seed = encounterSeed ?? hashSeed(
     `${state.stats.playtimeMs}|${enemyId}|${state.combat.kills[enemyId] ?? 0}|${state.rngState}`,
   );
@@ -511,7 +548,7 @@ export function fleeFight(state) {
   ensureCombat(state);
   if (!state.combat.fighting) return { ok: false, error: 'No fight to leave.' };
   const name = state.combat.foe?.name ?? 'the dark';
-  snapshotLastStation(state);
+  snapshotLastStation(state, 'flee');
   pushCombatLog(state, `You fall back from ${name} to the lantern-light.`, 'flee');
   state.combat.fighting = false;
   state.combat.foe = null;
@@ -610,7 +647,7 @@ function onKill(state, rng) {
 
   const repeatId = enemy.id;
   const auto = c.autoContinue && !enemy.boss && lanternIsFed(state);
-  snapshotLastStation(state);
+  snapshotLastStation(state, 'kill');
   c.fighting = false;
   c.foe = null;
   c.enemyId = null;
@@ -646,7 +683,7 @@ function onDeath(state) {
   }
   state.lumen = 0;
   recordDeath(state);
-  snapshotLastStation(state);
+  snapshotLastStation(state, 'death');
   pushCombatLog(state, `You fall. ✦${carried} Lumen spills at ${ZONE_BY_ID[zoneId]?.settlement ?? zoneId}. Walk back to gather it.`, 'death');
   c.fighting = false;
   c.foe = null;

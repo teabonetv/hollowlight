@@ -477,7 +477,43 @@ test('selected food skips empty stacks and lastStation snapshots a kill', () => 
   assert.ok(kill);
   assert.equal(s.combat.fighting, false);
   assert.equal(s.combat.lastStation?.enemyId, 'pale-moth');
+  assert.equal(s.combat.lastStation?.ended, 'kill');
   assert.equal(s.combat.lastStation?.hitPct, kit.hitPct);
   assert.equal(s.combat.lastStation?.foeHitPct, kit.foeHitPct);
   assert.equal(s.combat.lastStation?.playerMinHit, kit.playerMinHit);
+});
+
+test('flee snapshots lastStation as flee, not a kill', () => {
+  const s = createState({ rngSeed: 7 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 5 });
+  combat.fleeFight(s);
+  assert.equal(s.combat.lastStation?.ended, 'flee');
+  assert.equal(s.combat.lastStation?.enemyId, 'pale-moth');
+  assert.match(combat.leftoverKicker(s.combat.lastStation), /Fell back from Pale Moth/);
+});
+
+test('startFight clears the previous encounter log', () => {
+  const s = createState({ rngSeed: 4 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  s.combat.player.hp = 10;
+  combat.eatFood(s, 'lantern-loaf');
+  combat.fleeFight(s);
+  assert.ok(s.combat.log.some((l) => l.kind === 'eat'));
+  assert.ok(s.combat.log.some((l) => l.kind === 'flee'));
+  combat.startFight(s, 'pale-moth', { encounterSeed: 2 });
+  assert.equal(s.combat.log.some((l) => l.kind === 'eat'), false);
+  assert.equal(s.combat.log.some((l) => l.kind === 'flee'), false);
+  assert.equal(s.combat.log.some((l) => l.kind === 'kill'), false);
+  assert.match(s.combat.log[0].text, /You meet Pale Moth/);
+});
+
+test('cycleFood walks owned foods in FOOD_ORDER', () => {
+  const s = createState({ rngSeed: 5 });
+  assert.equal(combat.selectedFoodId(s), 'lantern-loaf');
+  assert.deepEqual(combat.ownedFoodIds(s), ['lantern-loaf', 'fogwort']);
+  assert.equal(combat.cycleFood(s).foodId, 'fogwort');
+  assert.equal(combat.selectedFoodId(s), 'fogwort');
+  assert.equal(combat.cycleFood(s).foodId, 'lantern-loaf');
+  assert.equal(combat.foodHeal('lantern-loaf'), 14);
+  assert.equal(combat.foodHeal('fogwort'), 5);
 });
