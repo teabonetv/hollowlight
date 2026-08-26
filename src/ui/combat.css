@@ -54,7 +54,7 @@
   flex-direction: column;
   overflow: hidden;
 }
-.screen.leftover-live { overflow: visible; }
+.screen.leftover-live { overflow: hidden; }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
 .screen.fight-live .xp-block,
@@ -83,8 +83,8 @@
   flex-direction: column;
   container-type: size;
 }
-#screen:has(.fight-live) { overflow: hidden; }
-#screen:has(.leftover-live) { overflow-y: auto; }
+#screen:has(.fight-live),
+#screen:has(.leftover-live) { overflow: hidden; }
 
 .encounter-held {
   display: flex;
@@ -126,9 +126,10 @@
   display: flex;
   flex-direction: column;
   flex: 1 1 auto;
-  min-height: 100%;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
-.combat-lobby-after { flex: 0 0 auto; }
 .fighter { display: flex; flex-direction: column; gap: 2px; }
 .fighter-head { display: flex; justify-content: space-between; gap: 8px; }
 .fighter-head strong { font-size: 13px; }
@@ -188,7 +189,7 @@
   padding: 0;
   border: 0;
   background: none;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
   min-height: calc(100cqh - 52px);
 }
 .cockpit-fill { flex: 1 1 0; min-height: 0; }
@@ -200,11 +201,17 @@
 .leftover-station .log-wrap {
   margin-top: 0;
   flex: 0 0 auto;
-  min-height: 64px;
-  max-height: 64px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+.combat-fight:not(.leftover-station) .log-wrap {
+  min-height: 64px;
+  max-height: 64px;
+}
+.leftover-station .log-wrap {
+  min-height: 88px;
+  max-height: 88px;
 }
 .combat-fight .combat-log,
 .leftover-station .combat-log {
@@ -215,6 +222,7 @@
   gap: 1px;
   overflow-y: auto;
 }
+.leftover-station .combat-log { overflow: hidden; }
 .leftover-station .log-line,
 .combat-fight .log-line { font-size: 12px; line-height: 1.2; }
 .leftover-kicker {
