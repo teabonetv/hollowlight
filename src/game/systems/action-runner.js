@@ -61,7 +61,7 @@ export function applyGains(state, gains) {
   const applied = [];
   for (const g of gains) {
     if (g.kind === 'item') {
-      bank.bankAdd(state.bank, g.id, g.qty);
+      bank.bankAdd(state.bank, g.id, g.qty, state);
       applied.push({ kind: 'item', id: g.id, name: ITEMS_BY_ID[g.id]?.name ?? g.id, qty: g.qty });
     } else if (g.kind === 'lumen') {
       const qty = Math.max(0, Math.round(g.qty * mods.lumenGainMultiplier(state)));
@@ -261,5 +261,6 @@ export function actionStatus(state, actionId) {
     xpBase: action?.xp ?? 0,
     xpRaw,
     xpGrant: Math.round(xpRaw),
+    durationCause: action ? mods.durationRewriteCause(state, action) : '',
   };
 }

@@ -50,6 +50,7 @@ import { hydrateState } from '../game/hydrate.js';
 import { cascadeAchievements, featToastMessage } from '../game/systems/achievements.js';
 import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
 import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
+import { shouldRebuildScreen } from './live-paint.js';
 
 const AUTOSAVE_MS = 30_000;
 const UI_KEY = 'hollowlight.ui';
@@ -206,7 +207,7 @@ function boot() {
     const n = flushAchievementsQuiet();
     persist({ stamp });
     updateHud();
-    if (redraw || n) renderScreen();
+    if (shouldRebuildScreen(ui, { redraw, featUnlocks: n })) renderScreen();
     else {
       liveUpdate();
       sheetRepaint?.();

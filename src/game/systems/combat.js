@@ -277,7 +277,7 @@ export function applyCombatDrops(state, drops) {
       state.lumen += d.qty;
       applied.push({ kind: 'lumen', qty: d.qty, name: 'Lumen' });
     } else if (d.kind === 'item') {
-      bank.bankAdd(state.bank, d.id, d.qty);
+      bank.bankAdd(state.bank, d.id, d.qty, state);
       applied.push({ kind: 'item', id: d.id, qty: d.qty, name: ITEMS_BY_ID[d.id]?.name ?? d.id });
     }
   }

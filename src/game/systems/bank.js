@@ -5,6 +5,9 @@
 import { ITEMS, ITEMS_BY_ID, BANK_TABS } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
 import { recordSell } from './stats.js';
+import { markDiscovered, isDiscovered } from './discovered.js';
+
+export { markDiscovered, isDiscovered };
 
 const CORE_TAB_IDS = new Set(['owned', 'pinned', 'all', 'catalogue']);
 
@@ -12,9 +15,10 @@ export function bankCount(bank, itemId) {
   return bank[itemId] ?? 0;
 }
 
-export function bankAdd(bank, itemId, qty) {
+export function bankAdd(bank, itemId, qty, state) {
   if (!Number.isFinite(qty) || qty <= 0) return;
   bank[itemId] = (bank[itemId] ?? 0) + Math.floor(qty);
+  if (state) markDiscovered(state, itemId);
 }
 
 export function canAfford(bank, costs) {

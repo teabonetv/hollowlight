@@ -215,17 +215,31 @@ cycle. No skill, bank, or level is wiped to gain it (charter §4.9).
 | Constant | Value | Why |
 |---|---|---|
 | `RADIANCE_PER_XP` | 0.025 | 40 action-XP ≈ 1 spark. Tend the Flame (14 XP / 4 s) yields ~0.35 sparks/cycle → first star (`Kindling`, cost 1) in ~12 s of tending. Slow enough to stay prestige; fast enough that the grid is playable in the first session. |
-| Origin Kindling | +5% skill XP | +1% left Tend at `round(14 × 1.01 × 1.01) = 14`. +5% makes the live grant **14 → 15 XP**. Action cards show that grant. Running actions show remaining time AND cycle length (`2.1s left · 4.0s / cycle`). Drawn Wick (+2% speed) rewrites the duration chip to **3.9s / cycle**. |
+| Origin Kindling | +5% skill XP | +1% left Tend at `round(14 × 1.01 × 1.01) = 14`. +5% makes the live grant **14 → 15 XP**. Action cards show that grant. Running actions show remaining time AND cycle length (`2.1s left · 4.0s / cycle`). Drawn Wick (+2% speed) rewrites the duration chip to **3.9s / cycle · Wick**. |
 | Perk costs | 1 → 30 | Origin 1; branch nodes 2–10; branch capstones 18; conjunctions 8–22; apex 30. Full grid ≈ 335 sparks ≈ **13.4k action-XP** — hours, not minutes. |
 | Respec | ✦25 × owned nodes | Refunds all spent Radiance; Lumen fee only. Skills/bank untouched. |
 | Effect stack | mastery → camp → radiance → achievement → mastery-hooks | Each layer is `×(1+bonus)`. Documented and unit-tested so live ticks, offline, and ETAs never disagree. |
 | Yield chance cap | 55% | Camp satchel 35% + perks/hooks; stops bonus-find from going guaranteed. |
-| Daily embers | 3 tasks, 1 reroll, UTC day | Rewards 2–4 sparks. Missing a day does nothing — no streak, no FOMO. |
+| Daily embers | 3 tasks, 1 reroll, UTC day | Rewards 2–4 sparks. Missing a day does nothing — no streak, no FOMO. `ensureDailies` / `pickSet` never offer a task the save cannot start (`unlockLevel` unmet). A Combat 1 / Foraging 1 save will not see Gather Fungi ×8. |
 
 Achievement rewards that grant `%` bonuses enter the stack as the
 **achievement** layer (after Radiance). Mastery hooks at 25/50/75 on each
 Wave-0 action enter as **hooks** (last). Flavor-only milestones (10, titles
 at 99) do not change math.
+
+## Almanac LOG items (S4d)
+
+Items completion is a **completionist book**, not a live inventory count.
+
+| Rule | Contract |
+|---|---|
+| What counts | Unique item ids in `state.discovered` (`{ [itemId]: true }`) |
+| Fresh save | **0 / N** — Melvor fresh Items is 0.00%. The starter pack (Tinderscrap, Rushwick, Fogwort, lantern-loaf, wick-oil, wick-knife) is a boot grant and does **not** count. |
+| First pickup | Action yields, combat loot, and stall / bundle buys call `markDiscovered`. That is the only increment. |
+| Last stack | Spending or selling to 0 never removes the id. Items 6/N cannot fall to 5/N. |
+| Save | Schema **v5**. v4 saves migrate to an empty `discovered` map; the next pickup in play writes the first ticks. |
+
+Tapping Skills / Mastery / Items / Feats on the LOG opens a drill-down (per-skill 1/99, per-action mastery, found-vs-missing items, feats grid) and keeps the bucket % in the header.
 
 ## Offline playtime (S4 honesty)
 

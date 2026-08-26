@@ -5,15 +5,17 @@
 
 import { ITEMS_BY_ID } from '../data/items.js';
 import { recordLumenSpend } from './stats.js';
+import { markDiscovered } from './discovered.js';
 import {
   ALWAYS_STOCK, KINDLING_BUNDLE, BANK_THEMES,
   catalogBuyPrice, sellUnitPrice, buyUnitPrice, recoveredPressure,
   rareStockAt, PRESSURE_PER_UNIT, PRESSURE_CAP,
 } from '../data/store.js';
 
-function bankAdd(bank, itemId, qty) {
+function bankAdd(bank, itemId, qty, state) {
   if (!Number.isFinite(qty) || qty <= 0) return;
   bank[itemId] = (bank[itemId] ?? 0) + Math.floor(qty);
+  if (state) markDiscovered(state, itemId);
 }
 
 export function ensureStore(state) {
@@ -92,7 +94,7 @@ export function buyFromStore(state, itemId, qty = 1) {
   if (state.lumen < total) return { ok: false, error: 'Not enough Lumen.' };
   state.lumen -= total;
   recordLumenSpend(state, total);
-  bankAdd(state.bank, itemId, n);
+  bankAdd(state.bank, itemId, n, state);
   return { ok: true, bought: n, spent: total, unit };
 }
 
@@ -101,7 +103,7 @@ export function buyKindlingBundle(state) {
   if (state.lumen < cost) return { ok: false, error: 'Not enough Lumen.' };
   state.lumen -= cost;
   recordLumenSpend(state, cost);
-  for (const g of grants) bankAdd(state.bank, g.id, g.qty);
+  for (const g of grants) bankAdd(state.bank, g.id, g.qty, state);
   return { ok: true, spent: cost, grants: grants.map((g) => ({ ...g })) };
 }
 

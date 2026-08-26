@@ -73,6 +73,16 @@ export function effectiveDurationMs(state, action) {
   return Math.max(1, Math.round(action.durationMs / speedMultiplier(state)));
 }
 
+/**
+ * Player-facing cause when a constellation perk rewrote cycle length.
+ * Camp Lantern & Wick also shortens bars; the chip only names a perk.
+ */
+export function durationRewriteCause(state, action) {
+  if (!action) return '';
+  if (effectiveDurationMs(state, action) === action.durationMs) return '';
+  return perkBonus(state, 'speed') > 0 ? 'Wick' : '';
+}
+
 /** Additive chance, then cap. Camp yield is already a chance, not a (1+x). */
 export function yieldChance(state) {
   const campY = camp.yieldChance(state);
