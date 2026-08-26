@@ -8,7 +8,8 @@
 // HUD snaps. Boot persists feat grants before the first paint (without
 // restamping savedAt, so offline windows survive). The 30s interval only
 // covers playtime ticking. Hide still persists; return still computes
-// offline before restamp.
+// offline before restamp. While a recap is unclaimed, persist never
+// restamps — reload must still offer the same away window.
 //
 // Everything DOM-facing lives behind boot(); importing this module from node
 // stays side-effect free.
@@ -83,7 +84,9 @@ function boot() {
   // ── save / load / adopt ────────────────────────────────────────
   function persist({ stamp = true } = {}) {
     game.rngState = rng.getState();
-    if (stamp) game.savedAt = Date.now();
+    // Recap owns the save until Claim: autosave / hide / pagehide must
+    // not rewrite savedAt to now while the modal is still unclaimed.
+    if (stamp && !recapOpen) game.savedAt = Date.now();
     storageSet(window.localStorage, serializeSave(game, game.savedAt));
   }
 
@@ -666,6 +669,7 @@ function boot() {
     b.addEventListener('click', () => setTab(b.dataset.tab));
   });
   document.getElementById('btn-settings').addEventListener('click', () => {
+    if (recapOpen) return;
     game.stats.settingsOpens = (game.stats.settingsOpens ?? 0) + 1;
     showSettingsModal(modalRoot, ctx);
     afterMutation({ stamp: false });
@@ -680,8 +684,9 @@ function boot() {
       persist();
     } else {
       // Absence while hidden counts as idle time — credit it honestly.
-      // Compute BEFORE anything restamps game.savedAt, so hidden time counts;
-      // then stamp the return so a crash mid-modal can never double-count.
+      // Compute BEFORE anything restamps game.savedAt, so hidden time counts.
+      // persist() itself will not restamp while recapOpen, so a reload with
+      // the modal still up keeps the away window instead of a zero-away boot.
       if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
       persist();
       if (!recapOpen) loop.start();
