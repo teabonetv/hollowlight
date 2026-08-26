@@ -96,7 +96,7 @@ function renderOverview(ctx) {
         dataset: { logBucket: c.id },
         'data-log-bucket': c.id,
         onclick: () => ctx.openAlmanac(`log-${c.id}`),
-      },)
+      },
         el('span', { class: 'cat-name' }, c.name),
         el('span', { class: 'cat-pct' }, `${Math.floor(c.pct * 100)}% · ${c.done}/${c.total}`),
         el('span', { class: 'bar bar-mini cat-bar' },
