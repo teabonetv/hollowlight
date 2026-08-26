@@ -70,7 +70,7 @@ function buildHub(ctx, st, paint) {
   else wrap.append(el('p', { class: 'combat-intro muted' },
     'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
 
-  wrap.append(soulsLine(ctx, st));
+  if (!leftover) wrap.append(soulsLine(ctx, st));
   const spilled = deathBanner(ctx, st, paint);
   if (spilled) wrap.append(spilled);
   wrap.append(vigilCard(ctx, st, paint));
@@ -98,7 +98,12 @@ function rangeLabel(min, max) {
   return `${min}–${max}`;
 }
 
-function accStation(kit, extraClass = '') {
+function clockLabel(ms) {
+  if (ms == null || !Number.isFinite(ms)) return '';
+  return formatSeconds(ms);
+}
+
+function accStation(kit, extraClass = '', clocks = {}) {
   const row = el('div', { class: `acc-station fight-cockpit ${extraClass}`.trim() });
   if (!kit) {
     row.append(
@@ -110,10 +115,12 @@ function accStation(kit, extraClass = '') {
   }
   const you = rangeLabel(kit.playerMinHit, kit.playerMaxHit);
   const they = rangeLabel(kit.foeMinHit, kit.foeMaxHit);
+  const youClock = clockLabel(clocks.you ?? kit.playerSpeedMs);
+  const theyClock = clockLabel(clocks.they ?? kit.foeSpeedMs);
   row.append(
-    el('span', { class: 'chip acc-chip' }, `Acc ${kit.hitPct}% · ${you}`),
+    el('span', { class: 'chip acc-chip' }, `Acc ${kit.hitPct}% · ${you}${youClock ? ` · ${youClock}` : ''}`),
     el('span', { class: 'chip-sep', 'aria-hidden': 'true' }, ' / '),
-    el('span', { class: 'chip they-chip' }, `they ${kit.foeHitPct}% · ${they}`),
+    el('span', { class: 'chip they-chip' }, `they ${kit.foeHitPct}% · ${they}${theyClock ? ` · ${theyClock}` : ''}`),
   );
   return row;
 }
@@ -362,7 +369,7 @@ function huntCard(ctx, enemy, paint) {
 function lanternCopy(st, state) {
   const sips = st.oilSips ?? combat.oilSipsRemaining(state);
   if (!combat.lanternIsFed(state) || sips <= 0) {
-    return 'Lantern dry — the fog gathers. Drink oil or fall back.';
+    return 'Need oil — Lantern dry. The fog gathers.';
   }
   return `Lantern fed · ${formatNoun(sips, 'sip')} · next in ${formatSeconds(st.oilMs)}`;
 }
@@ -422,7 +429,6 @@ function styleRow(ctx, st, paint) {
 }
 
 function buildFight(ctx, st, paint) {
-  const enemy = st.enemy;
   const foe = st.foe;
   const wrap = el('div', { class: 'combat-fight' });
 
@@ -443,27 +449,25 @@ function buildFight(ctx, st, paint) {
     title: 'You',
     hp: st.playerHp,
     max: st.playerMaxHp,
-    next: st.playerNextMs,
-    speed: st.playerSpeedMs,
     fillClass: 'hp-you',
   }));
 
   wrap.append(fighterBlock({
     title: foe?.name ?? 'Foe',
-    sub: enemy ? `weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? ''}` : '',
     hp: foe?.hp ?? 0,
     max: foe?.maxHp ?? 1,
-    next: foe?.nextActMs ?? 0,
-    speed: enemy ? combat.foeSpeedMs(enemy, st.phase?.phase) : 1,
     fillClass: 'hp-foe',
   }));
 
-  wrap.append(accStation(st.cockpit));
+  wrap.append(accStation(st.cockpit, '', {
+    you: st.playerNextMs,
+    they: foe?.nextActMs ?? 0,
+  }));
 
   wrap.append(el('p', { class: `oil-line ${st.lanternFed ? 'muted' : 'danger'}` },
     lanternCopy(st, ctx.state)));
 
-  wrap.append(eatRow(ctx, st, paint));
+  wrap.append(eatRow(ctx, st, paint, { flee: true }));
 
   wrap.append(handChip(ctx, st, paint));
 
@@ -482,11 +486,6 @@ function buildFight(ctx, st, paint) {
   });
   wrap.append(keep);
 
-  wrap.append(el('button', {
-    class: 'btn btn-stop btn-wide',
-    onclick: () => { ctx.fleeFight(); paint(); },
-  }, 'Fall back'));
-
   wrap.append(el('p', { class: 'muted small' },
     'Auto-eat and auto-brew will arrive with a later camp purchase. Until then, eat with your own hand.'));
 
@@ -494,27 +493,22 @@ function buildFight(ctx, st, paint) {
   return wrap;
 }
 
-function fighterBlock({ title, sub, hp, max, next, speed, fillClass, compact = false }) {
+function fighterBlock({ title, hp, max, fillClass, compact = false }) {
   const frac = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 0;
-  const tFrac = speed > 0 ? Math.max(0, Math.min(1, 1 - next / speed)) : 0;
   return el('div', { class: `fighter ${compact ? 'fighter-compact' : ''}`.trim() },
     el('div', { class: 'fighter-head' },
       el('strong', {}, title),
       el('span', { class: 'muted' }, `${hp} / ${max}`)),
-    sub ? el('p', { class: 'muted small' }, sub) : null,
     el('div', { class: `bar bar-lg hp-bar`, role: 'progressbar', 'aria-label': `${title} vitality` },
-      el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })),
-    compact ? null : el('div', { class: 'action-barline' },
-      el('div', { class: 'bar', role: 'progressbar', 'aria-label': `${title} next blow` },
-        el('span', { class: 'bar-fill atk-fill', style: `width:${(tFrac * 100).toFixed(1)}%` })),
-      el('span', { class: 'bar-time' }, next > 0 ? formatSeconds(next) : 'now')));
+      el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
 }
 
-function eatRow(ctx, st, paint) {
+function eatRow(ctx, st, paint, { flee = false } = {}) {
   const row = el('div', { class: 'eat-row' });
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
     row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
+    if (flee) row.append(fleeButton(ctx, paint));
     return row;
   }
   const n = bankCount(ctx.state.bank, id);
@@ -522,18 +516,22 @@ function eatRow(ctx, st, paint) {
   const heal = combat.foodHeal(id);
   const full = st.playerHp >= st.playerMaxHp;
   const owned = combat.ownedFoodIds(ctx.state);
+  const label = `${food.name} +${heal} · ${n}`;
   const slot = el('div', { class: 'eat-slot' });
-  slot.append(el('button', {
-    class: 'btn btn-ghost eat-pick',
-    type: 'button',
-    'aria-label': owned.length > 1 ? `Cycle food, ${food.name} +${heal}` : `${food.name} +${heal}`,
-    onclick: () => {
-      if (owned.length < 2) return;
-      if (ctx.cycleFood) ctx.cycleFood();
-      else combat.cycleFood(ctx.state);
-      paint();
-    },
-  }, `${food.name} +${heal} · ${n}`));
+  if (owned.length > 1) {
+    slot.append(el('button', {
+      class: 'btn btn-ghost eat-pick',
+      type: 'button',
+      'aria-label': `Cycle food, ${food.name} +${heal}`,
+      onclick: () => {
+        if (ctx.cycleFood) ctx.cycleFood();
+        else combat.cycleFood(ctx.state);
+        paint();
+      },
+    }, label));
+  } else {
+    slot.append(el('span', { class: 'eat-pick eat-pick-solo' }, label));
+  }
   slot.append(el('button', {
     class: `btn eat-btn ${full ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
     'aria-disabled': full ? 'true' : 'false',
@@ -547,8 +545,16 @@ function eatRow(ctx, st, paint) {
       paint();
     },
   }, 'Eat'));
+  if (flee) slot.append(fleeButton(ctx, paint));
   row.append(slot);
   return row;
+}
+
+function fleeButton(ctx, paint) {
+  return el('button', {
+    class: 'btn btn-stop flee-btn',
+    onclick: () => { ctx.fleeFight(); paint(); },
+  }, 'Fall back');
 }
 
 function leftoverStation(ctx, st, paint) {
@@ -560,8 +566,6 @@ function leftoverStation(ctx, st, paint) {
     title: 'You',
     hp: st.playerHp,
     max: st.playerMaxHp,
-    next: 0,
-    speed: 1,
     fillClass: 'hp-you',
     compact: true,
   }));
@@ -572,7 +576,44 @@ function leftoverStation(ctx, st, paint) {
   wrap.append(el('p', { class: `oil-line ${dry ? 'danger leftover-dry' : 'muted'}` },
     dry ? 'Need oil' : `${formatNoun(sips, 'lantern sip')} remaining`));
   wrap.append(eatRow(ctx, st, paint));
+  const loot = leftoverLootRow(last);
+  if (loot) wrap.append(loot);
+  wrap.append(leftoverHunt(ctx, last, dry, paint));
   return wrap;
+}
+
+function leftoverLootRow(last) {
+  if (last.ended !== 'kill') return null;
+  const chips = [];
+  if (last.souls) chips.push(el('span', { class: 'chip chip-gold' }, formatNoun(last.souls, 'soul')));
+  for (const d of last.loot ?? []) {
+    if (d.kind === 'lumen') {
+      chips.push(el('span', { class: 'chip chip-gold' }, `✦${formatNumber(d.qty)}`));
+    } else {
+      chips.push(el('span', { class: 'chip' }, `${d.name ?? d.id} ×${d.qty}`));
+    }
+  }
+  if (!chips.length) chips.push(el('span', { class: 'chip' }, 'nothing but quiet'));
+  return chipRow('leftover-loot chips', chips);
+}
+
+function leftoverHunt(ctx, last, dry, paint) {
+  const enemy = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
+  const name = last.enemyName ?? enemy?.name ?? 'this foe';
+  return el('button', {
+    class: `btn btn-wide leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    'aria-disabled': dry ? 'true' : 'false',
+    onclick: () => {
+      if (!last.enemyId) return;
+      if (dry) {
+        ctx.toast?.('The lantern is dry — buy wick-oil at the stall before a stretch.', 'warn');
+        return;
+      }
+      const res = ctx.startFight(last.enemyId);
+      if (!res.ok) ctx.toast(res.error, 'warn');
+      paint();
+    },
+  }, dry ? 'Need oil' : `Hunt ${name}`);
 }
 
 function logPanel(log) {

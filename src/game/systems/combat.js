@@ -245,6 +245,8 @@ export function fightCockpit(state, enemy = planningEnemy(state)) {
     playerMaxHit: Math.max(1, Math.round(off.maxDmg * pMult)),
     foeMinHit: Math.max(1, Math.round(enemy.minDmg * (phase.dmgMult ?? 1))),
     foeMaxHit: Math.max(1, Math.round(enemy.maxDmg * (phase.dmgMult ?? 1))),
+    playerSpeedMs: off.speedMs,
+    foeSpeedMs: foeSpeedMs(enemy, phase),
   };
 }
 
@@ -297,10 +299,18 @@ export function foodHeal(itemId) {
   return FOOD[itemId]?.heal ?? 0;
 }
 
-function snapshotLastStation(state, ended = 'kill') {
+function snapshotLastStation(state, ended = 'kill', extra = {}) {
   const c = ensureCombat(state);
   const kit = fightCockpit(state);
   const enemy = c.foe ? ENEMIES_BY_ID[c.foe.id] : (c.enemyId ? ENEMIES_BY_ID[c.enemyId] : null);
+  const loot = Array.isArray(extra.loot)
+    ? extra.loot.map((d) => ({
+      kind: d.kind,
+      id: d.id ?? null,
+      qty: d.qty,
+      name: d.name,
+    }))
+    : [];
   c.lastStation = {
     enemyId: enemy?.id ?? c.foe?.id ?? c.enemyId ?? null,
     enemyName: c.foe?.name ?? enemy?.name ?? null,
@@ -311,6 +321,8 @@ function snapshotLastStation(state, ended = 'kill') {
     playerMaxHit: kit?.playerMaxHit ?? null,
     foeMinHit: kit?.foeMinHit ?? null,
     foeMaxHit: kit?.foeMaxHit ?? null,
+    souls: extra.souls ?? 0,
+    loot,
   };
 }
 
@@ -647,7 +659,7 @@ function onKill(state, rng) {
 
   const repeatId = enemy.id;
   const auto = c.autoContinue && !enemy.boss && lanternIsFed(state);
-  snapshotLastStation(state, 'kill');
+  snapshotLastStation(state, 'kill', { souls: enemy.souls, loot: applied });
   c.fighting = false;
   c.foe = null;
   c.enemyId = null;
