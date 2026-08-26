@@ -47,6 +47,8 @@ export function createCombatState() {
     equipment: {}, // { weapon: itemId | null } — unset weapon auto-wields starter steel
     paused: false,
     dryAnnounced: false,
+    foodId: null, // selected eat slot; null = first owned in FOOD_ORDER
+    lastStation: null, // leftover cockpit after a hunt (HP/acc snapshot)
   };
 }
 
@@ -71,6 +73,8 @@ export function ensureCombat(state) {
   if (c.paused == null) c.paused = false;
   if (c.dryAnnounced == null) c.dryAnnounced = false;
   if (c.autoContinue == null) c.autoContinue = false;
+  if (c.foodId === undefined) c.foodId = null;
+  if (c.lastStation === undefined) c.lastStation = null;
   return c;
 }
 
@@ -236,8 +240,52 @@ export function fightCockpit(state, enemy = planningEnemy(state)) {
     hitPct: Math.round(chance * 100),
     foeHitChance: foeChance,
     foeHitPct: Math.round(foeChance * 100),
+    playerMinHit: Math.max(1, Math.round(off.minDmg * pMult)),
     playerMaxHit: Math.max(1, Math.round(off.maxDmg * pMult)),
+    foeMinHit: Math.max(1, Math.round(enemy.minDmg * (phase.dmgMult ?? 1))),
     foeMaxHit: Math.max(1, Math.round(enemy.maxDmg * (phase.dmgMult ?? 1))),
+  };
+}
+
+function foodOwned(state, itemId) {
+  return !!(itemId && FOOD[itemId] && bank.bankCount(state.bank, itemId) > 0);
+}
+
+/** First owned food in FOOD_ORDER, or the player's last pick if it still has stock. */
+export function selectedFoodId(state) {
+  ensureCombat(state);
+  const wanted = state.combat.foodId;
+  if (foodOwned(state, wanted)) return wanted;
+  for (const id of FOOD_ORDER) {
+    if (foodOwned(state, id)) return id;
+  }
+  return null;
+}
+
+export function selectFood(state, itemId) {
+  ensureCombat(state);
+  if (itemId == null) {
+    state.combat.foodId = null;
+    return { ok: true, foodId: null };
+  }
+  if (!FOOD[itemId]) return { ok: false, error: 'That will not feed a fight.' };
+  state.combat.foodId = itemId;
+  return { ok: true, foodId: itemId };
+}
+
+function snapshotLastStation(state) {
+  const c = ensureCombat(state);
+  const kit = fightCockpit(state);
+  const enemy = c.foe ? ENEMIES_BY_ID[c.foe.id] : (c.enemyId ? ENEMIES_BY_ID[c.enemyId] : null);
+  c.lastStation = {
+    enemyId: enemy?.id ?? c.foe?.id ?? c.enemyId ?? null,
+    enemyName: c.foe?.name ?? enemy?.name ?? null,
+    hitPct: kit?.hitPct ?? null,
+    foeHitPct: kit?.foeHitPct ?? null,
+    playerMinHit: kit?.playerMinHit ?? null,
+    playerMaxHit: kit?.playerMaxHit ?? null,
+    foeMinHit: kit?.foeMinHit ?? null,
+    foeMaxHit: kit?.foeMaxHit ?? null,
   };
 }
 
@@ -462,6 +510,7 @@ export function fleeFight(state) {
   ensureCombat(state);
   if (!state.combat.fighting) return { ok: false, error: 'No fight to leave.' };
   const name = state.combat.foe?.name ?? 'the dark';
+  snapshotLastStation(state);
   pushCombatLog(state, `You fall back from ${name} to the lantern-light.`, 'flee');
   state.combat.fighting = false;
   state.combat.foe = null;
@@ -560,6 +609,7 @@ function onKill(state, rng) {
 
   const repeatId = enemy.id;
   const auto = c.autoContinue && !enemy.boss && lanternIsFed(state);
+  snapshotLastStation(state);
   c.fighting = false;
   c.foe = null;
   c.enemyId = null;
@@ -595,6 +645,7 @@ function onDeath(state) {
   }
   state.lumen = 0;
   recordDeath(state);
+  snapshotLastStation(state);
   pushCombatLog(state, `You fall. ✦${carried} Lumen spills at ${ZONE_BY_ID[zoneId]?.settlement ?? zoneId}. Walk back to gather it.`, 'death');
   c.fighting = false;
   c.foe = null;
@@ -815,6 +866,8 @@ export function combatStatus(state) {
     autoContinue: c.autoContinue,
     autoEat: c.autoEat,
     autoBrew: c.autoBrew,
+    foodId: selectedFoodId(state),
+    lastStation: c.lastStation,
     log: c.log,
     deathSite: c.deathSite,
     vigils: c.vigils,

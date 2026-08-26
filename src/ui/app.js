@@ -36,6 +36,7 @@ import { offerItems } from '../game/systems/offerings.js';
 import { repairLantern as doRepair } from '../game/systems/repairs.js';
 
 import { el, clear } from './dom.js';
+import { resetHuntScrollers } from './screens/combat.js';
 import { icon } from './icons.js';
 import { paintHud } from './hud.js';
 import { createToaster } from './toast.js';
@@ -456,16 +457,23 @@ function boot() {
       if (!res.ok) return res;
       afterMutation();
       renderScreen();
+      resetHuntScrollers(screenRoot);
       return res;
     },
     fleeFight() {
       const res = combat.fleeFight(game);
       afterMutation();
       renderScreen();
+      resetHuntScrollers(screenRoot);
       return res;
     },
     eatFood(itemId) {
       const res = combat.eatFood(game, itemId);
+      if (res.ok) afterMutation();
+      return res;
+    },
+    selectFood(itemId) {
+      const res = combat.selectFood(game, itemId);
       if (res.ok) afterMutation();
       return res;
     },

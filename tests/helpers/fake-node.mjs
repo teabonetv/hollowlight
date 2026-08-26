@@ -18,6 +18,8 @@ export class FakeNode {
     this.parentNode = null;
     this._classSet = new Set();
     this._html = '';
+    this.scrollTop = 0;
+    this.scrollLeft = 0;
     const self = this;
     this.classList = {
       add: (...cs) => cs.forEach((c) => self._classSet.add(c)),
