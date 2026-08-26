@@ -54,7 +54,13 @@
   flex-direction: column;
   overflow: hidden;
 }
-.screen.leftover-live { overflow: hidden; }
+.screen.leftover-live {
+  overflow: hidden;
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+}
+.screen.leftover-live .combat-root { flex: 1 1 0; }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
 .screen.fight-live .xp-block,
@@ -120,14 +126,17 @@
   flex-direction: column;
   gap: 3px;
   flex: 1 1 auto;
+}
+.combat-fight:not(.leftover-station) {
   min-height: calc(100cqh - 52px);
 }
 .leftover-hub {
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
-  height: 100%;
+  height: auto;
+  max-height: 100%;
   overflow: hidden;
 }
 .fighter { display: flex; flex-direction: column; gap: 2px; }
@@ -185,14 +194,41 @@
 .leftover-station {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
   padding: 0;
   border: 0;
   background: none;
-  flex: 1 1 auto;
-  min-height: calc(100cqh - 52px);
+  flex: 1 1 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
 }
-.cockpit-fill { flex: 1 1 0; min-height: 0; }
+.leftover-station > * { min-width: 0; }
+.leftover-station .leftover-kicker { line-height: 1.2; }
+.leftover-station .fighter { gap: 0; }
+.leftover-station .fighter-head { line-height: 1.15; }
+.leftover-station .fighter-head strong { font-size: 12px; }
+.leftover-station .bar.bar-lg { height: 8px; }
+.leftover-station .fight-cockpit { padding: 2px 6px; }
+.leftover-station .acc-station .chip {
+  min-height: 22px;
+  padding: 2px 4px;
+  font-size: 11px;
+}
+.leftover-station .oil-line { font-size: 12px; line-height: 1.2; }
+.leftover-station .eat-pick {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12.5px;
+  padding: 8px 8px;
+}
+.cockpit-fill {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+}
 .leftover-station .hand-chip { margin: 0; }
 .leftover-station .style-row { margin: 0; }
 .screen.fight-live .log-h,
@@ -209,9 +245,12 @@
   min-height: 64px;
   max-height: 64px;
 }
+/* 100px: two wrapping .log-line (12px × 1.2 × 2 = 28.8) + two singles + pad/gaps. */
 .leftover-station .log-wrap {
-  min-height: 88px;
-  max-height: 88px;
+  flex: 0 0 auto;
+  margin-top: auto;
+  min-height: 100px;
+  max-height: 100px;
 }
 .combat-fight .combat-log,
 .leftover-station .combat-log {
@@ -232,14 +271,30 @@
   text-transform: uppercase;
   color: var(--gold-hi);
 }
-.leftover-loot { margin: 0; }
+.leftover-loot {
+  margin: 0;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+  max-height: 18px;
+  overflow: hidden;
+}
+.leftover-loot .chip {
+  padding: 0 7px;
+  font-size: 11px;
+  line-height: 1.15;
+  min-height: 0;
+}
 .leftover-hunt {
   margin-top: 0;
   flex: 0 0 auto;
   min-height: 44px;
   min-width: 84px;
   padding: 8px 10px;
-  font-size: 13px;
+  font-size: 12.5px;
+  white-space: nowrap;
 }
 .fighter-compact { gap: 2px; }
 .weapon-card { margin: 0; }

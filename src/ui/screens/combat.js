@@ -30,27 +30,31 @@ export const COMBAT_360 = {
   xpBlock: 40,
   lobbyHead: 50,
   gap: 3,
-  kicker: 16,
-  fighter: 30,
-  acc: 28,
-  oil: 16,
+  leftoverGap: 2,
+  leftoverStationTop: 161, // 360 wrapped topbar 105 + pad 8 + detail-head 44 + gap 4
+  kicker: 14,
+  fighter: 26,
+  acc: 26,
+  oil: 14,
   eat: 44,
   hand: 44,
   styles: 44,
   keep: 44,
   hunt: 44,
-  loot: 22,
+  loot: 18,
   souls: 32,
   zoneChips: 44,
   huntCardAboveBtn: 140,
-  logLine: 15,
+  logLine: 15, // 12px × 1.2, rounded up for subpixel wraps
   logGap: 1,
   logPadY: 6,
   logLinesLeftover: 4,
   logWrapFight: 64,
-  /** 72px+ so a wrapping kill line still fits four leftover rows. */
-  logWrapLeftover: 88,
+  /** Two 28.8px wraps + two singles + pad/gaps; 88px clips line 4. */
+  logWrapLeftover: 100,
   leftoverKillWrapRows: 2,
+  /** Kill line + oil line wrap; two later singles. Newest-first leftover log. */
+  leftoverLogWrapRows: [2, 2, 1, 1],
 };
 
 /** Log box vs tab bar on a 360×640 fight or leftover cockpit (flex-pinned). */
@@ -63,13 +67,15 @@ export function cockpitLogVsTab(kind = 'leftover') {
   const logTop = logBottom - wrapH;
   const padTop = C.logPadY / 2;
   const n = kind === 'leftover' ? C.logLinesLeftover : 4;
+  const wrapRows = kind === 'leftover' ? C.leftoverLogWrapRows : null;
   const lines = [];
   let y = logTop + padTop;
   for (let i = 0; i < n; i++) {
-    const rows = kind === 'leftover' && i === 0 ? C.leftoverKillWrapRows : 1;
+    const rows = wrapRows?.[i] ?? (kind === 'leftover' && i === 0 ? C.leftoverKillWrapRows : 1);
     const top = y;
-    const bottom = y + rows * C.logLine + (rows - 1) * C.logGap;
-    lines.push({ top, bottom, index: i + 1 });
+    // A wrapping .log-line is one block; wrap rows do not add logGap.
+    const bottom = y + rows * C.logLine;
+    lines.push({ top, bottom, index: i + 1, rows });
     y = bottom + C.logGap;
   }
   const line4 = lines[3] ?? lines[lines.length - 1];
@@ -83,6 +89,31 @@ export function cockpitLogVsTab(kind = 'leftover') {
     lines,
     line4Bottom: line4?.bottom ?? logBottom,
     fits: logBottom < tabTop && leftoverFits,
+  };
+}
+
+/**
+ * Leftover 360 geometry after kill (loot chips) or Fall back (no loot).
+ * leftover-station is height-capped to the hub; .cockpit-fill eats the
+ * chrome remainder so loot cannot shove logWrap.bottom into the tab.
+ */
+export function leftoverLogVsTab({ loot = true } = {}) {
+  const C = COMBAT_360;
+  const box = cockpitLogVsTab('leftover');
+  const stationTop = C.leftoverStationTop;
+  const lootH = loot ? C.loot : 0;
+  const chromeItems = 8 + (loot ? 1 : 0);
+  const chrome = C.kicker + 2 * C.fighter + C.acc + C.oil + C.eat + C.hand + C.styles + lootH;
+  const chromeGaps = (C.leftoverGap ?? C.gap) * chromeItems;
+  const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
+  return {
+    ...box,
+    loot,
+    lootH,
+    fillH,
+    stationTop,
+    stationBottom: box.logBottom,
+    fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop,
   };
 }
 
