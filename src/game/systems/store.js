@@ -4,7 +4,7 @@
 // deterministic and offline/live never disagree.
 
 import { ITEMS_BY_ID } from '../data/items.js';
-import { recordLumenSpend } from './stats.js';
+import { recordLumenSpend, recordItemFound } from './stats.js';
 import { markDiscovered } from './discovered.js';
 import { canAcceptStack, PACK_FULL_MSG } from './lantern-room.js';
 import {
@@ -15,8 +15,12 @@ import {
 
 function bankAdd(bank, itemId, qty, state) {
   if (!Number.isFinite(qty) || qty <= 0) return;
-  bank[itemId] = (bank[itemId] ?? 0) + Math.floor(qty);
-  if (state) markDiscovered(state, itemId);
+  const n = Math.floor(qty);
+  bank[itemId] = (bank[itemId] ?? 0) + n;
+  if (state) {
+    markDiscovered(state, itemId);
+    recordItemFound(state, itemId, n);
+  }
 }
 
 export function ensureStore(state) {

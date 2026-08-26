@@ -463,6 +463,10 @@ test('v4 saves gain an empty discovered map (v4→v5)', () => {
   assert.equal(logCategoryStats(state).find((r) => r.id === 'items').done, 0);
   assert.equal(state.radiance, 3);
   assert.equal(state.bank.tinderscrap, 12);
+  assert.deepEqual(state.bankLocks, []);
+  assert.deepEqual(state.stats.itemFound, {});
+  assert.deepEqual(state.stats.itemSold, {});
+  assert.deepEqual(state.stats.itemLumen, {});
 });
 
 test('S4d-only v5 saves keep discovered and gain eat/station defaults without v6', () => {
@@ -481,4 +485,6 @@ test('S4d-only v5 saves keep discovered and gain eat/station defaults without v6
   assert.equal(state.combat.foodId, null);
   assert.equal(state.combat.lastStation, null);
   assert.equal(state.combat.kills['pale-moth'], 1);
+  assert.deepEqual(state.bankLocks, []);
+  assert.deepEqual(state.stats.itemFound, {});
 });

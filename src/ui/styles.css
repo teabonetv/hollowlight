@@ -150,7 +150,8 @@ body {
   color: var(--gold-hi);
   border-color: rgba(217, 164, 65, 0.35);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
 }
 
 .icon-btn {
@@ -594,6 +595,13 @@ body {
 .bank-glyph.glyph-lanternleaf { color: #d4c070; }
 .bank-glyph.glyph-myrrh { color: #c4a060; }
 .bank-glyph.glyph-mushroom { color: #b7c48a; }
+.bank-glyph.glyph-morel { color: #c4b898; }
+.bank-glyph.glyph-inkcap { color: #8a90a8; }
+.bank-glyph.glyph-puffball { color: #d4c8a0; }
+.bank-glyph.glyph-earfungus { color: #a87878; }
+.bank-glyph.glyph-sporecloud { color: #9ad4b0; }
+.bank-glyph.glyph-bracket { color: #b07050; }
+.bank-glyph.glyph-lichen { color: #7aa090; }
 .bank-glyph.glyph-reed { color: #c4b07a; }
 .bank-glyph.glyph-loaf { color: #d4a574; }
 .bank-glyph.glyph-vial { color: #8cb8d4; }
@@ -619,6 +627,15 @@ body {
   overflow: hidden;
   text-overflow: clip;
   white-space: nowrap;
+}
+.bank-stall-pip {
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  color: #c09068;
+  letter-spacing: -0.01em;
+  pointer-events: none;
+  max-width: 100%;
 }
 .bank-tile-dense {
   min-height: 96px;
@@ -646,19 +663,19 @@ body {
 }
 .bank-sell-qty {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 .bank-sell-qty-btn {
   appearance: none;
   min-height: 44px;
   min-width: 44px;
-  padding: 8px 6px;
+  padding: 8px 4px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel);
   color: var(--muted);
-  font-size: 14px;
+  font-size: 12px;
   cursor: pointer;
 }
 .bank-sell-qty-btn.active {
@@ -1018,6 +1035,20 @@ html.reduced-motion *::after {
   margin-bottom: 4px;
 }
 .sell-primary .btn { width: 100%; min-height: 44px; }
+.sell-keep1-btn { grid-column: 1 / -1; }
+.sell-pin-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.sell-pin-row .btn { min-height: 44px; min-width: 44px; }
+.sell-stack-stats {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
 .sell-actions { display: flex; gap: 8px; margin-bottom: 8px; }
 .sell-actions .btn { flex: 1; min-height: 46px; }
 .sell-custom {
@@ -1261,8 +1292,21 @@ html.reduced-motion *::after {
   min-height: 0;
   line-height: 1;
 }
-.bank-tile-catalogue .bank-pin { position: static; }
+.bank-lock {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  width: 14px;
+  height: 14px;
+  color: var(--gold-lo);
+  pointer-events: none;
+  line-height: 0;
+}
+.bank-lock svg { width: 14px; height: 14px; display: block; }
+.bank-tile-catalogue .bank-pin,
+.bank-tile-catalogue .bank-lock { position: static; }
 .bank-tile.pinned { border-color: var(--gold); }
+.bank-tile.locked { border-style: dashed; }
 
 .preset-actions { display: flex; flex-direction: column; gap: 8px; }
 .preset-list { display: flex; flex-direction: column; gap: 8px; }

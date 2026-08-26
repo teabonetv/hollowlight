@@ -78,12 +78,23 @@ export const MIGRATIONS = [
     from: 4,
     migrate(state) {
       const combat = state.combat ?? createCombatState();
+      const stats = state.stats && typeof state.stats === 'object' ? state.stats : {};
       return {
         ...state,
         discovered: (state.discovered && typeof state.discovered === 'object'
           && !Array.isArray(state.discovered))
           ? state.discovered
           : {},
+        bankLocks: Array.isArray(state.bankLocks) ? state.bankLocks : [],
+        stats: {
+          ...stats,
+          itemFound: (stats.itemFound && typeof stats.itemFound === 'object'
+            && !Array.isArray(stats.itemFound)) ? stats.itemFound : {},
+          itemSold: (stats.itemSold && typeof stats.itemSold === 'object'
+            && !Array.isArray(stats.itemSold)) ? stats.itemSold : {},
+          itemLumen: (stats.itemLumen && typeof stats.itemLumen === 'object'
+            && !Array.isArray(stats.itemLumen)) ? stats.itemLumen : {},
+        },
         combat: {
           ...combat,
           foodId: combat.foodId ?? null,

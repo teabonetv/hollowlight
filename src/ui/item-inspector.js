@@ -5,9 +5,10 @@ import { el, clear } from './dom.js';
 import { formatNumber } from '../core/format.js';
 import { ITEMS_BY_ID } from '../game/data/items.js';
 import { ACTIONS } from '../game/data/actions.js';
-import { bankCount, needsSellConfirm, isPinned } from '../game/systems/bank.js';
+import { bankCount, needsSellConfirm, isPinned, isLocked, sellQtyForMode } from '../game/systems/bank.js';
 import { liveSellUnit } from '../game/systems/store.js';
 import { sparksFor } from '../game/systems/offerings.js';
+import { itemTimesFound, itemTimesSold, itemLumenTaken } from '../game/systems/stats.js';
 import {
   sellConfirmPending, clearSellConfirm, armSellConfirm, SELL_CONFIRM_WINDOW_MS,
 } from './sell-confirm.js';
@@ -15,6 +16,14 @@ import {
 /** First-paint price law: catalog vs live stall, named — not two naked numbers. */
 export function inspectorPriceLawLine(item, liveUnit) {
   return `catalog ✦${item.sell} · stall today ✦${liveUnit} (Fair Trade / stall pressure)`;
+}
+
+/** Melvor Times Found — derived from live counters, repainted on every inspect. */
+export function inspectorStackStatsLine(state, itemId) {
+  const found = itemTimesFound(state, itemId);
+  const sold = itemTimesSold(state, itemId);
+  const taken = itemLumenTaken(state, itemId);
+  return `times found ${formatNumber(found)} · sold ${formatNumber(sold)} · lumen taken ✦${formatNumber(taken)}`;
 }
 
 function itemMeta(item) {
@@ -46,39 +55,66 @@ export function createItemInspector(ctx, itemId, {
   const qtyLabel = el('span', { class: 'sell-qty' });
   const worthLabel = el('span', { class: 'sell-worth gold' });
   const priceLaw = el('span', { class: 'sell-price-law' });
+  const statsLine = el('span', { class: 'sell-stack-stats' });
   const confirmBtn = el('button', {
     class: 'btn btn-wide sell-all-btn',
     'aria-live': 'assertive',
   });
+  const keep1Btn = el('button', {
+    class: 'btn btn-ghost btn-wide sell-keep1-btn',
+  }, 'Sell all-but-1');
 
   function awaitingConfirm() { return sellConfirmPending(itemId); }
   function ownedQty() { return bankCount(ctx.state.bank, itemId); }
   function unitPrice() { return liveSellUnit(ctx.state, itemId); }
+  function locked() { return isLocked(ctx.state, itemId); }
+
+  function paintStats() {
+    statsLine.textContent = inspectorStackStatsLine(ctx.state, itemId);
+  }
 
   function paintButtons() {
     const qty = ownedQty();
     const unit = unitPrice();
+    const held = locked();
     qtyLabel.textContent = `${formatNumber(qty)} in the bank`;
     worthLabel.textContent = `stack worth ✦${formatNumber(qty * unit)} at today’s stall`;
     priceLaw.textContent = inspectorPriceLawLine(item, unit);
+    paintStats();
 
+    const canSell = qty >= 1 && !held;
     sell1Btn.textContent = 'Sell 1';
-    sell1Btn.disabled = qty < 1;
-    sell1Btn.setAttribute('aria-disabled', qty < 1 ? 'true' : 'false');
+    sell1Btn.disabled = !canSell;
+    sell1Btn.setAttribute('aria-disabled', canSell ? 'false' : 'true');
     sell10Btn.textContent = 'Sell 10';
     sell100Btn.textContent = 'Sell 100';
     clear(sellActions);
-    if (qty >= 10) sellActions.append(sell10Btn);
-    if (qty >= 100) sellActions.append(sell100Btn);
+    if (qty >= 10 && !held) sellActions.append(sell10Btn);
+    if (qty >= 100 && !held) sellActions.append(sell100Btn);
     sellActions.style.display = sellActions.children.length ? '' : 'none';
 
     sellQtyInput.setAttribute('max', String(Math.max(1, qty)));
     const typed = Math.floor(Number(sellQtyInput.value));
     if (!Number.isFinite(typed) || typed < 1) sellQtyInput.value = qty >= 1 ? '1' : '0';
     else if (typed > qty) sellQtyInput.value = String(qty);
-    sellQtyInput.disabled = qty < 1;
-    sellCustomBtn.disabled = qty < 1;
-    sellCustomRow.style.display = qty >= 1 ? '' : 'none';
+    sellQtyInput.disabled = !canSell;
+    sellCustomBtn.disabled = !canSell;
+    sellCustomRow.style.display = qty >= 1 && !held ? '' : 'none';
+
+    const keepQty = sellQtyForMode('keep1', qty);
+    keep1Btn.style.display = qty >= 2 && !held ? '' : 'none';
+    keep1Btn.disabled = keepQty < 1;
+    keep1Btn.textContent = keepQty >= 1
+      ? `Sell all-but-1 — ✦${formatNumber(keepQty * unit)}`
+      : 'Sell all-but-1';
+
+    if (held) {
+      clearSellConfirm(itemId);
+      confirmBtn.className = 'btn btn-ghost btn-wide btn-disabled sell-all-btn';
+      confirmBtn.textContent = 'Locked — unlock to sell';
+      confirmBtn.setAttribute('aria-disabled', 'true');
+      return;
+    }
 
     if (qty <= 0) {
       clearSellConfirm(itemId);
@@ -106,6 +142,7 @@ export function createItemInspector(ctx, itemId, {
     ctx.toast(`Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`, 'success');
     paintButtons();
     paintOffer();
+    paintLock();
     if (ownedQty() <= 0) onEmpty?.();
   }
 
@@ -128,6 +165,14 @@ export function createItemInspector(ctx, itemId, {
   const sellCustomRow = el('div', { class: 'sell-custom' },
     sellQtyInput, sellCustomBtn);
   const sellActions = el('div', { class: 'sell-actions' });
+  keep1Btn.addEventListener('click', () => {
+    const qty = sellQtyForMode('keep1', ownedQty());
+    if (qty <= 0) {
+      ctx.toast(`Keeping the last ${item.name}.`, 'info');
+      return;
+    }
+    doSell(qty);
+  });
 
   let expiryTimer = 0;
   function armConfirm() {
@@ -154,6 +199,7 @@ export function createItemInspector(ctx, itemId, {
     uses.slice(0, 4).map((u) => el('span', { class: 'chip chip-cost' }, u)));
 
   const pinBtn = el('button', { class: 'btn btn-ghost btn-small' });
+  const lockBtn = el('button', { class: 'btn btn-ghost btn-small' });
   function paintPin() {
     if (!ctx.togglePin) { pinBtn.style.display = 'none'; return; }
     pinBtn.style.display = '';
@@ -162,6 +208,17 @@ export function createItemInspector(ctx, itemId, {
   pinBtn.addEventListener('click', () => {
     ctx.togglePin?.(itemId);
     paintPin();
+  });
+  function paintLock() {
+    if (!ctx.toggleLock) { lockBtn.style.display = 'none'; return; }
+    lockBtn.style.display = '';
+    lockBtn.textContent = isLocked(ctx.state, itemId) ? 'Unlock' : 'Lock';
+    lockBtn.setAttribute('aria-pressed', isLocked(ctx.state, itemId) ? 'true' : 'false');
+  }
+  lockBtn.addEventListener('click', () => {
+    ctx.toggleLock?.(itemId);
+    paintLock();
+    paintButtons();
   });
 
   const offerBtn = el('button', { class: 'btn btn-ghost btn-wide' });
@@ -189,11 +246,14 @@ export function createItemInspector(ctx, itemId, {
     el('br'),
     qtyLabel,
     el('br'),
-    worthLabel);
-  const sellPrimary = el('div', { class: 'sell-primary' }, sell1Btn, confirmBtn);
+    worthLabel,
+    el('br'),
+    statsLine);
+  const sellPrimary = el('div', { class: 'sell-primary' }, sell1Btn, confirmBtn, keep1Btn);
+  const pinRow = el('div', { class: 'sell-pin-row' }, pinBtn, lockBtn);
   const lore = el('div', { class: 'item-inspector-lore' },
     el('p', { class: 'sell-flavor' }, `“${item.flavor}”`),
-    pinBtn,
+    pinRow,
     useChips,
     sellActions,
     sellCustomRow,
@@ -206,13 +266,14 @@ export function createItemInspector(ctx, itemId, {
 
   paintButtons();
   paintPin();
+  paintLock();
   paintOffer();
 
   return {
     node,
     title: item.name,
     itemId,
-    repaint: () => { paintButtons(); paintPin(); paintOffer(); },
+    repaint: () => { paintButtons(); paintPin(); paintLock(); paintOffer(); },
     dispose: () => { clearSellConfirm(itemId); clearTimeout(expiryTimer); },
   };
 }

@@ -29,7 +29,7 @@ import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
 import * as combat from '../game/systems/combat.js';
-import { sellItems, togglePin as pinItem, savePreset as writePreset, applyPreset as usePreset,
+import { sellItems, togglePin as pinItem, toggleLock as lockItem, savePreset as writePreset, applyPreset as usePreset,
   deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot } from '../game/systems/bank.js';
 import * as storeSys from '../game/systems/store.js';
 import { offerItems } from '../game/systems/offerings.js';
@@ -56,7 +56,7 @@ import { shouldRebuildScreen } from './live-paint.js';
 const AUTOSAVE_MS = 30_000;
 const UI_KEY = 'hollowlight.ui';
 const UI_TABS = new Set(['camp', 'skills', 'bank', 'map', 'journal']);
-const SELL_QTY_MODES = new Set(['1', '10', 'dump']);
+const SELL_QTY_MODES = new Set(['1', '10', 'keep1', 'dump']);
 const PACK_FULL_TOAST_MS = 8000;
 
 function boot() {
@@ -266,6 +266,7 @@ function boot() {
         campView: ui.campView,
         sellMode: !!ui.sellMode,
         sellQtyMode: SELL_QTY_MODES.has(ui.sellQtyMode) ? ui.sellQtyMode : '1',
+        bankLocks: [...(game?.bankLocks ?? [])],
       }));
     } catch { /* quota / private mode */ }
   }
@@ -293,6 +294,12 @@ function boot() {
     ui.campView = saved.tab === 'camp' && saved.campView === 'store' ? 'store' : null;
     ui.sellMode = !!saved.sellMode;
     ui.sellQtyMode = SELL_QTY_MODES.has(saved.sellQtyMode) ? saved.sellQtyMode : '1';
+    if (Array.isArray(saved.bankLocks) && game) {
+      game.bankLocks ??= [];
+      for (const id of saved.bankLocks) {
+        if (typeof id === 'string' && !game.bankLocks.includes(id)) game.bankLocks.push(id);
+      }
+    }
     return true;
   }
 
@@ -389,6 +396,11 @@ function boot() {
     },
     togglePin(itemId) {
       pinItem(game, itemId);
+      afterMutation();
+    },
+    toggleLock(itemId) {
+      lockItem(game, itemId);
+      writeUiRoute();
       afterMutation();
     },
     savePreset(kind) {

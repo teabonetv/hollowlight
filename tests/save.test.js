@@ -113,3 +113,24 @@ test('storage set/get round-trip through a working backend', () => {
   storageSet(store, 'hello');
   assert.equal(storageGet(store), 'hello');
 });
+
+test('v5 envelope stays 5; missing lock and stack-stat maps hydrate empty', () => {
+  assert.equal(SAVE_VERSION, 5);
+  const json = JSON.stringify({
+    version: 5,
+    savedAt: 1,
+    state: {
+      lumen: 20,
+      bank: { tinderscrap: 4 },
+      stats: { playtimeMs: 10 },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(state.schemaVersion ?? SAVE_VERSION, SAVE_VERSION);
+  assert.deepEqual(state.bankLocks, []);
+  assert.deepEqual(state.stats.itemFound, {});
+  assert.deepEqual(state.stats.itemSold, {});
+  assert.deepEqual(state.stats.itemLumen, {});
+  const round = JSON.parse(serializeSave(state, 1));
+  assert.equal(round.version, 5);
+});

@@ -4,7 +4,7 @@
 
 import { ITEMS, ITEMS_BY_ID, BANK_TABS } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
-import { recordSell } from './stats.js';
+import { recordSell, recordItemFound } from './stats.js';
 import { markDiscovered, isDiscovered } from './discovered.js';
 import {
   BASE_LANTERN_ROOM, SATCHEL_ROOM_PER_TIER, PACK_FULL_MSG,
@@ -25,8 +25,12 @@ export function bankCount(bank, itemId) {
 
 export function bankAdd(bank, itemId, qty, state) {
   if (!Number.isFinite(qty) || qty <= 0) return;
-  bank[itemId] = (bank[itemId] ?? 0) + Math.floor(qty);
-  if (state) markDiscovered(state, itemId);
+  const n = Math.floor(qty);
+  bank[itemId] = (bank[itemId] ?? 0) + n;
+  if (state) {
+    markDiscovered(state, itemId);
+    recordItemFound(state, itemId, n);
+  }
 }
 
 /**
@@ -81,6 +85,15 @@ export function needsSellConfirm(qty, item) {
   return qty > SELL_CONFIRM_THRESHOLD;
 }
 
+/** Grid / inspector qty modes. `keep1` is Melvor All-but-1; Dump still clears. */
+export function sellQtyForMode(mode, owned) {
+  const n = Math.max(0, Math.floor(owned));
+  if (mode === 'dump') return n;
+  if (mode === 'keep1') return Math.max(0, n - 1);
+  if (mode === '10') return Math.min(10, n);
+  return Math.min(1, n);
+}
+
 /**
  * Sell `qty` of `itemId` from the bank.
  * Pays the live stall unit (registry sell at 0 pressure; see store.js curve).
@@ -90,6 +103,7 @@ export function needsSellConfirm(qty, item) {
 export function sellItems(state, itemId, qty) {
   const item = ITEMS_BY_ID[itemId];
   if (!item) return { ok: false, error: 'Unknown item.' };
+  if (isLocked(state, itemId)) return { ok: false, error: 'Locked. Unlock to sell.' };
   const owned = bankCount(state.bank, itemId);
   const n = Math.min(Math.floor(qty), owned);
   if (!Number.isFinite(n) || n <= 0) {
@@ -101,7 +115,7 @@ export function sellItems(state, itemId, qty) {
   const gained = n * unit;
   state.lumen += gained;
   addSellPressure(state, itemId, n);
-  recordSell(state, n, gained);
+  recordSell(state, n, gained, itemId);
   return { ok: true, sold: n, gained, unit };
 }
 
@@ -121,6 +135,7 @@ export function matchesQuery(item, query) {
 export function ensureBankMeta(state) {
   if (!Array.isArray(state.bankPins)) state.bankPins = [];
   if (!Array.isArray(state.bankPresets)) state.bankPresets = [];
+  if (!Array.isArray(state.bankLocks)) state.bankLocks = [];
   return state;
 }
 
@@ -134,6 +149,18 @@ export function togglePin(state, itemId) {
   if (i >= 0) state.bankPins.splice(i, 1);
   else state.bankPins.push(itemId);
   return isPinned(state, itemId);
+}
+
+export function isLocked(state, itemId) {
+  return (state.bankLocks ?? []).includes(itemId);
+}
+
+export function toggleLock(state, itemId) {
+  ensureBankMeta(state);
+  const i = state.bankLocks.indexOf(itemId);
+  if (i >= 0) state.bankLocks.splice(i, 1);
+  else state.bankLocks.push(itemId);
+  return isLocked(state, itemId);
 }
 
 /** Working bank hides ghosts; Catalogue (`all`) is the opt-in atlas. */

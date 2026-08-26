@@ -6,10 +6,11 @@ import { filledIcon } from '../icons.js';
 import { ITEMS, ITEM_CATEGORIES, DEFAULT_BANK_TAB } from '../../game/data/items.js';
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import {
-  bankCount, bankSellValue, filterItems, isPinned, isCatalogueTab, visibleBankTabs,
-  needsSellConfirm, uniqueStackCount, lanternRoom,
+  bankCount, bankSellValue, filterItems, isPinned, isLocked, isCatalogueTab, visibleBankTabs,
+  needsSellConfirm, uniqueStackCount, lanternRoom, sellQtyForMode,
 } from '../../game/systems/bank.js';
 import { formatNumber } from '../../core/format.js';
+import { liveSellUnit } from '../../game/systems/store.js';
 import { createItemInspector } from '../item-inspector.js';
 import {
   sellConfirmPending, clearSellConfirm, armSellConfirm, SELL_CONFIRM_WINDOW_MS,
@@ -73,7 +74,13 @@ export function itemTileChrome(item, qty) {
   return `✦${item.sell} · ×${formatNumber(qty)}`;
 }
 
-const SELL_QTY_MODES = new Set(['1', '10', 'dump']);
+/** Live stall pip when catalog ✦ silently disagrees with the inspector. */
+export function itemTileStallPip(item, liveUnit) {
+  if (!item || !Number.isFinite(liveUnit) || liveUnit === item.sell) return '';
+  return `stall ✦${liveUnit}`;
+}
+
+const SELL_QTY_MODES = new Set(['1', '10', 'keep1', 'dump']);
 
 export function renderBankScreen(ctx) {
   const headerSub = el('p', { class: 'screen-sub' });
@@ -141,17 +148,17 @@ export function renderBankScreen(ctx) {
   }, 'Sell Mode');
   const qty1Btn = el('button', { type: 'button', class: 'bank-sell-qty-btn', 'data-qty': '1' }, '×1');
   const qty10Btn = el('button', { type: 'button', class: 'bank-sell-qty-btn', 'data-qty': '10' }, '×10');
+  const keep1Btn = el('button', { type: 'button', class: 'bank-sell-qty-btn', 'data-qty': 'keep1' }, 'All-but-1');
   const dumpBtn = el('button', { type: 'button', class: 'bank-sell-qty-btn', 'data-qty': 'dump' }, 'Dump');
   const sellHint = el('p', { class: 'bank-sell-hint muted small' });
   const sellQtyRow = el('div', { class: 'bank-sell-qty', role: 'group', 'aria-label': 'Sell quantity' },
-    qty1Btn, qty10Btn, dumpBtn);
+    qty1Btn, qty10Btn, keep1Btn, dumpBtn);
 
   function requestedQty(itemId) {
-    const owned = bankCount(ctx.state.bank, itemId);
-    if (sellQtyMode === 'dump') return owned;
-    if (sellQtyMode === '10') return Math.min(10, owned);
-    return Math.min(1, owned);
+    return sellQtyForMode(sellQtyMode, bankCount(ctx.state.bank, itemId));
   }
+
+  const qtyButtons = [[qty1Btn, '1'], [qty10Btn, '10'], [keep1Btn, 'keep1'], [dumpBtn, 'dump']];
 
   function paintSellBar() {
     root.classList.toggle('bank-selling', sellMode);
@@ -160,7 +167,7 @@ export function renderBankScreen(ctx) {
     sellToggle.textContent = sellMode ? 'Selling' : 'Sell Mode';
     sellQtyRow.style.display = sellMode ? '' : 'none';
     sellHint.style.display = sellMode ? '' : 'none';
-    for (const [btn, mode] of [[qty1Btn, '1'], [qty10Btn, '10'], [dumpBtn, 'dump']]) {
+    for (const [btn, mode] of qtyButtons) {
       const on = sellQtyMode === mode;
       btn.className = `bank-sell-qty-btn${on ? ' active' : ''}`;
       btn.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -169,8 +176,10 @@ export function renderBankScreen(ctx) {
       sellHint.textContent = '';
       return;
     }
-    const verb = sellQtyMode === 'dump' ? 'dump' : `sell ×${sellQtyMode}`;
-    sellHint.textContent = `Tap a stack to ${verb}. Catalog ✦ on the tile; inspector stays for lore.`;
+    const verb = sellQtyMode === 'dump' ? 'dump'
+      : sellQtyMode === 'keep1' ? 'sell all-but-1'
+      : `sell ×${sellQtyMode}`;
+    sellHint.textContent = `Tap a stack to ${verb}. Catalog ✦ on the tile; stall pip when they differ.`;
   }
 
   sellToggle.addEventListener('click', () => {
@@ -179,7 +188,7 @@ export function renderBankScreen(ctx) {
     paintSellBar();
     syncGrid();
   });
-  for (const [btn, mode] of [[qty1Btn, '1'], [qty10Btn, '10'], [dumpBtn, 'dump']]) {
+  for (const [btn, mode] of qtyButtons) {
     btn.addEventListener('click', () => {
       sellQtyMode = mode;
       ctx.setSellQtyMode?.(mode);
@@ -213,11 +222,21 @@ export function renderBankScreen(ctx) {
     const rec = tiles.get(itemId);
     const item = rec?.item;
     if (!item || !ctx.sell) return;
+    if (isLocked(ctx.state, itemId)) {
+      ctx.toast(`Unlock ${item.name} to sell.`, 'warn');
+      return;
+    }
     const qty = requestedQty(itemId);
-    if (qty <= 0) return;
+    if (qty <= 0) {
+      if (sellQtyMode === 'keep1') ctx.toast(`Keeping the last ${item.name}.`, 'info');
+      return;
+    }
     if (needsSellConfirm(qty, item) && !sellConfirmPending(itemId)) {
       armSellConfirm(itemId, Date.now() + SELL_CONFIRM_WINDOW_MS);
-      ctx.toast(`Tap again to ${sellQtyMode === 'dump' ? 'dump' : 'sell'} ${item.name} ×${formatNumber(qty)}.`, 'warn');
+      const verb = sellQtyMode === 'dump' ? 'dump'
+        : sellQtyMode === 'keep1' ? 'sell all-but-1'
+        : 'sell';
+      ctx.toast(`Tap again to ${verb} ${item.name} ×${formatNumber(qty)}.`, 'warn');
       paintSellBar();
       return;
     }
@@ -257,42 +276,55 @@ export function renderBankScreen(ctx) {
   function makeTile(it) {
     const qtyEl = el('span', { class: 'bank-qty' });
     const chromeEl = el('span', { class: 'bank-chrome' });
+    const stallEl = el('span', { class: 'bank-stall-pip' });
     const pinMark = el('span', { class: 'bank-pin' });
+    const lockMark = el('span', { class: 'bank-lock', 'aria-hidden': 'true' });
     const glyphEl = el('span', { class: 'bank-glyph', 'aria-hidden': 'true' });
     const nameEl = el('span', { class: 'bank-name' }, it.name);
     const tile = el('button', {
       type: 'button',
       'data-item': it.id,
       onclick: () => inspect(it.id),
-    }, pinMark, qtyEl, glyphEl, nameEl, chromeEl);
-    return { item: it, tile, qtyEl, chromeEl, pinMark, glyphEl, nameEl };
+    }, pinMark, lockMark, qtyEl, glyphEl, nameEl, chromeEl, stallEl);
+    return { item: it, tile, qtyEl, chromeEl, stallEl, pinMark, lockMark, glyphEl, nameEl };
   }
 
   function paintTile(rec, dense) {
-    const { item: it, tile, qtyEl, chromeEl, pinMark, glyphEl, nameEl } = rec;
+    const { item: it, tile, qtyEl, chromeEl, stallEl, pinMark, lockMark, glyphEl, nameEl } = rec;
     const qty = bankCount(ctx.state.bank, it.id);
     const pinned = isPinned(ctx.state, it.id);
+    const held = isLocked(ctx.state, it.id);
     const rarity = it.unique ? 'unique' : it.rare ? 'rare' : `tier-${it.tier ?? 1}`;
     const glyph = itemTileGlyph(it);
+    const live = qty > 0 ? liveSellUnit(ctx.state, it.id) : it.sell;
+    const stallPip = qty > 0 ? itemTileStallPip(it, live) : '';
     tile.className = [
       'bank-tile',
       dense ? 'bank-tile-dense' : 'bank-tile-catalogue',
       qty > 0 ? 'owned' : 'unowned',
       pinned ? 'pinned' : '',
+      held ? 'locked' : '',
+      stallPip ? 'stall-divergent' : '',
       selectedId === it.id ? 'selected' : '',
       `cat-${it.category}`,
       `glyph-${glyph}`,
       rarity,
     ].filter(Boolean).join(' ');
     const sellBit = qty > 0 ? `, catalog ✦${it.sell} each` : '';
-    const action = sellMode && qty > 0 ? 'Sell' : 'Inspect';
+    const stallBit = stallPip ? `, ${stallPip}` : '';
+    const lockBit = held ? ', locked' : '';
+    const action = sellMode && qty > 0 ? (held ? 'Locked' : 'Sell') : 'Inspect';
     tile.title = qty > 0 ? `${action} ${it.name}` : it.flavor;
-    tile.setAttribute('aria-label', `${it.name}, ${qty} owned${sellBit}`);
+    tile.setAttribute('aria-label', `${it.name}, ${qty} owned${sellBit}${stallBit}${lockBit}`);
     qtyEl.textContent = qty > 0 ? formatNumber(qty) : '—';
     qtyEl.className = dense ? 'bank-qty visually-hidden' : 'bank-qty';
     chromeEl.textContent = qty > 0 ? itemTileChrome(it, qty) : '';
     chromeEl.className = dense && qty > 0 ? 'bank-chrome' : 'bank-chrome visually-hidden';
+    stallEl.textContent = stallPip;
+    stallEl.className = dense && stallPip ? 'bank-stall-pip' : 'bank-stall-pip visually-hidden';
     pinMark.textContent = pinned ? '★' : '';
+    lockMark.innerHTML = held ? filledIcon('lock') : '';
+    lockMark.className = held ? 'bank-lock' : 'bank-lock visually-hidden';
     glyphEl.className = `bank-glyph bank-glyph-fill glyph-${glyph}`;
     glyphEl.innerHTML = filledIcon(glyph);
     if (!glyphEl.innerHTML) glyphEl.textContent = itemTileInitials(it);

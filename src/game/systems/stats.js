@@ -60,13 +60,47 @@ export function emptyStats(nowMs = 0) {
   return s;
 }
 
+function hydrateCountMap(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(raw)) {
+    if (Number.isFinite(v) && v > 0) out[k] = Math.floor(v);
+  }
+  return out;
+}
+
 export function hydrateStats(stats, nowMs = 0) {
   const base = emptyStats(nowMs);
   const out = { ...base, ...(stats ?? {}) };
   for (const k of STAT_KEYS) {
     if (!Number.isFinite(out[k])) out[k] = base[k];
   }
+  // Per-stack inspector counters (Melvor Times Found). Missing maps stay
+  // empty — we do not invent history from current qty or capped journal logs.
+  out.itemFound = hydrateCountMap(out.itemFound);
+  out.itemSold = hydrateCountMap(out.itemSold);
+  out.itemLumen = hydrateCountMap(out.itemLumen);
   return out;
+}
+
+export function itemTimesFound(state, itemId) {
+  return state?.stats?.itemFound?.[itemId] ?? 0;
+}
+
+export function itemTimesSold(state, itemId) {
+  return state?.stats?.itemSold?.[itemId] ?? 0;
+}
+
+export function itemLumenTaken(state, itemId) {
+  return state?.stats?.itemLumen?.[itemId] ?? 0;
+}
+
+export function recordItemFound(state, itemId, qty) {
+  const n = Math.floor(qty);
+  if (!state || !itemId || !(n > 0)) return;
+  state.stats ??= {};
+  state.stats.itemFound ??= {};
+  state.stats.itemFound[itemId] = (state.stats.itemFound[itemId] ?? 0) + n;
 }
 
 /** Lifetime cycle count across every action. */
@@ -88,11 +122,19 @@ export function recordCycle(state, appliedGains = []) {
   }
 }
 
-export function recordSell(state, sold, gained) {
+export function recordSell(state, sold, gained, itemId) {
   state.stats ??= {};
   state.stats.sells = (state.stats.sells ?? 0) + 1;
   state.stats.itemsSold = (state.stats.itemsSold ?? 0) + sold;
   state.stats.lumenEarned = (state.stats.lumenEarned ?? 0) + gained;
+  if (itemId && sold > 0) {
+    state.stats.itemSold ??= {};
+    state.stats.itemSold[itemId] = (state.stats.itemSold[itemId] ?? 0) + sold;
+  }
+  if (itemId && gained > 0) {
+    state.stats.itemLumen ??= {};
+    state.stats.itemLumen[itemId] = (state.stats.itemLumen[itemId] ?? 0) + gained;
+  }
 }
 
 export function recordLumenSpend(state, qty) {

@@ -26,6 +26,7 @@ export function hydrateState(state) {
   };
   state.bankPins ??= [];
   state.bankPresets ??= [];
+  state.bankLocks = Array.isArray(state.bankLocks) ? state.bankLocks : [];
   state.store ??= { pressure: {}, pressureAt: {} };
   if (!Number.isFinite(state.lanternIntegrity)) state.lanternIntegrity = 100;
   state.dailies ??= null;
