@@ -2,7 +2,7 @@
 // neither module has to import the other at init time.
 
 import { ACTIONS } from './data/actions.js';
-import { hydrateStats } from './systems/stats.js';
+import { hydrateStats, floorItemFoundToHeld } from './systems/stats.js';
 import { ensureCombat } from './systems/combat.js';
 
 export function hydrateState(state) {
@@ -51,6 +51,7 @@ export function hydrateState(state) {
     }
   }
   state.stats = hydrateStats(state.stats, state.createdAt ?? 0);
+  floorItemFoundToHeld(state);
   state.log ??= [];
   return state;
 }

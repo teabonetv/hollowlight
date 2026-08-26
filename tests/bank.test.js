@@ -6,7 +6,8 @@ import {
   tryBankAdd, uniqueStackCount, lanternRoom, canAcceptStack,
   BASE_LANTERN_ROOM, PACK_FULL_MSG,
 } from '../src/game/systems/bank.js';
-import { createState } from '../src/game/state.js';
+import { createState, STARTER_BANK } from '../src/game/state.js';
+import { itemTimesFound } from '../src/game/systems/stats.js';
 import { applyGains } from '../src/game/systems/action-runner.js';
 import { buyFromStore } from '../src/game/systems/store.js';
 
@@ -71,6 +72,22 @@ test('lantern hollow starts at 12 and grows with Keeper\'s Satchel, not a slot s
   assert.equal(canAcceptStack(s, 'palecap'), true);
   s.campUpgrades = { 'foraging-satchel': 3 };
   assert.equal(lanternRoom(s), BASE_LANTERN_ROOM + 6);
+});
+
+test('Times Found is never 0 for a held stack — starter Rushwick is 5', () => {
+  const s = createState({ rngSeed: 1 });
+  assert.equal(s.bank.rushwick, STARTER_BANK.rushwick);
+  assert.equal(itemTimesFound(s, 'rushwick'), STARTER_BANK.rushwick);
+  assert.equal(s.discovered.rushwick, undefined, 'starter is not Almanac-discovered');
+  for (const [id, qty] of Object.entries(STARTER_BANK)) {
+    assert.equal(itemTimesFound(s, id), qty, `${id} starter Times Found matches held`);
+  }
+  const grew = tryBankAdd(s, 'rushwick', 3);
+  assert.equal(grew.ok, true);
+  assert.equal(itemTimesFound(s, 'rushwick'), STARTER_BANK.rushwick + 3);
+  assert.equal(itemTimesFound(s, 'palecap'), 0);
+  tryBankAdd(s, 'palecap', 10);
+  assert.equal(itemTimesFound(s, 'palecap'), 10);
 });
 
 test('unique-stack cap blocks a new kind when full; existing stacks still grow', () => {

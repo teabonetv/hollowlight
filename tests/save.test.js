@@ -4,7 +4,7 @@ import {
   SAVE_VERSION, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
   storageGet, storageSet,
 } from '../src/core/save.js';
-import { createState } from '../src/game/state.js';
+import { createState, hydrateState } from '../src/game/state.js';
 
 function fakeStorage() {
   const map = new Map();
@@ -19,6 +19,7 @@ test('serialize → deserialize round-trips the state byte-for-byte (deep equal)
   const s = createState({ nowMs: 1_000_000, rngSeed: 424242 });
   s.lumen = 777;
   s.bank.fogwort = 99;
+  hydrateState(s);
   s.skills.emberkeeping.xp = 5321;
   s.skills.emberkeeping.level = 8;
   s.actions.active['tend-flame'] = { progressMs: 1234 };
@@ -123,7 +124,7 @@ test('adoptedSavedAt honours the earlier of envelope and state stamps', () => {
   assert.equal(adoptedSavedAt(now - threeHours, undefined), now - threeHours);
 });
 
-test('v5 envelope stays 5; missing lock and stack-stat maps hydrate empty', () => {
+test('v5 envelope stays 5; missing lock hydrates; held stacks floor Times Found', () => {
   assert.equal(SAVE_VERSION, 5);
   const json = JSON.stringify({
     version: 5,
@@ -137,10 +138,29 @@ test('v5 envelope stays 5; missing lock and stack-stat maps hydrate empty', () =
   const { state } = deserializeSave(json);
   assert.equal(state.schemaVersion ?? SAVE_VERSION, SAVE_VERSION);
   assert.deepEqual(state.bankLocks, []);
-  assert.deepEqual(state.stats.itemFound, {});
+  assert.deepEqual(state.stats.itemFound, { tinderscrap: 4 });
   assert.deepEqual(state.stats.itemSold, {});
   assert.deepEqual(state.stats.itemLumen, {});
   const round = JSON.parse(serializeSave(state, 1));
   assert.equal(round.version, 5);
+});
 
+test('v5 hydrate floors found to held qty and never invents sold history', () => {
+  const json = JSON.stringify({
+    version: 5,
+    savedAt: 1,
+    state: {
+      lumen: 20,
+      bank: { rushwick: 5, palecap: 1 },
+      stats: {
+        itemFound: { palecap: 10 },
+        itemSold: { palecap: 9 },
+      },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(SAVE_VERSION, 5);
+  assert.equal(state.stats.itemFound.rushwick, 5, 'starter-like grant is counted as found');
+  assert.equal(state.stats.itemFound.palecap, 10, 'found 10 / held 1 stays 10');
+  assert.equal(state.stats.itemSold.palecap, 9);
 });

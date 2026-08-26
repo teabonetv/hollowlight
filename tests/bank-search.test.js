@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState } from '../src/game/state.js';
+import { createState, hydrateState } from '../src/game/state.js';
 import { ITEMS, ITEMS_BY_ID, validateItems } from '../src/game/data/items.js';
 import { serializeSave, deserializeSave, SAVE_VERSION } from '../src/core/save.js';
 import {
@@ -106,6 +106,7 @@ test('expanded registry + presets + store pressure round-trip through save v2', 
   s.cosmetics.bankTheme = 'dusk';
   s.cosmetics.unlocked = ['default', 'dusk'];
   s.radiance = 4;
+  hydrateState(s);
 
   const json = serializeSave(s, 123);
   assert.equal(JSON.parse(json).version, SAVE_VERSION);

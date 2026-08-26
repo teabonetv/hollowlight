@@ -31,6 +31,7 @@ const { formatHollowChip } = await import('../src/ui/hud.js');
 const { readFileSync } = await import('node:fs');
 const modals = await import('../src/ui/modals.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
+const { itemTimesFound } = await import('../src/game/systems/stats.js');
 const { formatNumber } = await import('../src/core/format.js');
 
 function makeCtx(state, overrides = {}) {
@@ -529,6 +530,11 @@ test('dense owned tile keeps catalog chrome and paints a stall pip when they div
 
 test('inspector stack stats pull times found / sold / lumen taken without a version bump', () => {
   const s = createState({ rngSeed: 1 });
+  assert.equal(itemTimesFound(s, 'rushwick'), STARTER_BANK.rushwick);
+  assert.equal(
+    inspectorStackStatsLine(s, 'rushwick'),
+    `times found ${STARTER_BANK.rushwick} · sold 0 · lumen taken ✦0`,
+  );
   assert.equal(inspectorStackStatsLine(s, 'palecap'), 'times found 0 · sold 0 · lumen taken ✦0');
   tryBankAdd(s, 'palecap', 3);
   assert.equal(inspectorStackStatsLine(s, 'palecap'), 'times found 3 · sold 0 · lumen taken ✦0');
@@ -547,7 +553,33 @@ test('inspector stack stats pull times found / sold / lumen taken without a vers
   assert.match(dock, /sold 2/);
   assert.match(dock, /lumen taken ✦/);
   assert.match(dock, /catalog ✦4 · stall today ✦/);
+  tileByName(scr.node, 'Rushwick').click();
+  const rushDock = scr.node.querySelector('.bank-inspector').textContent ?? '';
+  assert.match(rushDock, new RegExp(`times found ${STARTER_BANK.rushwick}`));
   globalThis.window = prev;
+});
+
+test('grid sell with a feat unlock is one toast, not sell + feat competing', () => {
+  const s = createState({ rngSeed: 3 });
+  const toasts = [];
+  let scr;
+  const ctx = makeCtx(s, {
+    openSellSheet() {},
+    toast: (m) => toasts.push(m),
+    sell(id, qty) {
+      const res = sellItems(s, id, qty);
+      res.feats = cascadeAchievements(s);
+      scr.update();
+      return res;
+    },
+  });
+  scr = tabs.renderBankScreen(ctx);
+  scr.node.querySelector('.bank-sell-toggle').click();
+  tileByName(scr.node, 'Tinderscrap').click();
+  assert.equal(toasts.length, 1, 'one mutation, one toast');
+  assert.match(toasts[0], /Sold Tinderscrap ×1 for ✦1/);
+  assert.match(toasts[0], /Feat: A Fair Trade/);
+  assert.equal(toasts.filter((m) => /^Sold /.test(m)).length, 1, 'do not double the same sell');
 });
 
 

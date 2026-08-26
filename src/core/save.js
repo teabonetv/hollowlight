@@ -88,6 +88,7 @@ export const MIGRATIONS = [
         bankLocks: Array.isArray(state.bankLocks) ? state.bankLocks : [],
         stats: {
           ...stats,
+          // Held-stack Times Found floor lives in hydrateState (no version bump).
           itemFound: (stats.itemFound && typeof stats.itemFound === 'object'
             && !Array.isArray(stats.itemFound)) ? stats.itemFound : {},
           itemSold: (stats.itemSold && typeof stats.itemSold === 'object'

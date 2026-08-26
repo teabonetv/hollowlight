@@ -229,6 +229,23 @@ test('Sell 1 from the Owned grid: HUD lumen == save.lumen same-eval', () => {
     assert.equal(state.lumen, lumenBefore + catalogDrop + 5, 'Fair Trade lumen is extra, not a catalog lie');
     const toastText = elements.toasts.textContent ?? '';
     assert.match(toastText, /A Fair Trade/);
+    assert.match(toastText, /Sold Tinderscrap/);
+    const toastNodes = elements.toasts.querySelectorAll('.toast');
+    const combined = toastNodes.filter((n) => {
+      const t = n.textContent ?? '';
+      return /Sold Tinderscrap/.test(t) && /A Fair Trade/.test(t);
+    });
+    const splitSell = toastNodes.filter((n) => {
+      const t = n.textContent ?? '';
+      return /Sold Tinderscrap/.test(t) && !/A Fair Trade/.test(t);
+    });
+    const splitFeat = toastNodes.filter((n) => {
+      const t = n.textContent ?? '';
+      return /A Fair Trade/.test(t) && !/Sold Tinderscrap/.test(t);
+    });
+    assert.equal(combined.length, 1, 'sell + Fair Trade share one toast');
+    assert.equal(splitSell.length, 0, 'do not double the same sell');
+    assert.equal(splitFeat.length, 0, 'feat is not a competing pop');
     assert.doesNotMatch(
       tinderAfter.querySelector('.bank-chrome')?.textContent ?? '',
       /✦6/,

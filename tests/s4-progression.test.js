@@ -13,7 +13,7 @@ import {
 } from '../src/game/systems/radiance.js';
 import {
   evaluateAchievements, triggerMet, isUnlocked, cascadeAchievements,
-  featToastMessage,
+  featToastMessage, actionFeatToast,
 } from '../src/game/systems/achievements.js';
 import {
   ensureDailies, rerollDailies, canReroll, claimDaily, taskProgress, utcDayKey,
@@ -336,6 +336,11 @@ test('feat toasts name the Lumen the wallet just gained', () => {
   assert.equal(featToastMessage(ACHIEVEMENTS_BY_ID['s-title']), 'Feat: Wear a Name. +✦10.');
   assert.equal(featToastMessage(ACHIEVEMENTS_BY_ID['x-journal']), 'Feat: Write It Down. +✦5.');
   assert.equal(featToastMessage(ACHIEVEMENTS_BY_ID['g-known-6']), 'Feat: Six Known Things.');
+  assert.equal(
+    actionFeatToast('Sold Tinderscrap ×1 for ✦1.', [ACHIEVEMENTS_BY_ID['e-sell-1']]),
+    'Sold Tinderscrap ×1 for ✦1. Feat: A Fair Trade. +✦5.',
+  );
+  assert.equal(actionFeatToast('Sold Tinderscrap ×1 for ✦1.', []), 'Sold Tinderscrap ×1 for ✦1.');
 });
 
 test('Kindling changes Tend the Flame from a 14 XP chip to a 15 XP grant', () => {
@@ -483,7 +488,7 @@ test('v4 saves gain an empty discovered map (v4→v5)', () => {
   assert.equal(state.radiance, 3);
   assert.equal(state.bank.tinderscrap, 12);
   assert.deepEqual(state.bankLocks, []);
-  assert.deepEqual(state.stats.itemFound, {});
+  assert.deepEqual(state.stats.itemFound, { tinderscrap: 12, fogwort: 4 });
   assert.deepEqual(state.stats.itemSold, {});
   assert.deepEqual(state.stats.itemLumen, {});
 });

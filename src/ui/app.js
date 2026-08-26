@@ -16,7 +16,7 @@
 import { createEventBus } from '../core/event-bus.js';
 import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
-import { formatDuration, formatNoun } from '../core/format.js';
+import { formatDuration, formatNoun, formatNumber } from '../core/format.js';
 import {
   SAVE_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
   storageGet, storageSet,
@@ -24,6 +24,7 @@ import {
 import { computeOfflineProgress, OFFLINE_MIN_AWAY_MS } from '../core/offline.js';
 import { createState, pushLog } from '../game/state.js';
 import { ACTIONS_BY_ID } from '../game/data/actions.js';
+import { ITEMS_BY_ID } from '../game/data/items.js';
 import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
@@ -48,7 +49,7 @@ import {
 import { renderAlmanacScreen } from './screens/meta.js';
 import { renderStoreScreen } from './screens/store.js';
 import { hydrateState } from '../game/hydrate.js';
-import { cascadeAchievements, featToastMessage } from '../game/systems/achievements.js';
+import { cascadeAchievements, featToastMessage, actionFeatToast } from '../game/systems/achievements.js';
 import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
 import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailies.js';
 import { shouldRebuildScreen } from './live-paint.js';
@@ -198,14 +199,22 @@ function boot() {
     toaster.push("The lantern's hollow is full. Sell a stack to make room.", 'warn');
   });
 
-  function flushAchievementsQuiet() {
-    if (!game) return 0;
-    const newly = cascadeAchievements(game, {
+  function collectFeats() {
+    if (!game) return [];
+    return cascadeAchievements(game, {
       onUnlock(a) {
-        toaster.push(featToastMessage(a), 'success');
         pushLog(game, `Feat lit: ${a.name}.`, game.stats.playtimeMs);
       },
     });
+  }
+
+  function toastFeats(newly) {
+    for (const a of newly) toaster.push(featToastMessage(a), 'success');
+  }
+
+  function flushAchievementsQuiet() {
+    const newly = collectFeats();
+    toastFeats(newly);
     return newly.length;
   }
 
@@ -219,16 +228,22 @@ function boot() {
 
   // Evaluate feats, write hollowlight.save, then snap the HUD — never paint
   // from live state while the envelope still holds the pre-feat snapshot.
-  function afterMutation({ redraw = false, stamp = true } = {}) {
-    const n = flushAchievementsQuiet();
+  // `actionToast`: one mutation, one line (buy/sell + feats). `holdToasts`:
+  // caller will emit that line (grid/inspector sell).
+  function afterMutation({ redraw = false, stamp = true, actionToast, holdToasts = false } = {}) {
+    const newly = collectFeats();
     persist({ stamp });
     updateHud();
-    if (shouldRebuildScreen(ui, { redraw, featUnlocks: n })) renderScreen();
+    if (shouldRebuildScreen(ui, { redraw, featUnlocks: newly.length })) renderScreen();
     else {
       liveUpdate();
       sheetRepaint?.();
     }
-    return n;
+    if (!holdToasts) {
+      if (actionToast) toaster.push(actionFeatToast(actionToast, newly), 'success');
+      else toastFeats(newly);
+    }
+    return newly;
   }
 
   // ── screen routing ─────────────────────────────────────────────
@@ -343,7 +358,8 @@ function boot() {
     // ── F1c economy: selling + Keeper's Camp upgrades ──────────────
     sell(itemId, qty) {
       const res = sellItems(game, itemId, qty);
-      if (res.ok) afterMutation();
+      if (res.ok) res.feats = afterMutation({ holdToasts: true });
+      else res.feats = [];
       return res;
     },
     get sellMode() { return ui.sellMode; },
@@ -364,21 +380,27 @@ function boot() {
     storeBuy(itemId, qty) {
       const res = storeSys.buyFromStore(game, itemId, qty);
       if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
-      toaster.push(`Bought ${res.bought} for ✦${res.spent}.`, 'success');
-      afterMutation();
+      afterMutation({ actionToast: `Bought ${res.bought} for ✦${res.spent}.` });
       renderScreen();
       return res;
     },
     storeSell(itemId, qty) {
       const res = ctx.sell(itemId, qty);
-      if (res.ok) renderScreen();
+      if (!res.ok) return res;
+      const item = ITEMS_BY_ID[itemId];
+      const line = item
+        ? `Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`
+        : `Sold ×${res.sold} for ✦${formatNumber(res.gained)}.`;
+      toaster.push(actionFeatToast(line, res.feats), 'success');
+      renderScreen();
       return res;
     },
     buyKindlingBundle() {
       const res = storeSys.buyKindlingBundle(game);
       if (!res.ok) { toaster.push(res.error ?? 'Could not buy.', 'warn'); return res; }
-      toaster.push(`Kindling bundle — eight handfuls of Tinderscrap. −✦${res.spent}.`, 'success');
-      afterMutation();
+      afterMutation({
+        actionToast: `Kindling bundle — eight handfuls of Tinderscrap. −✦${res.spent}.`,
+      });
       renderScreen();
       return res;
     },
