@@ -5,7 +5,7 @@ import { el, clear } from './dom.js';
 import { formatDuration, formatNumber } from '../core/format.js';
 import {
   OFFLINE_CAP_HOURS, formatRecapLine, formatLevelUpLine, formatMasteryUpLine,
-  formatOfflineCapNote,
+  formatOfflineCapNote, formatIdleRecapLine, formatOfflineHourRate,
 } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
@@ -67,12 +67,22 @@ export function openModal(mount, {
 }
 
 /** "While you were away…" — honest, capped, per-action breakdown. */
+function qtyWithHourRate(qty, creditedMs, { gold = false } = {}) {
+  const rate = formatOfflineHourRate(qty, creditedMs);
+  const text = `+${formatNumber(qty)}${rate ? ` · ${rate}` : ''}`;
+  return el('span', { class: gold ? 'offline-detail gold' : 'offline-detail' }, text);
+}
+
 export function showOfflineModal(mount, summary, { onClaim }) {
   const {
     awayMs, creditedMs, capped, gains, idleNotes = [], recapLines, featPreview,
-    levelUps = [], masteryUps = [],
+    levelUps = [], masteryUps = [], hasGains,
   } = summary;
   const rows = [];
+  const idleLine = formatIdleRecapLine({ hasGains, idleNotes }, featPreview);
+  if (idleLine) {
+    rows.push(el('p', { class: 'offline-idle' }, idleLine));
+  }
   const actionRecap = recapLines ?? [
     ...gains.actions,
     ...idleNotes,
@@ -96,35 +106,36 @@ export function showOfflineModal(mount, summary, { onClaim }) {
   if (gains.lumen > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Lumen'),
-      el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.lumen)}`)));
+      qtyWithHourRate(gains.lumen, creditedMs, { gold: true })));
   }
   if (gains.radiance > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Radiance'),
-      el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.radiance)}`)));
+      qtyWithHourRate(gains.radiance, creditedMs, { gold: true })));
   }
   if (gains.flame > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Flame units'),
-      el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.flame)}`)));
+      qtyWithHourRate(gains.flame, creditedMs, { gold: true })));
   }
   for (const item of gains.items) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, itemName(item.id) ?? item.name ?? item.id),
-      el('span', { class: 'offline-detail' }, `+${formatNumber(item.qty)}`)));
+      qtyWithHourRate(item.qty, creditedMs)));
   }
-  if (featPreview?.lumen > 0 || featPreview?.radiance > 0 || (featPreview?.feats?.length ?? 0) > 0) {
+  const feats = featPreview?.feats ?? [];
+  if (featPreview?.lumen > 0 || featPreview?.radiance > 0 || feats.length > 0) {
     const bits = [];
     if (featPreview.lumen > 0) bits.push(`+${formatNumber(featPreview.lumen)} Lumen`);
     if (featPreview.radiance > 0) bits.push(`+${formatNumber(featPreview.radiance)} Radiance`);
-    const names = (featPreview.feats ?? []).map((a) => a.name).slice(0, 4).join(', ');
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Feats on Claim'),
       el('span', { class: 'offline-detail gold' },
-        bits.length ? bits.join(' · ') : 'titles'),
+        bits.length ? bits.join(' · ') : `${feats.length} titles`),
     ));
-    if (names) {
-      rows.push(el('p', { class: 'muted small' }, names));
+    if (feats.length) {
+      rows.push(el('div', { class: 'offline-feat-list' },
+        ...feats.map((a) => el('div', { class: 'offline-feat' }, a.name))));
     }
   }
 
@@ -138,9 +149,7 @@ export function showOfflineModal(mount, summary, { onClaim }) {
     ),
     capped ? el('p', { class: 'muted small' },
       `Credited ${formatDuration(creditedMs)}.`) : null,
-    rows.length
-      ? el('div', { class: 'offline-list' }, rows)
-      : el('p', { class: 'muted' }, 'Your actions rested with you. Nothing was gathered.'),
+    el('div', { class: 'offline-list' }, rows),
   );
 
   let claimed = false;

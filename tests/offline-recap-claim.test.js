@@ -25,7 +25,8 @@ import { cascadeAchievements } from '../src/game/systems/achievements.js';
 import { hydrateState } from '../src/game/hydrate.js';
 import {
   computeOfflineProgress, previewOfflineClaim, recapWalletDelta,
-  formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, OFFLINE_CAP_HOURS,
+  formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, formatIdleRecapLine,
+  formatOfflineHourRate, shouldOfferOfflineRecap, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
 } from '../src/core/offline.js';
 
 const { showOfflineModal } = await import('../src/ui/modals.js');
@@ -101,6 +102,12 @@ test('recap preview Radiance equals post-Claim HUD Radiance for an offline gathe
   assert.ok(text.includes(foragingLine), `recap names ${foragingLine}`);
   assert.ok(text.includes(masteryLine), `recap names ${masteryLine}`);
   assert.ok(text.includes(formatOfflineCapNote()), 'uncapped recap still prints Cap 12h');
+  assert.equal(shouldOfferOfflineRecap(res), true);
+  const fogwort = res.gains.items.find((i) => i.id === 'fogwort');
+  assert.ok(fogwort, 'Fogwort EV line');
+  const fogRate = formatOfflineHourRate(fogwort.qty, res.creditedMs);
+  assert.match(text, new RegExp(fogRate.replace('/', '\\/')));
+  assert.match(text, /\/h/);
 });
 
 test('idle rewind does not inflate playtime or grant Work Went On with zero cycles', () => {
@@ -143,6 +150,44 @@ test('idle rewind does not inflate playtime or grant Work Went On with zero cycl
   assert.equal(none.nextState.stats.playtimeMs, play);
   const idlePreview = previewOfflineClaim(none);
   assert.equal(isUnlocked(idlePreview.state, 't-off-1'), false);
+  assert.equal(shouldOfferOfflineRecap(none), true,
+    'idle 3h with active {} still opens the recap');
+  assert.match(formatIdleRecapLine(none, idlePreview), /Nothing ran/,
+    'idle copy is Nothing ran / feats-only, never silence');
+});
+
+test('recap names every feat Claim will light, not a sliced four', () => {
+  const feats = [
+    { id: 'a', name: 'First Kindling' },
+    { id: 'b', name: 'First Sprig' },
+    { id: 'c', name: 'Five Minutes by the Flame' },
+    { id: 'd', name: 'A Watch' },
+    { id: 'e', name: 'The Long Sit' },
+    { id: 'f', name: 'Unscathed' },
+    { id: 'g', name: 'First Spark' },
+    { id: 'h', name: 'Wear a Name' },
+    { id: 'i', name: 'Write It Down' },
+    { id: 'j', name: 'Cataloguer' },
+    { id: 'k', name: 'Five and Alive' },
+    { id: 'l', name: 'Calloused' },
+  ];
+  const s = gatheringState();
+  const res = computeOfflineProgress({
+    state: s, nowMs: H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, {
+    ...res,
+    featPreview: { feats, lumen: 98, radiance: 11 },
+  }, { onClaim() {} });
+  const text = mount.textContent ?? '';
+  assert.ok(mount.querySelector('.offline-feat-list'), 'feat names scroll in their own list');
+  assert.equal(mount.querySelectorAll('.offline-feat').length, feats.length);
+  for (const a of feats) {
+    assert.ok(text.includes(a.name), `recap names ${a.name}`);
+  }
+  assert.match(text, /\+98 Lumen/);
+  assert.match(text, /\+11 Radiance/);
 });
 
 test('every recap prints the 12h cap, including uncapped windows', () => {
@@ -162,3 +207,39 @@ test('every recap prints the 12h cap, including uncapped windows', () => {
   }, { onClaim() {} });
   assert.match(mount.textContent ?? '', /Cap 12h/);
 });
+
+test('absences below the min threshold do not offer a recap', () => {
+  const s = createState({ nowMs: 0, rngSeed: 4 });
+  const res = computeOfflineProgress({
+    state: s,
+    nowMs: OFFLINE_MIN_AWAY_MS - 1,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(shouldOfferOfflineRecap(res), false);
+});
+
+test('idle recap modal prints time away, Cap 12h, and Nothing ran', () => {
+  const idle = createState({ nowMs: 0, rngSeed: 5 });
+  idle.actions.active = {};
+  const res = computeOfflineProgress({
+    state: idle,
+    nowMs: 3 * H,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  const featPreview = previewOfflineClaim(res);
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, { ...res, featPreview }, { onClaim() {} });
+  const text = mount.textContent ?? '';
+  assert.equal(mount.querySelector('.modal-title')?.textContent, 'While You Were Away…');
+  assert.match(text, /Cap 12h/);
+  assert.match(text, /Nothing ran/);
+  assert.equal(
+    mount.querySelectorAll('button').filter((b) => b.getAttribute('aria-label') === 'Close').length,
+    0,
+  );
+  mount.querySelector('.modal-overlay')?.click();
+  assert.equal(mount.querySelector('.modal-title')?.textContent, 'While You Were Away…');
+});
+

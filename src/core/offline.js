@@ -10,7 +10,7 @@
 // so it works for any future content set without edits.
 
 import { levelFromXp } from './xp.js';
-import { formatMissingChip } from './format.js';
+import { formatMissingChip, formatNumber } from './format.js';
 import {
   xpGrantMultiplier, effectiveDurationMs, lumenGainMultiplier,
   radianceGainMultiplier, masteryXpMultiplier,
@@ -162,7 +162,9 @@ export function computeOfflineProgress({
       next.actions.completed[actionId] = (next.actions.completed[actionId] ?? 0) + completions;
       next.stats.actionsDone = (next.stats.actionsDone ?? 0) + completions;
 
-      actionLines.push({ actionId, name: action.name, completions, xp: xpGain });
+      actionLines.push({
+        actionId, name: action.name, completions, xp: xpGain, creditedMs,
+      });
       if (missingId && completions < timeCompletions) {
         idleNotes.push({
           actionId, name: action.name, completions, missingId, timeCompletions,
@@ -214,6 +216,33 @@ export function computeOfflineProgress({
   };
 }
 
+/**
+ * Melvor still shows Welcome Back on empty-away. Hollowlight must recap
+ * every absence at/above the min threshold, including idle / feats-only.
+ * Claim (or a Claim-equivalent skip) is still the only way to close it.
+ */
+export function shouldOfferOfflineRecap(res) {
+  return (res?.awayMs ?? 0) >= OFFLINE_MIN_AWAY_MS;
+}
+
+/**
+ * Idle / feats-only copy. Halted actions already have recap lines, so they
+ * return null. Never hide an empty-away behind silence.
+ */
+export function formatIdleRecapLine(res, featPreview) {
+  if (res?.hasGains || (res?.idleNotes?.length ?? 0) > 0) return null;
+  const n = featPreview?.feats?.length ?? 0;
+  return n > 0 ? 'Nothing ran — feats only.' : 'Nothing ran.';
+}
+
+/** `+3,240 · 1,080/h` — honest EV rate from credited window. */
+export function formatOfflineHourRate(qty, creditedMs) {
+  if (!(creditedMs > 0) || !(qty > 0) || !Number.isFinite(qty)) return '';
+  const perHour = qty / (creditedMs / 3_600_000);
+  if (!(perHour > 0) || !Number.isFinite(perHour)) return '';
+  return `${formatNumber(Math.round(perHour))}/h`;
+}
+
 function mergeRecapLines(actionLines, idleNotes) {
   /** @type {Map<string, object>} */
   const byId = new Map();
@@ -246,7 +275,11 @@ export function formatRecapLine(line, resolveItem = (id) => id) {
   if (line.missingId) {
     const left = Number.isFinite(line.remainingQty) ? line.remainingQty : 0;
     text += ` — ${formatMissingChip(resolveItem(line.missingId), left)}`;
-  } else if (line.xp > 0) text += ` · +${line.xp} XP`;
+  } else if (line.xp > 0) {
+    text += ` · +${line.xp} XP`;
+    const rate = formatOfflineHourRate(n, line.creditedMs);
+    if (rate) text += ` · ${rate}`;
+  }
   return text;
 }
 
