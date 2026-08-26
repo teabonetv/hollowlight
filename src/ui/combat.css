@@ -41,10 +41,20 @@
   font-size: 12px;
 }
 
-/* First 360 owns the fight: strip Combat title / tagline / Level XP bar / XP chip. */
+/* First 360 owns the fight: strip Combat title / tagline / Level XP bar / XP chip.
+   Cockpit fills #screen; log pins to the bottom, above --tab-h. */
 .fight-xp-chip { display: none; }
 .screen.fight-live,
-.screen.leftover-live { gap: 4px; }
+.screen.leftover-live {
+  gap: 4px;
+  flex: 1 1 auto;
+  min-height: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.screen.leftover-live { overflow: visible; }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
 .screen.fight-live .xp-block,
@@ -56,11 +66,24 @@
   align-items: center;
   min-height: 44px;
   margin-bottom: 0;
+  flex: 0 0 auto;
 }
 .screen.fight-live .combat-root,
-.screen.leftover-live .combat-root { gap: 0; }
+.screen.leftover-live .combat-root {
+  gap: 0;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 #screen:has(.fight-live),
-#screen:has(.leftover-live) { padding-top: 8px; }
+#screen:has(.leftover-live) {
+  padding: 8px 16px 8px;
+  display: flex;
+  flex-direction: column;
+}
+#screen:has(.fight-live) { overflow: hidden; }
+#screen:has(.leftover-live) { overflow-y: auto; }
 
 .encounter-held {
   display: flex;
@@ -91,10 +114,23 @@
   padding: 8px 6px;
   font-size: 13px;
 }
-.combat-fight { display: flex; flex-direction: column; gap: 3px; }
+.combat-fight {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1 1 auto;
+  min-height: calc(100dvh - var(--tab-h) - 116px);
+}
+.leftover-hub {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 100%;
+}
+.combat-lobby-after { flex: 0 0 auto; }
 .fighter { display: flex; flex-direction: column; gap: 2px; }
 .fighter-head { display: flex; justify-content: space-between; gap: 8px; }
-.fighter-head strong { font-size: 14px; }
+.fighter-head strong { font-size: 13px; }
 .eat-row {
   display: flex;
   flex-direction: column;
@@ -144,16 +180,41 @@
   padding: 8px 4px 8px 2px;
 }
 .eat-empty { margin: 0; }
-.leftover-station { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; }
+.leftover-station {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0;
+  border: 0;
+  background: none;
+  flex: 0 0 auto;
+  /* One 360 frame: 100dvh minus topbar, tab bar, screen pad, back row. */
+  min-height: calc(100dvh - var(--tab-h) - 116px);
+}
 .leftover-station .hand-chip { margin: 0; }
 .leftover-station .style-row { margin: 0; }
-.leftover-station .log-h { margin: 4px 0 0; }
+.screen.fight-live .log-h,
+.screen.leftover-live .log-h { display: none; }
+.combat-fight .log-wrap,
+.leftover-station .log-wrap {
+  margin-top: auto;
+  flex: 1 1 auto;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.combat-fight .combat-log,
 .leftover-station .combat-log {
+  flex: 1 1 auto;
+  min-height: 0;
   max-height: none;
   padding: 6px 8px;
   gap: 2px;
+  overflow-y: auto;
 }
-.leftover-station .log-line { font-size: 12px; line-height: 1.35; }
+.leftover-station .log-line,
+.combat-fight .log-line { font-size: 12px; line-height: 1.35; }
 .leftover-kicker {
   margin: 0;
   font-size: 11.5px;
@@ -162,7 +223,7 @@
   color: var(--gold-hi);
 }
 .leftover-loot { margin: 0; }
-.leftover-hunt { margin-top: 2px; }
+.leftover-hunt { margin-top: 2px; flex: 0 0 auto; }
 .fighter-compact { gap: 2px; }
 .weapon-card { margin: 0; }
 .weapon-row {
@@ -194,17 +255,43 @@
 }
 .chip-btn.on { border-color: var(--gold-lo); color: var(--gold-hi); background: rgba(217, 164, 65, 0.12); }
 .chip-btn.locked { opacity: 0.55; }
-.hunt-list { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+.hunt-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.combat-lobby > .hunt-list { margin-top: 0; }
+.combat-lobby .hunt-card {
+  padding: 10px 12px 12px;
+  gap: 8px;
+}
+.combat-lobby .hunt-card .action-desc {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hunt-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.hunt-who { flex: 1 1 auto; min-width: 0; }
+.hunt-who .action-name { font-size: 17px; }
+.hunt-go {
+  flex: 0 0 auto;
+  min-width: 88px;
+  min-height: 44px;
+  padding: 8px 14px;
+}
+.lobby-oil { margin: 0 0 4px; }
 .boss-card { border-color: rgba(217, 164, 65, 0.4); }
 .combat-death { border-color: rgba(192, 86, 79, 0.45); }
 .hp-you { background: linear-gradient(90deg, #6d8a4a, var(--ok) 70%, #c5e0b0); box-shadow: 0 0 10px rgba(127, 165, 109, 0.35); }
 .hp-foe { background: linear-gradient(90deg, #8a3e3a, var(--danger) 70%, #eda49d); box-shadow: 0 0 10px rgba(192, 86, 79, 0.3); }
 .atk-fill { background: linear-gradient(90deg, var(--line), var(--gold-lo)); box-shadow: none; }
 .style-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-.style-btn { min-height: 48px; padding: 8px 6px; }
+.style-btn { min-height: 44px; padding: 8px 6px; }
 .oil-line { margin: 0; font-size: 12.5px; }
 .oil-line.danger { color: #eda49d; }
-.combat-keep { margin-left: 0; }
+.combat-keep { margin-left: 0; flex: 0 0 auto; }
+.acc-station .chip { min-height: 28px; }
 .combat-log {
   display: flex;
   flex-direction: column;

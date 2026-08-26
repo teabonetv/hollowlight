@@ -325,10 +325,14 @@ function snapshotLastStation(state, ended = 'kill', extra = {}) {
       name: d.name,
     }))
     : [];
+  const maxHp = c.foe?.maxHp ?? enemy?.hp ?? 1;
+  const hpNow = c.foe?.hp;
   c.lastStation = {
     enemyId: enemy?.id ?? c.foe?.id ?? c.enemyId ?? null,
     enemyName: c.foe?.name ?? enemy?.name ?? null,
     ended,
+    foeHp: ended === 'kill' ? 0 : (hpNow ?? maxHp),
+    foeMaxHp: maxHp,
     hitPct: kit?.hitPct ?? null,
     foeHitPct: kit?.foeHitPct ?? null,
     playerMinHit: kit?.playerMinHit ?? null,
@@ -338,6 +342,22 @@ function snapshotLastStation(state, ended = 'kill', extra = {}) {
     souls: extra.souls ?? 0,
     loot,
     log: copyLogTail(c.log),
+  };
+}
+
+/** Last-foe vitals for the leftover cockpit. Old saves without foeHp still resolve. */
+export function leftoverFoeVitals(last) {
+  if (!last) return { name: 'Foe', hp: 0, max: 1 };
+  const enemy = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
+  const max = last.foeMaxHp ?? enemy?.hp ?? 1;
+  let hp = last.foeHp;
+  if (hp == null) {
+    hp = last.ended === 'kill' || last.ended === 'death' ? 0 : max;
+  }
+  return {
+    name: last.enemyName ?? enemy?.name ?? 'Foe',
+    hp: Math.max(0, hp),
+    max: Math.max(1, max),
   };
 }
 
