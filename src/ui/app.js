@@ -77,6 +77,7 @@ function boot() {
   let sheetRepaint = null;
   let rng = createRng(1);
   let lastPackFullToastAt = 0;
+  let recapOpen = false;
 
   // ── save / load / adopt ────────────────────────────────────────
   function persist({ stamp = true } = {}) {
@@ -576,6 +577,7 @@ function boot() {
   }
 
   function offerOffline() {
+    if (recapOpen) return;
     const res = computeOfflineProgress({
       state: game,
       nowMs: Date.now(),
@@ -590,8 +592,11 @@ function boot() {
     }
 
     const levels = [...res.levelUps];
+    recapOpen = true;
+    loop.stop();
     showOfflineModal(modalRoot, { ...res, featPreview }, {
       onClaim: () => {
+        recapOpen = false;
         const livePlay = game.stats.playtimeMs;
         game = hydrateState(res.nextState);
         combat.ensureCombat(game);
@@ -606,6 +611,7 @@ function boot() {
           game.stats.playtimeMs);
         for (const lu of levels) bus.emit('levelup', lu);
         afterMutation({ redraw: true });
+        loop.start();
       },
     });
   }
@@ -614,6 +620,7 @@ function boot() {
   const loop = createTickLoop({
     stepMs: TICK_MS,
     onTick(dtMs) {
+      if (recapOpen) return;
       const events = runner.tickActions(game, dtMs, rng);
       events.push(...combat.tickCombat(game, dtMs));
       game.stats.playtimeMs += dtMs;
@@ -655,7 +662,7 @@ function boot() {
       // then stamp the return so a crash mid-modal can never double-count.
       if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
       persist();
-      loop.start();
+      if (!recapOpen) loop.start();
     }
   });
   window.addEventListener('pagehide', persist);
@@ -691,7 +698,7 @@ function boot() {
     ? document.getElementById('boot-fallback') : null;
   staleFallback?.setAttribute('hidden', '');
   if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
-  loop.start();
+  if (!recapOpen) loop.start();
 }
 
 if (typeof document !== 'undefined') {

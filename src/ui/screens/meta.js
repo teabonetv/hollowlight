@@ -6,6 +6,9 @@ import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
 import { PERKS, PERK_BRANCHES, PERKS_BY_ID } from '../../game/data/perks.js';
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES } from '../../game/data/achievements.js';
+import { SKILL_BY_ID } from '../../game/data/skills.js';
+import { ITEMS_BY_ID } from '../../game/data/items.js';
+import { itemGlyph } from '../../game/data/item-glyphs.js';
 import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
 import { canUnlock, respecCostLumen, cheapestAvailable } from '../../game/systems/radiance.js';
 import { isUnlocked } from '../../game/systems/achievements.js';
@@ -14,6 +17,7 @@ import {
   totalCompletion, achievementCompletion,
   closestAchievement, logCategoryStats,
   skillLogDetails, masteryLogDetails, itemsLogDetails,
+  logFeatAchievements,
 } from '../../game/systems/completion.js';
 import { statsRows } from '../../game/systems/stats.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
@@ -398,16 +402,26 @@ function logHero(ctx, bucketId, title, blurb) {
   ];
 }
 
-function detailRow(name, done, total, extra = {}) {
+function mysteryMark() {
+  return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.4c-.7.4-1.3.8-1.3 1.7V14"/><circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/></svg>';
+}
+
+function logTile({
+  id, name, glyph, done = 0, total = 99, frac, mystery = false, locked = false,
+}) {
   const pct = total > 0 ? Math.min(1, done / total) : 0;
+  const fracText = mystery ? '?' : locked ? 'Locked' : (frac ?? `${done}/${total}`);
+  const label = mystery ? '?' : name;
   return el('div', {
-    class: 'log-detail-row',
-    dataset: { logRow: extra.id ?? name },
-    'data-log-row': extra.id ?? name,
+    class: `log-tile${mystery ? ' log-tile-mystery' : ''}${locked ? ' log-tile-locked' : ''}`,
+    dataset: { logRow: id },
+    'data-log-row': id,
+    'aria-label': mystery ? 'Unknown item' : `${name}, ${fracText}`,
   },
-    el('span', { class: 'log-detail-name' }, name),
-    el('span', { class: 'log-detail-frac' }, extra.frac ?? `${done}/${total}`),
-    el('span', { class: 'bar bar-mini cat-bar' },
+    el('span', { class: 'log-tile-icon', html: mystery ? mysteryMark() : icon(glyph ?? 'star') }),
+    el('span', { class: 'log-tile-name' }, label),
+    el('span', { class: 'log-tile-frac' }, fracText),
+    mystery || locked ? null : el('span', { class: 'bar bar-mini cat-bar' },
       el('span', { class: 'bar-fill', style: `width:${(pct * 100).toFixed(1)}%` })));
 }
 
@@ -415,9 +429,16 @@ function renderLogSkills(ctx) {
   const rows = skillLogDetails(ctx.state);
   return {
     node: el('section', { class: 'screen almanac' },
-      ...logHero(ctx, 'skills', 'Skills', 'each craft toward lantern-master'),
-      el('div', { class: 'log-detail-list', 'data-log-drill': 'skills' },
-        rows.map((r) => detailRow(r.name, r.done, r.total, { id: r.id })))),
+      ...logHero(ctx, 'skills', 'Skills', 'each live craft toward 99'),
+      el('div', { class: 'log-tile-grid', 'data-log-drill': 'skills' },
+        rows.map((r) => logTile({
+          id: r.id,
+          name: r.name,
+          glyph: r.glyph ?? SKILL_BY_ID[r.id]?.glyph,
+          done: r.done,
+          total: r.total,
+          locked: r.locked,
+        })))),
     update: () => {},
   };
 }
@@ -427,8 +448,14 @@ function renderLogMastery(ctx) {
   return {
     node: el('section', { class: 'screen almanac' },
       ...logHero(ctx, 'mastery', 'Mastery', 'per-action practice to 99'),
-      el('div', { class: 'log-detail-list', 'data-log-drill': 'mastery' },
-        rows.map((r) => detailRow(r.name, r.done, r.total, { id: r.id })))),
+      el('div', { class: 'log-tile-grid', 'data-log-drill': 'mastery' },
+        rows.map((r) => logTile({
+          id: r.id,
+          name: r.name,
+          glyph: r.glyph,
+          done: r.done,
+          total: r.total,
+        })))),
     update: () => {},
   };
 }
@@ -436,16 +463,29 @@ function renderLogMastery(ctx) {
 function renderLogItems(ctx) {
   const { found, missing } = itemsLogDetails(ctx.state);
   const foundBlock = found.length
-    ? el('div', { class: 'log-detail-list', 'data-log-drill': 'items-found' },
-      found.map((r) => detailRow(r.name, 1, 1, { id: r.id, frac: 'Found' })))
+    ? el('div', { class: 'log-tile-grid', 'data-log-drill': 'items-found' },
+      found.map((r) => logTile({
+        id: r.id,
+        name: r.name,
+        glyph: itemGlyph(ITEMS_BY_ID[r.id]),
+        done: 1,
+        total: 1,
+        frac: 'Found',
+      })))
     : el('div', { class: 'empty-state log-items-empty' },
       el('span', { class: 'empty-icon', html: icon('book') }),
       el('h2', { class: 'empty-title' }, 'Nothing found in play'),
       el('p', { class: 'empty-text' },
         'The starter pack does not count. Gather, hunt, or buy — the first pickup writes the line. Spending the last stack never erases it.'));
   const missingBlock = missing.length
-    ? el('div', { class: 'log-detail-list log-missing', 'data-log-drill': 'items-missing' },
-      missing.map((r) => detailRow(r.name, 0, 1, { id: r.id, frac: 'Missing' })))
+    ? el('div', { class: 'log-tile-grid log-missing', 'data-log-drill': 'items-missing' },
+      missing.map((r) => logTile({
+        id: r.id,
+        name: r.name,
+        mystery: true,
+        done: 0,
+        total: 1,
+      })))
     : el('p', { class: 'footnote muted' }, 'Every name in the book is lit.');
 
   return {
@@ -461,13 +501,15 @@ function renderLogItems(ctx) {
 
 function renderLogFeats(ctx) {
   const { state } = ctx;
-  const ach = achievementCompletion(state);
+  const listAll = logFeatAchievements();
   const root = el('section', { class: 'screen almanac' },
-    ...logHero(ctx, 'feats', 'Feats', 'lit names in the book'),
-    el('p', { class: 'muted small' }, `${ach.done} of ${ach.total} · ${Math.floor(ach.pct * 100)}%`));
+    ...logHero(ctx, 'feats', 'Feats', 'lit names in the book — visits do not pad this mean'),
+    el('p', { class: 'muted small' },
+      'Opening a page is remembered on the Feats tab. It does not raise this book.'));
 
   for (const cat of ACHIEVEMENT_CATEGORIES) {
-    const list = ACHIEVEMENTS.filter((a) => a.category === cat.id);
+    const list = listAll.filter((a) => a.category === cat.id);
+    if (!list.length) continue;
     const done = list.filter((a) => isUnlocked(state, a.id)).length;
     root.append(el('h2', { class: 'section-title' }, `${cat.name} · ${done}/${list.length}`));
     const wrap = el('div', { class: 'feat-list log-feat-grid', 'data-log-drill': `feats-${cat.id}` });

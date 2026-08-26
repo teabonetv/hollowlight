@@ -21,7 +21,7 @@ const { renderAlmanacScreen } = await import('../src/ui/screens/meta.js');
 const { showOfflineModal } = await import('../src/ui/modals.js');
 const { computeOfflineProgress, formatRecapLine } = await import('../src/core/offline.js');
 const { ACTIONS_BY_ID } = await import('../src/game/data/actions.js');
-const { logCategoryStats, totalCompletion } = await import('../src/game/systems/completion.js');
+const { logCategoryStats, totalCompletion, COMPLETION_HONESTY_RULE, liveMasteryTracks } = await import('../src/game/systems/completion.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { shouldRebuildScreen } = await import('../src/ui/live-paint.js');
 const { readFileSync } = await import('node:fs');
@@ -137,10 +137,12 @@ test('LOG screen lists Skills / Mastery / Items / Feats rows', () => {
   const rows = logCategoryStats(state);
   assert.equal(rows.length, 4);
   assert.equal(rows.find((r) => r.id === 'items').done, 0, 'starter pack is not 4% of the book');
+  assert.equal(rows.find((r) => r.id === 'mastery').done, 0, 'fresh mastery is 0');
   assert.ok(totalCompletion(state).pct < 0.08);
+  assert.match(COMPLETION_HONESTY_RULE, /True completion must not move when you open the Almanac/i);
 });
 
-test('tap Skills / Mastery / Items / Feats opens drill-down rows and keeps %', () => {
+test('tap Skills / Mastery / Items / Feats opens drill-down tiles and keeps %', () => {
   const state = createState({ nowMs: 0, rngSeed: 9 });
   state.discovered = { fogwort: true };
   const ctx = almanacCtx(state, 'overview');
@@ -152,7 +154,7 @@ test('tap Skills / Mastery / Items / Feats opens drill-down rows and keeps %', (
 
   const drills = {
     'log-skills': { name: 'Emberkeeping', frac: '1/99' },
-    'log-mastery': { name: 'Tend the Flame', frac: '1/99' },
+    'log-mastery': { name: 'Tend the Flame', frac: '0/99' },
     'log-items': { name: 'Fogwort', frac: 'Found' },
     'log-feats': { name: 'First Kindling', frac: null },
   };
@@ -164,10 +166,47 @@ test('tap Skills / Mastery / Items / Feats opens drill-down rows and keeps %', (
     if (expect.frac) assert.match(scr.node.textContent ?? '', new RegExp(expect.frac));
     assert.ok(scr.node.querySelector('.log-back'), `${view} keeps a way back`);
   }
+
+  const skills = renderAlmanacScreen(almanacCtx(state, 'log-skills'));
+  assert.ok(skills.node.querySelector('[data-log-drill="skills"]'));
+  assert.equal(skills.node.textContent.includes('Almanac'), false,
+    'the Almanac tab is not a craft inside the Almanac');
+  assert.match(skills.node.textContent ?? '', /Locked/);
+
+  const mastery = renderAlmanacScreen(almanacCtx(state, 'log-mastery'));
+  assert.ok(mastery.node.querySelector('[data-log-drill="mastery"]'));
+  assert.match(mastery.node.textContent ?? '', /Pale Moth/);
+  assert.equal((mastery.node.textContent ?? '').includes('1/99'), false,
+    'unpracticed rows must not show 1/99');
+  const tracks = liveMasteryTracks(state);
+  assert.ok(tracks.some((t) => t.id === 'tend-flame'));
+  assert.ok(tracks.some((t) => t.id === 'pale-moth'));
+  assert.equal(tracks.some((t) => t.id.includes('mine') || t.name === 'Mining'), false);
+
   const items = renderAlmanacScreen(almanacCtx(state, 'log-items'));
-  assert.match(items.node.textContent ?? '', /Tinderscrap/);
-  assert.match(items.node.textContent ?? '', /Missing/);
+  assert.match(items.node.textContent ?? '', /Fogwort/);
   assert.match(items.node.textContent ?? '', /Found/);
+  const missing = items.node.querySelector('[data-log-drill="items-missing"]');
+  assert.ok(missing);
+  assert.equal((missing.textContent ?? '').includes('Tinderscrap'), false,
+    'unfound rows are mysteries, not spoiler names');
+  assert.match(missing.textContent ?? '', /\?/);
+});
+
+test('opening Almanac tab-open feats does not move the CAMP headline', () => {
+  const state = createState({ nowMs: 0, rngSeed: 9 });
+  cascadeAchievements(state);
+  const camp = totalCompletion(state);
+  state.stats.almanacOpens = 1;
+  state.stats.mapOpens = 1;
+  state.stats.starsOpens = 1;
+  state.stats.settingsOpens = 1;
+  cascadeAchievements(state, {
+    onUnlock() {},
+  });
+  const after = totalCompletion(state);
+  assert.equal(after.label, camp.label);
+  assert.equal(after.pct, camp.pct);
 });
 
 test('Claim on an open Embers tab keeps the same article and button node', () => {
@@ -223,7 +262,7 @@ test('Claim on an open Embers tab keeps the same article and button node', () =>
   assert.equal(afterBtn.getAttribute('disabled'), 'true');
 });
 
-test('offline recap modal names a ×0 Tinderscrap halt', () => {
+test('offline recap modal names leftover Tinderscrap ×0 and ×1', () => {
   const state = createState({ nowMs: 0, rngSeed: 1 });
   state.bank.tinderscrap = 0;
   state.actions.active['tend-flame'] = { progressMs: 0 };
@@ -233,11 +272,34 @@ test('offline recap modal names a ×0 Tinderscrap halt', () => {
     lastSavedAt: 0,
     actionsById: ACTIONS_BY_ID,
   });
+  assert.equal(res.idleNotes[0].remainingQty, 0);
   assert.equal(formatRecapLine(res.recapLines[0], () => 'Tinderscrap'),
-    'Tend the Flame ×0 — out of Tinderscrap');
+    'Tend the Flame ×0 — out of Tinderscrap ×0');
   const mount = new FakeNode('div');
   showOfflineModal(mount, { ...res, featPreview: { feats: [], lumen: 0, radiance: 0 } }, {
     onClaim() {},
   });
-  assert.match(mount.textContent ?? '', /Tend the Flame ×0 — out of Tinderscrap/);
+  assert.match(mount.textContent ?? '', /Tend the Flame ×0 — out of Tinderscrap ×0/);
+
+  const one = createState({ nowMs: 0, rngSeed: 1 });
+  one.bank.tinderscrap = 1;
+  one.actions.active['fan-the-coals'] = { progressMs: 0 };
+  one.skills.emberkeeping.level = 10;
+  const last = computeOfflineProgress({
+    state: one,
+    nowMs: 3_600_000,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(last.idleNotes[0].remainingQty, 1);
+  assert.equal(formatRecapLine(last.recapLines[0], () => 'Tinderscrap'),
+    'Fan the Coals ×0 — out of Tinderscrap ×1');
+});
+
+test('recap modal freezes the live runner until Claim', () => {
+  const src = readFileSync(new URL('../src/ui/app.js', import.meta.url), 'utf8');
+  assert.match(src, /let recapOpen = false/);
+  assert.match(src, /recapOpen = true;\s*loop\.stop\(\)/);
+  assert.match(src, /if \(recapOpen\) return;/);
+  assert.match(src, /if \(!recapOpen\) loop\.start\(\)/);
 });

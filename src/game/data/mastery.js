@@ -6,6 +6,14 @@
 /** Milestone levels shown on every action card. */
 export const MASTERY_MILESTONES = [10, 25, 50, 75, 99];
 
+/** Glyphs for Wave-0 gathering actions on the LOG mastery grid. */
+export const ACTION_GLYPH = {
+  'tend-flame': 'flame',
+  'fan-the-coals': 'spark',
+  'gather-herbs': 'leaf',
+  'gather-fungi': 'mushroom',
+};
+
 /**
  * @typedef {{
  *   level: number,

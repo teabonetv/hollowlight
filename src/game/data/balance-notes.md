@@ -241,11 +241,25 @@ Items completion is a **completionist book**, not a live inventory count.
 
 Tapping Skills / Mastery / Items / Feats on the LOG opens a drill-down (per-skill 1/99, per-action mastery, found-vs-missing items, feats grid) and keeps the bucket % in the header.
 
+## Almanac LOG honesty (S4e)
+
+True completion must not move when you open the Almanac. Visit and tab-open feats do not pad the LOG mean.
+
+| Rule | Contract |
+|---|---|
+| Headline | Mean of Skills / Mastery / Items / Feats. Opening the Almanac does not change the CAMP number. |
+| Tab-open feats | `TAB_OPEN_FEAT_IDS` still toast on the Feats tab. They are excluded from the Feats bucket used for total completion. Open the Book pays Lumen, not Radiance, so it cannot mint First Spark. |
+| Mastery | 0 until a cycle or hunt is practiced. Live tracks = emberkeeping + foraging actions + combat hunts on kindled stretches. No invented Mining/Fishing/Smithing rows. Locked-zone hunts stay off the board. |
+| Items | Found names stay named. Unfound rows are `?` / mystery marks. Starter pack still does not count. |
+| Skills | Wave-0 crafts (Emberkeeping, Foraging, Combat) as a 1/99 tile grid. The Almanac tab is not a craft inside this book. Later-wave crafts show as Locked, not fake 1/99. |
+| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). While the recap modal is open, the live runner is frozen. |
+
 ## Offline playtime (S4 honesty)
 
 `playtimeMs` (“Time by the Flame”) adds **credited** away-time on Claim
-(capped at 12 h, same cap as production). Live ticks that happen while the
-modal is open are merged on Claim so the HUD cannot jump backwards.
+(capped at 12 h, same cap as production). The tick loop is frozen while the
+recap modal is open so Tend cannot keep counting down on an empty tinder stack;
+any live playtime that did accrue is still merged on Claim.
 
 Lumen and mastery XP use the **live per-cycle round**, then × completions
 (`Math.round(qty × multiplier)`), not a floored batch. Skill XP already

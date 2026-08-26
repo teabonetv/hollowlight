@@ -65,11 +65,11 @@ test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', 
   const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
   assert.equal(
     formatRecapLine(none.recapLines[0], names),
-    'Tend the Flame ×0 — out of Tinderscrap',
+    'Tend the Flame ×0 — out of Tinderscrap ×0',
   );
   assert.equal(
     formatRecapLine(res.recapLines[0], names),
-    'Tend the Flame ×1 — out of Tinderscrap',
+    'Tend the Flame ×1 — out of Tinderscrap ×0',
   );
 });
 
