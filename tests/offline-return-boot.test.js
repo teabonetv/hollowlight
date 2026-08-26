@@ -108,5 +108,5 @@ test('3h rewind first paint is Camp + recap, never the candle overlay', () => {
 });
 
 test('HUD hollow chip carries a noun after the rewind boot', () => {
-  assert.match(elements['hud-hollow'].textContent ?? '', /\d+\s*\/\s*\d+\s+hollow/);
+  assert.match(elements['hud-hollow'].textContent ?? '', /Hollow\s+\d+\/\d+/);
 });
