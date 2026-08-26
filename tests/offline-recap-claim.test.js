@@ -29,8 +29,13 @@ import {
   formatIdleRecapStillness, IDLE_RECAP_STILLNESS,
   formatOfflineHourRate, shouldOfferOfflineRecap, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
 } from '../src/core/offline.js';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 
-const { showOfflineModal } = await import('../src/ui/modals.js');
+const { showOfflineModal, recapFeatExpandVsClaim, layoutOfflineFeatList, RECAP_360 } =
+  await import('../src/ui/modals.js');
+const here = dirname(fileURLToPath(import.meta.url));
 
 const H = 3_600_000;
 
@@ -156,6 +161,10 @@ test('idle rewind does not inflate playtime or grant Work Went On with zero cycl
   assert.equal(formatIdleRecapLine(none, idlePreview), 'Nothing ran.',
     'idle headline stays Nothing ran.');
   assert.equal(formatIdleRecapStillness(none), IDLE_RECAP_STILLNESS);
+  assert.doesNotMatch(IDLE_RECAP_STILLNESS, /stuffed/i);
+  assert.match(IDLE_RECAP_STILLNESS, /Time by the Flame/);
+  assert.match(IDLE_RECAP_STILLNESS, /dailies/i);
+  assert.match(IDLE_RECAP_STILLNESS, /queued/i);
 });
 
 test('recap names every feat Claim will light, not a sliced four', () => {
@@ -183,6 +192,8 @@ test('recap names every feat Claim will light, not a sliced four', () => {
     featPreview: { feats, lumen: 98, radiance: 11 },
   }, { onClaim() {} });
   const text = mount.textContent ?? '';
+  const block = mount.querySelector('.offline-feat-block');
+  assert.ok(block, 'feat names live in a block above Claim');
   assert.ok(mount.querySelector('.offline-feat-list'), 'feat names live in their own list');
   assert.ok(mount.querySelector('.offline-feat-list').classList.contains('is-collapsed'),
     'names start collapsed so Claim stays pinned');
@@ -191,9 +202,15 @@ test('recap names every feat Claim will light, not a sliced four', () => {
   assert.ok(toggle, 'N feats toggle');
   assert.match(toggle.textContent ?? '', /12 feats/);
   assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  const list = mount.querySelector('.offline-feat-list');
+  assert.equal(block.children[0], list, 'names sit above the toggle (and Claim)');
+  assert.equal(block.children[1], toggle);
+  assert.ok(mount.querySelector('.modal-body').contains(list),
+    'feat list is in the scroll region above Claim');
   toggle.click();
   assert.equal(toggle.getAttribute('aria-expanded'), 'true');
-  assert.ok(!mount.querySelector('.offline-feat-list').classList.contains('is-collapsed'));
+  assert.ok(!list.classList.contains('is-collapsed'), 'tapping N feats is not a no-op');
+  assert.match(toggle.textContent ?? '', /Hide feats/);
   for (const a of feats) {
     assert.ok(text.includes(a.name), `recap names ${a.name}`);
   }
@@ -246,11 +263,16 @@ test('idle recap modal prints time away, Cap 12h, and Nothing ran', () => {
   assert.equal(mount.querySelector('.modal-title')?.textContent, 'While You Were Away…');
   assert.match(text, /Cap 12h/);
   assert.match(text, /Nothing ran/);
-  assert.match(text, /No queued action/);
-  assert.match(text, /Time by the Flame not stuffed/);
-  assert.match(text, /Dailies frozen/);
+  assert.match(text, /With nothing queued/);
+  assert.match(text, /Time by the Flame/);
+  assert.match(text, /dailies sat still/);
+  assert.doesNotMatch(text, /stuffed/i);
   assert.ok(mount.querySelector('.offline-idle'), 'Nothing ran. stays the headline');
   assert.ok(mount.querySelector('.offline-idle-still'), 'stillness line is present');
+  assert.equal(
+    mount.querySelector('.offline-idle-still')?.textContent,
+    IDLE_RECAP_STILLNESS,
+  );
   assert.equal(
     mount.querySelectorAll('button').filter((b) => b.getAttribute('aria-label') === 'Close').length,
     0,
@@ -274,7 +296,85 @@ test('halted recap keeps its chip and does not use the idle stillness line', () 
   });
   const text = mount.textContent ?? '';
   assert.match(text, /out of Tinderscrap/);
-  assert.doesNotMatch(text, /No queued action/);
+  assert.doesNotMatch(text, /nothing queued/);
   assert.doesNotMatch(text, /Nothing ran/);
+  assert.doesNotMatch(text, /sat still/);
+});
+
+test('idle recap stillness copy has no stuffed', () => {
+  assert.doesNotMatch(IDLE_RECAP_STILLNESS, /stuffed/i);
+  assert.match(IDLE_RECAP_STILLNESS, /With nothing queued/);
+  assert.match(IDLE_RECAP_STILLNESS, /Time by the Flame and the dailies sat still/);
+  assert.equal(IDLE_RECAP_STILLNESS.includes('.'), true);
+  assert.equal(IDLE_RECAP_STILLNESS.replace(/[^.!?]/g, '').length, 1, 'one sentence');
+  const idle = createState({ nowMs: 0, rngSeed: 7 });
+  idle.actions.active = {};
+  const res = computeOfflineProgress({
+    state: idle, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(formatIdleRecapStillness(res), IDLE_RECAP_STILLNESS);
+});
+
+test('360 feat expand keeps feat names above Claim', () => {
+  const feats = Array.from({ length: 25 }, (_, i) => ({
+    id: `feat-${i}`,
+    name: `Feat Name ${i + 1}`,
+  }));
+  const s = gatheringState();
+  const res = computeOfflineProgress({
+    state: s, nowMs: H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, {
+    ...res,
+    featPreview: { feats, lumen: 98, radiance: 11 },
+  }, { onClaim() {} });
+
+  const box = recapFeatExpandVsClaim({ viewportH: RECAP_360.viewportH, featCount: 25 });
+  assert.equal(box.viewportH, 640);
+  assert.ok(box.listBottom <= box.claimTop,
+    `listBottom ${box.listBottom} must sit above Claim ${box.claimTop}`);
+  assert.ok(box.listBottom <= box.bodyBottom,
+    'list stays in the body scrollport, not under Claim');
+  assert.ok(box.listTop >= box.bodyTop);
+  assert.ok(box.namesVisible >= RECAP_360.minVisibleNames,
+    `at least ${RECAP_360.minVisibleNames} names visible above Claim, got ${box.namesVisible}`);
+  assert.ok(box.claimBottom <= 640, `Claim ${box.claimTop}–${box.claimBottom} in the 360 viewport`);
+  assert.equal(box.fits, true);
+
+  const block = mount.querySelector('.offline-feat-block');
+  const list = mount.querySelector('.offline-feat-list');
+  const toggle = mount.querySelector('.offline-feat-toggle');
+  const body = mount.querySelector('.modal-body');
+  const claim = mount.querySelector('.modal-actions');
+  assert.ok(block && list && toggle && body && claim);
+  assert.match(toggle.textContent ?? '', /25 feats/);
+  assert.equal(block.children[0], list, 'DOM order: names above the toggle');
+  assert.equal(block.children[1], toggle);
+  assert.ok(body.contains(block), 'feat block is in the scroll region above Claim');
+  assert.equal(claim.contains(list), false, 'names must not live under Claim');
+  assert.equal(list.classList.contains('is-collapsed'), true);
+
+  body.clientHeight = box.bodyBottom - box.bodyTop;
+  toggle.offsetHeight = RECAP_360.featToggle;
+  block.offsetTop = 80;
+  block.offsetHeight = box.listH + RECAP_360.featToggle + RECAP_360.listGap;
+  toggle.click();
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  assert.equal(list.classList.contains('is-collapsed'), false, 'tapping 25 feats is not a no-op');
+  const cap = parseInt(list.style.maxHeight, 10);
+  assert.ok(Number.isFinite(cap), 'expand caps list height to the body');
+  assert.ok(cap <= body.clientHeight - RECAP_360.featToggle,
+    `cap ${cap} must leave room for the toggle above Claim`);
+  assert.ok(cap >= RECAP_360.minVisibleNames * RECAP_360.featRow);
+  assert.equal(mount.querySelectorAll('.offline-feat').length, 25);
+
+  layoutOfflineFeatList(list, { expanded: false, toggle });
+  assert.equal(list.style.maxHeight, '');
+
+  const css = readFileSync(join(here, '../src/ui/styles.css'), 'utf8');
+  assert.match(css, /\.offline-feat-block\s*\{[^}]*flex-direction:\s*column/s);
+  assert.match(css, /\.offline-feat-list\s*\{[^}]*max-height:\s*min\(36vh,\s*220px\)/s);
+  assert.match(css, /\.modal-actions\s*\{[^}]*z-index:\s*1/s);
 });
 

@@ -239,9 +239,9 @@ export function formatIdleRecapLine(res, _featPreview) {
   return 'Nothing ran.';
 }
 
-/** What did not move on an idle away. One line; not a novel. */
+/** What sat still on an idle away. Player voice; one sentence. */
 export const IDLE_RECAP_STILLNESS =
-  'No queued action. Time by the Flame not stuffed. Dailies frozen.';
+  'With nothing queued, Time by the Flame and the dailies sat still.';
 
 export function formatIdleRecapStillness(res) {
   if (!isIdleRecap(res)) return null;

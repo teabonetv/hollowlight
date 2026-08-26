@@ -991,8 +991,21 @@ button.pill:active {
   border-bottom: 1px solid var(--line-soft);
 }
 .modal-title { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 19px; color: var(--gold-hi); letter-spacing: 0.04em; }
-.modal-body { padding: 14px 18px; overflow-y: auto; min-height: 0; flex: 1 1 auto; }
-.modal-actions { flex: 0 0 auto; padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); }
+.modal-body {
+  padding: 14px 18px;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  overscroll-behavior: contain;
+}
+.modal-actions {
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+  background: var(--panel);
+  padding: 12px 18px calc(14px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line-soft);
+}
 
 .offline-away { margin: 0 0 10px; font-size: 15px; }
 .offline-idle { margin: 0 0 6px; font-size: 14.5px; }
@@ -1011,17 +1024,24 @@ button.pill:active {
 .offline-name { min-width: 0; overflow-wrap: anywhere; }
 .offline-detail { font-variant-numeric: tabular-nums; color: var(--muted); }
 .offline-detail.gold { color: var(--gold-hi); }
+.offline-feat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
 .offline-feat-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 28vh;
+  /* Cap so 25 names cannot paint under Claim on 360×640; JS tightens to the body. */
+  max-height: min(36vh, 220px);
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
 .offline-feat-list.is-collapsed { display: none; }
-.offline-feat-toggle { width: 100%; }
+.offline-feat-toggle { width: 100%; flex: 0 0 auto; }
 .offline-feat {
   font-size: 13.5px;
   line-height: 1.35;

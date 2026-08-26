@@ -19,6 +19,121 @@ import {
 export { sellConfirmPending, clearSellConfirm, SELL_CONFIRM_WINDOW_MS };
 
 /**
+ * 360×640 recap budget. Feat names expand in the body scrollport above the
+ * sticky Claim — never dumped under it (S4k: listBottom 753 vs vh 640).
+ */
+export const RECAP_360 = {
+  viewportH: 640,
+  overlayPad: 16,
+  panelMaxVh: 0.86,
+  headH: 44, // pad 14+10 + title 19 + border 1
+  actionsPadTop: 12,
+  actionsPadBottom: 14,
+  actionsBorder: 1,
+  claimBtn: 44,
+  featToggle: 44,
+  featRow: 36,
+  featGap: 4,
+  listGap: 6,
+  minVisibleNames: 3,
+};
+
+function closestClass(node, className) {
+  let n = node;
+  while (n) {
+    if (n.classList?.contains?.(className)) return n;
+    n = n.parentNode;
+  }
+  return null;
+}
+
+/**
+ * After expand+scroll, the feat list sits in the modal-body above Claim.
+ * Toggle is end-aligned; names occupy a capped band above it.
+ */
+export function recapFeatExpandVsClaim({
+  viewportH = RECAP_360.viewportH,
+  featCount = 25,
+} = {}) {
+  const C = RECAP_360;
+  const overlayInner = viewportH - 2 * C.overlayPad;
+  const panelH = Math.min(overlayInner, Math.round(C.panelMaxVh * viewportH));
+  const panelTop = C.overlayPad + Math.max(0, Math.floor((overlayInner - panelH) / 2));
+  const panelBottom = panelTop + panelH;
+  const actionsH = C.actionsBorder + C.actionsPadTop + C.claimBtn + C.actionsPadBottom;
+  const claimBottom = panelBottom - C.actionsPadBottom;
+  const claimTop = claimBottom - C.claimBtn;
+  const bodyTop = panelTop + C.headH;
+  const bodyBottom = panelBottom - actionsH;
+  const toggleBottom = bodyBottom;
+  const toggleTop = toggleBottom - C.featToggle;
+  const bodyH = Math.max(0, bodyBottom - bodyTop);
+  const listMaxH = Math.max(
+    C.minVisibleNames * C.featRow + (C.minVisibleNames - 1) * C.featGap,
+    Math.min(Math.floor(bodyH * 0.55), toggleTop - bodyTop - C.listGap),
+  );
+  const listBottom = toggleTop - C.listGap;
+  const naturalH = featCount * C.featRow + Math.max(0, featCount - 1) * C.featGap;
+  const listH = Math.min(naturalH, listMaxH);
+  const listTop = listBottom - listH;
+  const namesVisible = Math.max(
+    0, Math.floor((listH + C.featGap) / (C.featRow + C.featGap)),
+  );
+  return {
+    viewportH,
+    panelTop,
+    panelBottom,
+    bodyTop,
+    bodyBottom,
+    claimTop,
+    claimBottom,
+    listTop,
+    listBottom,
+    listMaxH,
+    listH,
+    toggleTop,
+    toggleBottom,
+    namesVisible,
+    fits: listBottom <= claimTop
+      && listBottom <= bodyBottom
+      && listTop >= bodyTop
+      && namesVisible >= C.minVisibleNames
+      && claimBottom <= viewportH
+      && claimTop < viewportH,
+  };
+}
+
+/** Cap the open feat list to the body and scroll it above Claim. */
+export function layoutOfflineFeatList(list, { expanded = true, toggle } = {}) {
+  if (!list) return;
+  if (!expanded) {
+    list.style.maxHeight = '';
+    return;
+  }
+  void list.offsetHeight;
+  const body = closestClass(list, 'modal-body');
+  const toggleH = Number(toggle?.offsetHeight) > 0
+    ? toggle.offsetHeight
+    : RECAP_360.featToggle;
+  const bodyH = Number(body?.clientHeight) > 0 ? body.clientHeight : 0;
+  if (bodyH > 0) {
+    const cap = Math.max(
+      RECAP_360.minVisibleNames * RECAP_360.featRow,
+      Math.min(Math.floor(bodyH * 0.55), bodyH - toggleH - RECAP_360.listGap),
+    );
+    list.style.maxHeight = `${cap}px`;
+  }
+  const block = closestClass(list, 'offline-feat-block') ?? list;
+  if (typeof block.scrollIntoView === 'function') {
+    block.scrollIntoView({ block: 'end', inline: 'nearest' });
+  } else if (body && bodyH > 0 && Number.isFinite(block.offsetTop)) {
+    body.scrollTop = Math.max(
+      0, block.offsetTop + (Number(block.offsetHeight) || 0) - bodyH,
+    );
+  }
+}
+
+/**
  * Opens a modal. Returns { close, panel, overlay }. Only one at a time; Escape
  * and backdrop tap close it unless persistent=true. Persistent dialogs have
  * no × — the action button is the only way out.
@@ -148,19 +263,28 @@ export function showOfflineModal(mount, summary, { onClaim }) {
         type: 'button',
         'aria-expanded': 'false',
       }, collapsedLabel);
-      toggle.addEventListener('click', () => {
+      const reveal = () => {
         const collapsed = list.classList.contains('is-collapsed');
         if (collapsed) {
           list.classList.remove('is-collapsed');
           toggle.setAttribute('aria-expanded', 'true');
           toggle.textContent = 'Hide feats';
+          layoutOfflineFeatList(list, { expanded: true, toggle });
+          if (typeof requestAnimationFrame === 'function') {
+            requestAnimationFrame(() => {
+              layoutOfflineFeatList(list, { expanded: true, toggle });
+            });
+          }
         } else {
           list.classList.add('is-collapsed');
           toggle.setAttribute('aria-expanded', 'false');
           toggle.textContent = collapsedLabel;
+          layoutOfflineFeatList(list, { expanded: false, toggle });
         }
-      });
-      rows.push(toggle, list);
+      };
+      toggle.addEventListener('click', reveal);
+      // Names first so expand grows above the toggle / Claim, not under it.
+      rows.push(el('div', { class: 'offline-feat-block' }, list, toggle));
     }
   }
 
