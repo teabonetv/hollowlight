@@ -146,33 +146,52 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
 }
 .eat-slot {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 .eat-name {
   flex: 1 1 auto;
   font-size: 13px;
   color: var(--text);
 }
-.eat-btn { min-height: 44px; min-width: 64px; flex: 0 0 auto; padding: 8px 12px; }
+.eat-btn {
+  min-height: 44px;
+  min-width: 44px;
+  width: auto;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
 .flee-btn {
   min-height: 44px;
-  min-width: 84px;
+  min-width: 44px;
   flex: 0 0 auto;
+  flex-shrink: 0;
   padding: 8px 10px;
   font-size: 13px;
+  white-space: nowrap;
 }
 .eat-pick {
   flex: 1 1 auto;
+  min-width: 0;
   min-height: 44px;
   justify-content: flex-start;
   text-align: left;
   font-size: 13px;
   padding: 8px 10px;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .eat-pick.btn-ghost { border-color: var(--line-soft); }
 .eat-pick.btn-primary,
@@ -287,11 +306,13 @@
   line-height: 1.15;
   min-height: 0;
 }
-.leftover-hunt {
+.leftover-hunt,
+.leftover-another {
   margin-top: 0;
   flex: 0 0 auto;
+  flex-shrink: 0;
   min-height: 44px;
-  min-width: 84px;
+  min-width: 44px;
   padding: 8px 10px;
   font-size: 12.5px;
   white-space: nowrap;
@@ -388,3 +409,16 @@
 .log-line.log-kill, .log-line.log-vigil { color: var(--ok); }
 .log-line.log-telegraph { color: var(--gold); font-style: italic; }
 .log-line.log-eat, .log-line.log-oil { color: #c5d4e8; }
+
+/* Short landscape: do not clip Eat / Fall back under the log or tab bar. */
+@media (max-height: 500px) {
+  #screen:has(.fight-live) {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+  .screen.fight-live {
+    overflow: visible;
+    height: auto;
+    max-height: none;
+  }
+}

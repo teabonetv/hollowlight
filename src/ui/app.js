@@ -584,6 +584,12 @@ function boot() {
       resetHuntScrollers(screenRoot);
       return res;
     },
+    dismissLastStation() {
+      const res = combat.dismissLastStation(game);
+      afterMutation();
+      renderScreen();
+      return res;
+    },
     eatFood(itemId) {
       const res = combat.eatFood(game, itemId);
       if (res.ok) afterMutation();

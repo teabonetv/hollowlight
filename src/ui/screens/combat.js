@@ -152,25 +152,57 @@ export function renderCombatPanel(ctx) {
   combat.ensureCombat(ctx.state);
   const root = el('div', { class: 'combat-root' });
   let wasFighting = false;
+  let fightView = null;
+
+  function syncScreenFlags() {
+    let screen = root.parentNode;
+    while (screen && !screen.classList?.contains?.('screen')) screen = screen.parentNode;
+    if (!screen?.classList) return;
+    const fighting = !!ctx.state.combat?.fighting;
+    const leftover = !fighting && !!ctx.state.combat?.lastStation;
+    screen.classList.toggle('fight-live', fighting);
+    screen.classList.toggle('leftover-live', leftover);
+  }
 
   function paint() {
     const st = combat.combatStatus(ctx.state);
     const enteringFight = !!st.fighting && !wasFighting;
     const leavingFight = !st.fighting && wasFighting;
     clear(root);
+    fightView = null;
     // Do not resumeCombat() here — reload pause must stay visible until Resume.
-    if (st.fighting) root.append(buildFight(ctx, st, paint));
-    else root.append(buildHub(ctx, st, paint));
+    if (st.fighting) {
+      fightView = mountFight(ctx, st, paint);
+      root.append(fightView.node);
+    } else {
+      root.append(buildHub(ctx, st, paint));
+    }
     if (enteringFight || leavingFight) resetHuntScrollers(root);
     wasFighting = !!st.fighting;
+    syncScreenFlags();
   }
+
+  function refreshFight() {
+    const st = combat.combatStatus(ctx.state);
+    if (!st.fighting || !fightView) {
+      paint();
+      return;
+    }
+    if (!!st.paused !== !!fightView.paused) {
+      paint();
+      return;
+    }
+    fightView.sync(st);
+  }
+
   paint();
 
   return {
     node: root,
     update() {
       const fighting = !!ctx.state.combat?.fighting;
-      if (fighting || wasFighting) paint();
+      if (fighting && wasFighting) refreshFight();
+      else if (fighting || wasFighting) paint();
     },
   };
 }
@@ -225,26 +257,80 @@ function clockLabel(ms) {
   return formatSeconds(ms);
 }
 
+function accYouText(kit, youMs) {
+  if (!kit) return 'Acc —';
+  const you = rangeLabel(kit.playerMinHit, kit.playerMaxHit);
+  const youClock = clockLabel(youMs ?? kit.playerSpeedMs);
+  return `Acc ${kit.hitPct}% · ${you}${youClock ? ` · ${youClock}` : ''}`;
+}
+
+function accTheyText(kit, theyMs) {
+  if (!kit) return 'they —';
+  const they = rangeLabel(kit.foeMinHit, kit.foeMaxHit);
+  const theyClock = clockLabel(theyMs ?? kit.foeSpeedMs);
+  return `they ${kit.foeHitPct}% · ${they}${theyClock ? ` · ${theyClock}` : ''}`;
+}
+
 function accStation(kit, extraClass = '', clocks = {}) {
   const row = el('div', { class: `acc-station fight-cockpit ${extraClass}`.trim() });
-  if (!kit) {
-    row.append(
-      el('span', { class: 'chip acc-chip' }, 'Acc —'),
-      el('span', { class: 'chip-sep', 'aria-hidden': 'true' }, ' / '),
-      el('span', { class: 'chip they-chip' }, 'they —'),
-    );
-    return row;
-  }
-  const you = rangeLabel(kit.playerMinHit, kit.playerMaxHit);
-  const they = rangeLabel(kit.foeMinHit, kit.foeMaxHit);
-  const youClock = clockLabel(clocks.you ?? kit.playerSpeedMs);
-  const theyClock = clockLabel(clocks.they ?? kit.foeSpeedMs);
   row.append(
-    el('span', { class: 'chip acc-chip' }, `Acc ${kit.hitPct}% · ${you}${youClock ? ` · ${youClock}` : ''}`),
+    el('span', { class: 'chip acc-chip' }, accYouText(kit, clocks.you)),
     el('span', { class: 'chip-sep', 'aria-hidden': 'true' }, ' / '),
-    el('span', { class: 'chip they-chip' }, `they ${kit.foeHitPct}% · ${they}${theyClock ? ` · ${theyClock}` : ''}`),
+    el('span', { class: 'chip they-chip' }, accTheyText(kit, clocks.they)),
   );
   return row;
+}
+
+function syncAccStation(row, kit, clocks = {}) {
+  if (!row) return;
+  const you = row.querySelector('.acc-chip');
+  const they = row.querySelector('.they-chip');
+  if (you) you.textContent = accYouText(kit, clocks.you);
+  if (they) they.textContent = accTheyText(kit, clocks.they);
+}
+
+function syncFighter(block, hp, max) {
+  if (!block) return;
+  const label = block.querySelector('.fighter-hp');
+  const fill = block.querySelector('.bar-fill');
+  if (label) label.textContent = `${hp} / ${max}`;
+  if (fill) {
+    const frac = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 0;
+    fill.style.width = `${(frac * 100).toFixed(1)}%`;
+  }
+}
+
+function fillLogBox(box, log, lines) {
+  if (!box) return;
+  clear(box);
+  const shown = [...(log ?? [])].slice(-lines).reverse();
+  if (!shown.length) {
+    box.append(el('p', { class: 'muted' }, 'The fog holds its breath.'));
+    return;
+  }
+  for (const line of shown) {
+    box.append(el('p', { class: `log-line log-${line.kind ?? 'info'}` }, line.text));
+  }
+}
+
+function syncEatRow(row, ctx, st) {
+  if (!row) return;
+  const btn = row.querySelector('.eat-btn');
+  if (btn) {
+    const full = st.playerHp >= st.playerMaxHp;
+    btn.classList.toggle('btn-ghost', full);
+    btn.classList.toggle('btn-disabled', full);
+    btn.classList.toggle('btn-primary', !full);
+    btn.setAttribute('aria-disabled', full ? 'true' : 'false');
+  }
+  const id = combat.selectedFoodId(ctx.state);
+  const pick = row.querySelector('.eat-pick');
+  if (id && pick) {
+    const n = bankCount(ctx.state.bank, id);
+    const food = FOOD[id];
+    const heal = combat.foodHeal(id);
+    pick.textContent = `${food.name} +${heal} · ${n}`;
+  }
 }
 
 function weaponToggleLabel(weapon) {
@@ -552,6 +638,38 @@ function styleRow(ctx, st, paint) {
   return styles;
 }
 
+function mountFight(ctx, st, paint) {
+  const wrap = buildFight(ctx, st, paint);
+  const fighters = wrap.querySelectorAll('.fighter');
+  const you = fighters[0];
+  const foeBlock = fighters[1];
+  const foeTitle = foeBlock?.querySelector('strong');
+  const acc = wrap.querySelector('.acc-station');
+  const oil = wrap.querySelector('.oil-line');
+  const eat = wrap.querySelector('.eat-row');
+  const logBox = wrap.querySelector('.combat-log');
+
+  return {
+    node: wrap,
+    paused: !!st.paused,
+    sync(next) {
+      syncFighter(you, next.playerHp, next.playerMaxHp);
+      syncFighter(foeBlock, next.foe?.hp ?? 0, next.foe?.maxHp ?? 1);
+      if (foeTitle) foeTitle.textContent = next.foe?.name ?? 'Foe';
+      syncAccStation(acc, next.cockpit, {
+        you: next.playerNextMs,
+        they: next.foe?.nextActMs ?? 0,
+      });
+      if (oil) {
+        oil.textContent = lanternCopy(next, ctx.state);
+        oil.className = `oil-line ${next.lanternFed ? 'muted' : 'danger'}`;
+      }
+      syncEatRow(eat, ctx, next);
+      fillLogBox(logBox, next.log, 12);
+    },
+  };
+}
+
 function buildFight(ctx, st, paint) {
   const foe = st.foe;
   const wrap = el('div', { class: 'combat-fight' });
@@ -620,7 +738,7 @@ function fighterBlock({ title, hp, max, fillClass, compact = false }) {
   return el('div', { class: `fighter ${compact ? 'fighter-compact' : ''}`.trim() },
     el('div', { class: 'fighter-head' },
       el('strong', {}, title),
-      el('span', { class: 'muted' }, `${hp} / ${max}`)),
+      el('span', { class: 'muted fighter-hp' }, `${hp} / ${max}`)),
     el('div', { class: `bar bar-lg hp-bar`, role: 'progressbar', 'aria-label': `${title} vitality` },
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
 }
@@ -630,8 +748,13 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
     row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
-    if (flee) row.append(fleeButton(ctx, paint));
-    if (hunt) row.append(leftoverHunt(ctx, hunt, dry, paint));
+    const tools = el('div', { class: 'eat-slot' });
+    if (flee) tools.append(fleeButton(ctx, paint));
+    if (hunt) {
+      tools.append(leftoverHunt(ctx, hunt, dry, paint));
+      tools.append(leftoverAnother(ctx, paint));
+    }
+    if (tools.children.length) row.append(tools);
     return row;
   }
   const n = bankCount(ctx.state.bank, id);
@@ -657,19 +780,25 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
   }
   slot.append(el('button', {
     class: `btn eat-btn ${full ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    type: 'button',
     'aria-disabled': full ? 'true' : 'false',
     onclick: () => {
-      if (full) {
+      const now = combat.combatStatus(ctx.state);
+      if (now.playerHp >= now.playerMaxHp) {
         ctx.toast?.('Already whole.', 'info');
         return;
       }
-      const res = ctx.eatFood(id);
+      const foodId = combat.selectedFoodId(ctx.state) ?? id;
+      const res = ctx.eatFood(foodId);
       if (!res.ok) ctx.toast(res.error, 'warn');
       paint();
     },
   }, 'Eat'));
   if (flee) slot.append(fleeButton(ctx, paint));
-  if (hunt) slot.append(leftoverHunt(ctx, hunt, dry, paint));
+  if (hunt) {
+    slot.append(leftoverHunt(ctx, hunt, dry, paint));
+    slot.append(leftoverAnother(ctx, paint));
+  }
   row.append(slot);
   return row;
 }
@@ -677,6 +806,7 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
 function fleeButton(ctx, paint) {
   return el('button', {
     class: 'btn btn-stop flee-btn',
+    type: 'button',
     onclick: () => { ctx.fleeFight(); paint(); },
   }, 'Fall back');
 }
@@ -741,6 +871,7 @@ function leftoverHunt(ctx, last, dry, paint) {
   const name = last.enemyName ?? enemy?.name ?? 'this foe';
   return el('button', {
     class: `btn leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    type: 'button',
     disabled: dry ? true : undefined,
     'aria-disabled': dry ? 'true' : 'false',
     onclick: () => {
@@ -756,15 +887,20 @@ function leftoverHunt(ctx, last, dry, paint) {
   }, `Hunt ${name}`);
 }
 
+function leftoverAnother(ctx, paint) {
+  return el('button', {
+    class: 'btn btn-ghost leftover-another',
+    type: 'button',
+    onclick: () => {
+      if (ctx.dismissLastStation) ctx.dismissLastStation();
+      else combat.dismissLastStation(ctx.state);
+      paint();
+    },
+  }, 'Hunt another');
+}
+
 function logPanel(log, { lines = 12 } = {}) {
-  const shown = [...(log ?? [])].slice(-lines).reverse();
   const box = el('div', { class: 'combat-log', 'aria-label': 'Combat log' });
-  if (!shown.length) {
-    box.append(el('p', { class: 'muted' }, 'The fog holds its breath.'));
-    return el('div', { class: 'log-wrap' }, el('h3', { class: 'log-h' }, 'Log'), box);
-  }
-  for (const line of shown) {
-    box.append(el('p', { class: `log-line log-${line.kind ?? 'info'}` }, line.text));
-  }
+  fillLogBox(box, log, lines);
   return el('div', { class: 'log-wrap' }, el('h3', { class: 'log-h' }, 'Log'), box);
 }
