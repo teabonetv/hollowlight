@@ -1121,7 +1121,7 @@ html.reduced-motion *::after {
 .log-detail-frac { color: var(--gold-hi); font-variant-numeric: tabular-nums; font-size: 13px; }
 .log-missing .log-detail-frac, .log-missing .log-tile-frac { color: var(--muted); }
 .log-missing .log-detail-name { color: var(--muted); }
-.log-items-empty { margin: 8px 0; }
+.log-items-empty { margin: 8px 0; padding: 16px 14px; }
 .log-feat-grid { width: 100%; }
 .log-tile-grid {
   display: grid;

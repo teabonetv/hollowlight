@@ -175,6 +175,7 @@ export function skillLogDetails(state) {
       locked: !live,
     });
   }
+  rows.sort((a, b) => Number(a.locked) - Number(b.locked));
   return rows;
 }
 

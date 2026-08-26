@@ -172,6 +172,8 @@ test('tap Skills / Mastery / Items / Feats opens drill-down tiles and keeps %', 
   assert.equal(skills.node.textContent.includes('Almanac'), false,
     'the Almanac tab is not a craft inside the Almanac');
   assert.match(skills.node.textContent ?? '', /Locked/);
+  const skillNames = [...skills.node.querySelectorAll('.log-tile-name')].map((n) => n.textContent);
+  assert.deepEqual(skillNames.slice(0, 3), ['Emberkeeping', 'Foraging', 'Combat']);
 
   const mastery = renderAlmanacScreen(almanacCtx(state, 'log-mastery'));
   assert.ok(mastery.node.querySelector('[data-log-drill="mastery"]'));
