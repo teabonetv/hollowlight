@@ -1,9 +1,7 @@
 // Log Book / completion percentages. Total completion is the mean of four
-// honest buckets we actually have: Skills, Mastery, Items, Feats. Tab-open
-// feats still exist; they cannot dominate because they are 6 of ~76 feats
-// and Feats is only one quarter of the headline number.
+// honest buckets we actually have: Skills, Mastery, Items, Feats.
 
-import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES } from '../data/achievements.js';
+import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, TAB_OPEN_FEAT_IDS } from '../data/achievements.js';
 import { PERKS } from '../data/perks.js';
 import { isUnlocked, triggerMet } from './achievements.js';
 import { cheapestAvailable } from './radiance.js';
@@ -13,6 +11,17 @@ import { ACTIONS, ACTIONS_BY_ID } from '../data/actions.js';
 import { SKILLS, SKILL_BY_ID } from '../data/skills.js';
 import { ITEMS } from '../data/items.js';
 import { MILESTONE_LEVEL } from '../../core/xp.js';
+import { ENEMIES } from '../data/enemies/index.js';
+import { ZONE_BY_ID } from '../data/combat/zones.js';
+import { ACTION_GLYPH } from '../data/mastery.js';
+
+/**
+ * Completion-honesty rule (S4e): true completion must not move when you open
+ * the Almanac. Visit and tab-open feats may still toast on the Feats tab;
+ * they are excluded from the Feats bucket that feeds the LOG mean.
+ */
+export const COMPLETION_HONESTY_RULE =
+  'True completion must not move when you open the Almanac. Visit and tab-open feats do not pad the LOG mean.';
 
 export function categoryStats(state) {
   const rows = [];
@@ -54,24 +63,81 @@ function clampRatio(have, need) {
   return Math.min(1, Math.max(0, have / need));
 }
 
+const TAB_OPEN_FEAT_SET = new Set(TAB_OPEN_FEAT_IDS);
+
+/** Wave-0 crafts only. The Almanac tab is not a skill inside this book. */
+export function logSkillCrafts() {
+  return SKILLS.filter((sk) => sk.wave === 0);
+}
+
 function skillLogRow(state) {
   const cap = MILESTONE_LEVEL;
+  const live = logSkillCrafts();
   let have = 0;
-  for (const sk of SKILLS) {
+  for (const sk of live) {
     have += Math.min(cap, state.skills?.[sk.id]?.level ?? 1);
   }
-  const total = SKILLS.length * cap;
+  const total = live.length * cap;
   return { id: 'skills', name: 'Skills', done: have, total, pct: clampRatio(have, total) };
+}
+
+function zoneIsPlayable(state, zone) {
+  if (!zone) return false;
+  const kindled = state.beacons?.kindled ?? [];
+  return kindled.includes(zone.beaconId) || kindled.includes(zone.id);
+}
+
+/**
+ * Every live action that already tracks mastery: emberkeeping, foraging, and
+ * combat hunts on currently kindled stretches. No invented Mining/Fishing
+ * rows; locked-zone hunts stay off the board.
+ */
+export function liveMasteryTracks(state) {
+  const rows = [];
+  for (const action of ACTIONS) {
+    const level = state.skills?.[action.skill]?.level ?? 1;
+    rows.push({
+      id: action.id,
+      name: action.name,
+      skillId: action.skill,
+      glyph: ACTION_GLYPH[action.id] ?? SKILL_BY_ID[action.skill]?.glyph ?? 'star',
+      kind: 'action',
+      locked: level < (action.unlockLevel ?? 1),
+    });
+  }
+  for (const enemy of ENEMIES) {
+    const zone = ZONE_BY_ID[enemy.zoneId];
+    if (!zoneIsPlayable(state, zone)) continue;
+    rows.push({
+      id: enemy.id,
+      name: enemy.name,
+      skillId: 'combat',
+      glyph: enemy.boss ? 'star' : 'sword',
+      kind: 'hunt',
+      locked: false,
+    });
+  }
+  return rows;
+}
+
+/** Mastery is 0 until a cycle or hunt is actually practiced. */
+export function practicedMasteryLevel(state, skillId, actionId) {
+  const cap = MILESTONE_LEVEL;
+  const m = state.skills?.[skillId]?.mastery?.[actionId];
+  const cycles = state.actions?.completed?.[actionId] ?? 0;
+  const kills = state.combat?.kills?.[actionId] ?? 0;
+  if ((m?.xp ?? 0) <= 0 && cycles <= 0 && kills <= 0) return 0;
+  return Math.min(cap, m?.level ?? 1);
 }
 
 function masteryLogRow(state) {
   const cap = MILESTONE_LEVEL;
+  const tracks = liveMasteryTracks(state);
   let have = 0;
-  for (const action of ACTIONS) {
-    const m = state.skills?.[action.skill]?.mastery?.[action.id];
-    have += Math.min(cap, m?.level ?? 1);
+  for (const track of tracks) {
+    have += practicedMasteryLevel(state, track.skillId, track.id);
   }
-  const total = ACTIONS.length * cap;
+  const total = tracks.length * cap;
   return { id: 'mastery', name: 'Mastery', done: have, total, pct: clampRatio(have, total) };
 }
 
@@ -92,21 +158,38 @@ export function discoveredItemIds(state) {
 
 export function skillLogDetails(state) {
   const cap = MILESTONE_LEVEL;
-  return SKILLS.map((sk) => {
-    const done = Math.min(cap, state.skills?.[sk.id]?.level ?? 1);
-    return { id: sk.id, name: sk.name, done, total: cap, pct: clampRatio(done, cap) };
-  });
+  const rows = [];
+  for (const sk of SKILLS) {
+    // Almanac is the tab you are in — never a craft named Almanac in this book.
+    if (sk.id === 'almanac') continue;
+    const live = sk.wave === 0;
+    const done = live ? Math.min(cap, state.skills?.[sk.id]?.level ?? 1) : 0;
+    rows.push({
+      id: sk.id,
+      name: sk.name,
+      glyph: sk.glyph,
+      done,
+      total: cap,
+      pct: live ? clampRatio(done, cap) : 0,
+      live,
+      locked: !live,
+    });
+  }
+  rows.sort((a, b) => Number(a.locked) - Number(b.locked));
+  return rows;
 }
 
 export function masteryLogDetails(state) {
   const cap = MILESTONE_LEVEL;
-  return ACTIONS.map((action) => {
-    const m = state.skills?.[action.skill]?.mastery?.[action.id];
-    const done = Math.min(cap, m?.level ?? 1);
+  return liveMasteryTracks(state).map((track) => {
+    const done = practicedMasteryLevel(state, track.skillId, track.id);
     return {
-      id: action.id,
-      name: action.name,
-      skillId: action.skill,
+      id: track.id,
+      name: track.name,
+      skillId: track.skillId,
+      glyph: track.glyph,
+      kind: track.kind,
+      locked: track.locked,
       done,
       total: cap,
       pct: clampRatio(done, cap),
@@ -118,15 +201,26 @@ export function itemsLogDetails(state) {
   const found = [];
   const missing = [];
   for (const item of ITEMS) {
-    const row = { id: item.id, name: item.name, found: !!state.discovered?.[item.id] };
+    const row = {
+      id: item.id,
+      name: item.name,
+      found: !!state.discovered?.[item.id],
+      mystery: !state.discovered?.[item.id],
+    };
     (row.found ? found : missing).push(row);
   }
   return { found, missing };
 }
 
+/** Feats that feed the LOG mean — visit/tab-open feats are excluded. */
+export function logFeatAchievements() {
+  return ACHIEVEMENTS.filter((a) => !TAB_OPEN_FEAT_SET.has(a.id));
+}
+
 function featsLogRow(state) {
-  const a = achievementCompletion(state);
-  return { id: 'feats', name: 'Feats', done: a.done, total: a.total, pct: a.pct };
+  const list = logFeatAchievements();
+  const done = list.filter((a) => isUnlocked(state, a.id)).length;
+  return { id: 'feats', name: 'Feats', done, total: list.length, pct: clampRatio(done, list.length) };
 }
 
 /** Front-and-centre number: mean of Skills / Mastery / Items / Feats. */

@@ -90,7 +90,7 @@ export const ACHIEVEMENTS = [
   A('x-camp', 'explore', 'Hearthway Kindled', 'Stand in the only lit camp.', { type: 'beaconsKindled', count: 1 }, T('Last Ember')),
   A('x-map', 'explore', 'Look Down the Road', 'Open the pilgrim map.', { type: 'mapOpens', count: 1 }, L(5)),
   A('x-journal', 'explore', 'Write It Down', 'The Almanac has a journal entry.', { type: 'logCount', count: 1 }, L(5)),
-  A('x-almanac', 'explore', 'Open the Book', 'Open the Almanac tab.', { type: 'almanacOpens', count: 1 }, R(1)),
+  A('x-almanac', 'explore', 'Open the Book', 'Open the Almanac tab.', { type: 'almanacOpens', count: 1 }, L(8)),
   A('x-stars', 'explore', 'Chart the Dark', 'Open the constellation.', { type: 'starsOpens', count: 1 }, L(8)),
   A('x-settings', 'explore', 'Tinker', 'Open Settings once.', { type: 'settingsOpens', count: 1 }, L(5)),
 

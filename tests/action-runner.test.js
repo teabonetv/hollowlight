@@ -166,7 +166,7 @@ test('actionStatus reports lock/affordability/progress for UI rows', () => {
   assert.equal(st.running, true);
   assert.ok(Math.abs(st.frac - 0.375) < 0.01, `frac ~0.375, got ${st.frac}`);
   assert.ok(Math.abs(st.etaMs - 2500) < 100);
-  assert.equal(st.mastery.level, 1);
+  assert.equal(st.mastery.level, 0, 'unfinished cycle is still mastery 0');
 });
 
 test('level-up event fires when XP crosses a level boundary', () => {

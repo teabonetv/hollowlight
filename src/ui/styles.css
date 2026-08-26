@@ -1119,10 +1119,67 @@ html.reduced-motion *::after {
 }
 .log-detail-name { font-size: 15px; }
 .log-detail-frac { color: var(--gold-hi); font-variant-numeric: tabular-nums; font-size: 13px; }
-.log-missing .log-detail-frac { color: var(--muted); }
+.log-missing .log-detail-frac, .log-missing .log-tile-frac { color: var(--muted); }
 .log-missing .log-detail-name { color: var(--muted); }
-.log-items-empty { margin: 8px 0; }
+.log-items-empty { margin: 8px 0; padding: 16px 14px; }
 .log-feat-grid { width: 100%; }
+.log-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
+}
+.log-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 3px;
+  min-height: 72px;
+  min-width: 44px;
+  padding: 8px 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  text-align: center;
+}
+.log-tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--gold-hi);
+}
+.log-tile-icon svg { width: 24px; height: 24px; }
+.log-tile-name {
+  font-size: 11px;
+  line-height: 1.2;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.log-tile-frac {
+  color: var(--gold-hi);
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+}
+.log-tile .cat-bar { width: 100%; margin-top: 2px; }
+.log-tile-mystery {
+  min-height: 44px;
+  justify-content: center;
+}
+.log-tile-mystery .log-tile-icon { color: var(--faint); }
+.log-tile-mystery .log-tile-name {
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-size: 14px;
+  -webkit-line-clamp: 1;
+}
+.log-tile-locked { opacity: 0.55; }
+.log-tile-locked .log-tile-frac { color: var(--muted); }
 
 @media (min-width: 720px) {
   .log-detail-list[data-log-drill="items-found"],
@@ -1130,6 +1187,9 @@ html.reduced-motion *::after {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
+  }
+  .log-tile-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 }
 

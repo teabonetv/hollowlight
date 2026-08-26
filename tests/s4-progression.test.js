@@ -363,20 +363,26 @@ test('Drawn Wick rewrites Tend duration in the same eval (4.0s → 3.9s / cycle)
   assert.equal(after.durationCause, 'Wick');
 });
 
-test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats stay a small %', () => {
+test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats do not pad the mean', () => {
   const s = createState({ nowMs: 0, rngSeed: 9 });
-  s.achievements.unlocked = Object.fromEntries(
-    TAB_OPEN_FEAT_IDS.map((id) => [id, { atMs: 0 }]),
-  );
+  cascadeAchievements(s);
+  const before = totalCompletion(s);
+  s.achievements.unlocked = {
+    ...s.achievements.unlocked,
+    ...Object.fromEntries(TAB_OPEN_FEAT_IDS.map((id) => [id, { atMs: 0 }])),
+  };
   const rows = logCategoryStats(s);
   assert.deepEqual(rows.map((r) => r.name), ['Skills', 'Mastery', 'Items', 'Feats']);
   const feats = rows.find((r) => r.id === 'feats');
-  assert.ok(feats.pct < 0.12, `tab-open feats must not be ~15% of Feats, got ${feats.pct}`);
   const items = rows.find((r) => r.id === 'items');
+  const mastery = rows.find((r) => r.id === 'mastery');
   assert.equal(items.done, 0, 'fresh Items is 0 — starter pack is not 4% of the book');
+  assert.equal(mastery.done, 0, 'unpracticed mastery is 0, not fake 1/99');
   const tot = totalCompletion(s);
+  assert.equal(tot.label, before.label, 'tab-open feats must not move the headline');
+  assert.equal(tot.pct, before.pct);
+  assert.ok(feats.pct < 0.12, `tab-open feats must not pad Feats, got ${feats.pct}`);
   assert.ok(tot.pct < 0.08, `headline must stay a small early %, got ${tot.pct}`);
-  assert.ok(Math.abs(tot.pct - 0.15) > 0.04);
 });
 
 test('discovered items never decrease when the last stack is spent', () => {
