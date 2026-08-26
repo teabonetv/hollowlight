@@ -1,0 +1,164 @@
+// S4h: recap preview == Claim.
+// Radiance from offline XP is a recap line; after Claim, recap arithmetic
+// matches HUD. Idle rewind with zero cycles does not stuff playtime or
+// light "The Work Went On". Every recap prints the 12h cap.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { FakeNode, FakeText } from './helpers/fake-node.mjs';
+
+globalThis.document = {
+  createElement: (t) => new FakeNode(t),
+  createTextNode: (s) => new FakeText(s),
+  addEventListener() {},
+  removeEventListener() {},
+};
+globalThis.requestAnimationFrame = () => 0;
+try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
+
+import { createState } from '../src/game/state.js';
+import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
+import { SKILL_BY_ID } from '../src/game/data/skills.js';
+import { formatNumber } from '../src/core/format.js';
+import { isUnlocked } from '../src/game/systems/achievements.js';
+import { cascadeAchievements } from '../src/game/systems/achievements.js';
+import { hydrateState } from '../src/game/hydrate.js';
+import {
+  computeOfflineProgress, previewOfflineClaim, recapWalletDelta,
+  formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, OFFLINE_CAP_HOURS,
+} from '../src/core/offline.js';
+
+const { showOfflineModal } = await import('../src/ui/modals.js');
+
+const H = 3_600_000;
+
+function gatheringState({ radiance = 12 } = {}) {
+  const s = createState({ nowMs: 0, rngSeed: 1 });
+  s.radiance = radiance;
+  s.radianceEarned = radiance;
+  s.stats.radianceEarned = radiance;
+  s.actions.active['gather-herbs'] = { progressMs: 0 };
+  return s;
+}
+
+/** Claim path: adopt nextState, credit claims only when work ran, cascade feats. */
+function applyClaim(res) {
+  const game = hydrateState(structuredClone(res.nextState));
+  if (res.hasGains) {
+    game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
+  }
+  cascadeAchievements(game);
+  return game;
+}
+
+test('recap preview Radiance equals post-Claim HUD Radiance for an offline gather', () => {
+  const startRadiance = 12;
+  const s = gatheringState({ radiance: startRadiance });
+  const res = computeOfflineProgress({
+    state: s,
+    nowMs: 3 * H,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.ok(res.hasGains);
+  assert.ok(res.gains.radiance > 100, 'XP conversion is not a small feat grant');
+
+  const featPreview = previewOfflineClaim(res);
+  const wallet = recapWalletDelta(res, featPreview);
+  const claimed = applyClaim(res);
+
+  assert.equal(
+    wallet.radiance,
+    claimed.radiance - startRadiance,
+    'recap Radiance (XP + feats) must equal HUD delta',
+  );
+  assert.equal(featPreview.state.radiance, claimed.radiance);
+  assert.ok(
+    res.gains.radiance !== featPreview.radiance
+      || featPreview.radiance === 0,
+    'XP Radiance must not be reported only as the feats line',
+  );
+  assert.ok(
+    res.gains.radiance > (featPreview.radiance ?? 0),
+    'do not hide XP Radiance behind Feats on Claim',
+  );
+
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, { ...res, featPreview }, { onClaim() {} });
+  const text = mount.textContent ?? '';
+  assert.ok(text.includes('Radiance'), 'dedicated Radiance line');
+  assert.ok(text.includes(`+${formatNumber(res.gains.radiance)}`),
+    `XP Radiance +${formatNumber(res.gains.radiance)} on the recap`);
+  if (featPreview.radiance > 0) {
+    assert.ok(text.includes('Feats on Claim'));
+    assert.ok(text.includes(`+${formatNumber(featPreview.radiance)} Radiance`));
+  }
+  const foraging = res.levelUps.find((l) => l.skillId === 'foraging');
+  assert.ok(foraging, '3h gather must level Foraging');
+  const foragingLine = formatLevelUpLine(foraging, (id) => SKILL_BY_ID[id]?.name ?? id);
+  assert.ok(res.masteryUps.length > 0);
+  const masteryLine = formatMasteryUpLine(res.masteryUps[0]);
+  assert.ok(text.includes(foragingLine), `recap names ${foragingLine}`);
+  assert.ok(text.includes(masteryLine), `recap names ${masteryLine}`);
+  assert.ok(text.includes(formatOfflineCapNote()), 'uncapped recap still prints Cap 12h');
+});
+
+test('idle rewind does not inflate playtime or grant Work Went On with zero cycles', () => {
+  const play = 90_000;
+  const s = createState({ nowMs: 0, rngSeed: 2 });
+  s.stats.playtimeMs = play;
+  s.stats.offlineClaims = 0;
+  s.bank.tinderscrap = 0;
+  s.actions.active['tend-flame'] = { progressMs: 0 };
+
+  const res = computeOfflineProgress({
+    state: s,
+    nowMs: 3 * H,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(res.hasGains, false);
+  assert.equal(res.nextState.stats.playtimeMs, play);
+
+  const featPreview = previewOfflineClaim(res);
+  assert.equal(featPreview.state.stats.playtimeMs, play);
+  assert.equal(featPreview.state.stats.offlineClaims ?? 0, 0);
+  assert.equal(isUnlocked(featPreview.state, 't-off-1'), false);
+  assert.ok(!(featPreview.feats ?? []).some((a) => a.id === 't-off-1'));
+
+  const claimed = applyClaim(res);
+  assert.equal(claimed.stats.playtimeMs, play);
+  assert.equal(claimed.stats.offlineClaims ?? 0, 0);
+  assert.equal(isUnlocked(claimed, 't-off-1'), false);
+
+  const idle = createState({ nowMs: 0, rngSeed: 3 });
+  idle.stats.playtimeMs = play;
+  const none = computeOfflineProgress({
+    state: idle,
+    nowMs: 3 * H,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(none.hasGains, false);
+  assert.equal(none.nextState.stats.playtimeMs, play);
+  const idlePreview = previewOfflineClaim(none);
+  assert.equal(isUnlocked(idlePreview.state, 't-off-1'), false);
+});
+
+test('every recap prints the 12h cap, including uncapped windows', () => {
+  assert.equal(formatOfflineCapNote(), `Cap ${OFFLINE_CAP_HOURS}h.`);
+  const s = gatheringState();
+  const res = computeOfflineProgress({
+    state: s,
+    nowMs: H,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(res.capped, false);
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, {
+    ...res,
+    featPreview: previewOfflineClaim(res),
+  }, { onClaim() {} });
+  assert.match(mount.textContent ?? '', /Cap 12h/);
+});

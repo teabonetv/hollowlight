@@ -22,7 +22,7 @@ import {
   SAVE_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
   storageGet, storageSet,
 } from '../core/save.js';
-import { computeOfflineProgress, OFFLINE_MIN_AWAY_MS } from '../core/offline.js';
+import { computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim } from '../core/offline.js';
 import { createState, pushLog } from '../game/state.js';
 import { ACTIONS_BY_ID } from '../game/data/actions.js';
 import { ITEMS_BY_ID } from '../game/data/items.js';
@@ -605,24 +605,6 @@ function boot() {
   };
 
   // ── offline progress (boot + tab-hidden returns) ───────────────
-  function previewOfflineClaim(res) {
-    const preview = structuredClone(res.nextState);
-    preview.stats ??= {};
-    preview.stats.offlineClaims = (preview.stats.offlineClaims ?? 0) + 1;
-    const beforeL = preview.lumen;
-    const beforeR = preview.radiance ?? 0;
-    const newly = cascadeAchievements(preview, {
-      onUnlock(a) {
-        pushLog(preview, `Feat lit: ${a.name}.`, preview.stats.playtimeMs ?? 0);
-      },
-    });
-    return {
-      feats: newly,
-      lumen: preview.lumen - beforeL,
-      radiance: (preview.radiance ?? 0) - beforeR,
-    };
-  }
-
   function offerOffline() {
     if (recapOpen) return;
     const res = computeOfflineProgress({
@@ -652,10 +634,17 @@ function boot() {
         applyMotionClass();
         const extraLive = Math.max(0, livePlay - (res.originalPlaytimeMs ?? livePlay));
         game.stats.playtimeMs += extraLive;
-        game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
-        pushLog(game,
-          `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
-          game.stats.playtimeMs);
+        // Work Went On tracks real idle labour, not a feats-only / fuel-halt pop.
+        if (res.hasGains) {
+          game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
+          pushLog(game,
+            `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
+            game.stats.playtimeMs);
+        } else {
+          pushLog(game,
+            `Returned after ${formatDuration(res.awayMs)}.`,
+            game.stats.playtimeMs);
+        }
         for (const lu of levels) bus.emit('levelup', lu);
         afterMutation({ redraw: true });
         loop.start();

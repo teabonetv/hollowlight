@@ -257,11 +257,18 @@ True completion must not move when you open the Almanac. Visit and tab-open feat
 ## Offline playtime (S4 honesty)
 
 `playtimeMs` (“Time by the Flame”) adds **credited** away-time on Claim
-(capped at 12 h, same cap as production). The tick loop is frozen while the
-recap modal is open so Tend cannot keep counting down on an empty tinder stack;
-any live playtime that did accrue is still merged on Claim. Until Claim,
-autosave / hide / pagehide keep the rewound `savedAt` so a reload still
-offers the same recap (wallet stays pre-Claim; HUD==save).
+**only when cycles actually ran** (capped at 12 h, same cap as production).
+A feats-only or fuel-halt rewind does not stuff wall-clock into playtime
+and does not increment `offlineClaims` / light “The Work Went On”.
+The tick loop is frozen while the recap modal is open so Tend cannot keep
+counting down on an empty tinder stack; any live playtime that did accrue
+is still merged on Claim. Until Claim, autosave / hide / pagehide keep the
+rewound `savedAt` so a reload still offers the same recap (wallet stays
+pre-Claim; HUD==save).
+
+Recap preview == Claim: XP→Radiance sparks are a dedicated Radiance line,
+not hidden behind Feats. Level-ups and mastery print `Foraging 1 → 21` /
+`Mastery 1 → 18`. Every recap prints the 12h cap.
 
 Lumen and mastery XP use the **live per-cycle round**, then × completions
 (`Math.round(qty × multiplier)`), not a floored batch. Skill XP already

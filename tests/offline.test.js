@@ -260,3 +260,18 @@ test('N-cycle offline claim with lumen + mastery XP bonuses equals N live cycles
   );
   assert.equal(res.nextState.skills.emberkeeping.xp, live.skills.emberkeeping.xp);
 });
+
+test('offline gather reports Radiance from XP, not only feats', () => {
+  const s = createState({ nowMs: 0, rngSeed: 1 });
+  s.actions.active['gather-herbs'] = { progressMs: 0 };
+  const res = computeOfflineProgress({
+    state: s, nowMs: H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const herbs = res.gains.actions.find((a) => a.actionId === 'gather-herbs');
+  assert.ok(herbs.completions > 0);
+  assert.ok(res.gains.radiance > 0, 'XP→Radiance must be a recap wallet line');
+  assert.equal(
+    res.gains.radiance,
+    (res.nextState.radiance ?? 0) - (s.radiance ?? 0),
+  );
+});

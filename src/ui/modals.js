@@ -3,9 +3,13 @@
 
 import { el, clear } from './dom.js';
 import { formatDuration, formatNumber } from '../core/format.js';
-import { OFFLINE_CAP_HOURS, formatRecapLine } from '../core/offline.js';
+import {
+  OFFLINE_CAP_HOURS, formatRecapLine, formatLevelUpLine, formatMasteryUpLine,
+  formatOfflineCapNote,
+} from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
+import { SKILL_BY_ID } from '../game/data/skills.js';
 import { createItemInspector } from './item-inspector.js';
 import {
   sellConfirmPending, clearSellConfirm, SELL_CONFIRM_WINDOW_MS,
@@ -64,7 +68,10 @@ export function openModal(mount, {
 
 /** "While you were away…" — honest, capped, per-action breakdown. */
 export function showOfflineModal(mount, summary, { onClaim }) {
-  const { awayMs, creditedMs, capped, gains, idleNotes = [], recapLines, featPreview } = summary;
+  const {
+    awayMs, creditedMs, capped, gains, idleNotes = [], recapLines, featPreview,
+    levelUps = [], masteryUps = [],
+  } = summary;
   const rows = [];
   const actionRecap = recapLines ?? [
     ...gains.actions,
@@ -75,10 +82,26 @@ export function showOfflineModal(mount, summary, { onClaim }) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, text)));
   }
+  const skillName = (id) => SKILL_BY_ID[id]?.name ?? id;
+  for (const lu of levelUps) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, formatLevelUpLine(lu, skillName))));
+  }
+  const nameMastery = masteryUps.length > 1;
+  for (const mu of masteryUps) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' },
+        formatMasteryUpLine(mu, { named: nameMastery }))));
+  }
   if (gains.lumen > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Lumen'),
       el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.lumen)}`)));
+  }
+  if (gains.radiance > 0) {
+    rows.push(el('div', { class: 'offline-line' },
+      el('span', { class: 'offline-name' }, 'Radiance'),
+      el('span', { class: 'offline-detail gold' }, `+${formatNumber(gains.radiance)}`)));
   }
   if (gains.flame > 0) {
     rows.push(el('div', { class: 'offline-line' },
@@ -107,10 +130,13 @@ export function showOfflineModal(mount, summary, { onClaim }) {
 
   const body = el('div', {},
     el('p', { class: 'offline-away' },
-      formatDuration(awayMs), ' away.',
-      capped ? el('span', { class: 'muted' },
-        ` The lantern kept ${OFFLINE_CAP_HOURS} hours of work.`) : ''),
-    !capped && creditedMs < awayMs ? el('p', { class: 'muted small' },
+      formatDuration(awayMs), ' away. ',
+      el('span', { class: 'muted' },
+        capped
+          ? `The lantern kept ${OFFLINE_CAP_HOURS} hours of work.`
+          : formatOfflineCapNote()),
+    ),
+    capped ? el('p', { class: 'muted small' },
       `Credited ${formatDuration(creditedMs)}.`) : null,
     rows.length
       ? el('div', { class: 'offline-list' }, rows)

@@ -193,6 +193,22 @@ test('offline Claim absorbs credited wall-clock into playtimeMs', () => {
   assert.ok(res.nextState.stats.playtimeMs > s.stats.playtimeMs, 'must not go backwards');
 });
 
+test('idle rewind with zero cycles does not inflate playtimeMs', () => {
+  const s = createState({ nowMs: 0, rngSeed: 8 });
+  s.stats.playtimeMs = 19 * 60_000 + 18_000;
+  s.bank.tinderscrap = 0;
+  s.actions.active['tend-flame'] = { progressMs: 0 };
+  const threeH = 3 * 3_600_000;
+  const res = computeOfflineProgress({
+    state: s,
+    nowMs: threeH,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(res.hasGains, false);
+  assert.equal(res.nextState.stats.playtimeMs, s.stats.playtimeMs);
+});
+
 test('nextWants always offers three concrete pulls; camp completion is defined', () => {
   const s = createState({ nowMs: 0, rngSeed: 9 });
   ensureDailies(s, Date.UTC(2026, 7, 25));
