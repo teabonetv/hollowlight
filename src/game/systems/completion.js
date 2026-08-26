@@ -76,9 +76,52 @@ function masteryLogRow(state) {
 }
 
 function itemsLogRow(state) {
-  const have = Object.values(state.bank ?? {}).filter((n) => n > 0).length;
+  const have = discoveredItemIds(state).length;
   const total = ITEMS.length;
   return { id: 'items', name: 'Items', done: have, total, pct: clampRatio(have, total) };
+}
+
+/** Unique registry ids marked found in play. Starter pack is not discovered. */
+export function discoveredItemIds(state) {
+  const found = [];
+  for (const item of ITEMS) {
+    if (state.discovered?.[item.id]) found.push(item.id);
+  }
+  return found;
+}
+
+export function skillLogDetails(state) {
+  const cap = MILESTONE_LEVEL;
+  return SKILLS.map((sk) => {
+    const done = Math.min(cap, state.skills?.[sk.id]?.level ?? 1);
+    return { id: sk.id, name: sk.name, done, total: cap, pct: clampRatio(done, cap) };
+  });
+}
+
+export function masteryLogDetails(state) {
+  const cap = MILESTONE_LEVEL;
+  return ACTIONS.map((action) => {
+    const m = state.skills?.[action.skill]?.mastery?.[action.id];
+    const done = Math.min(cap, m?.level ?? 1);
+    return {
+      id: action.id,
+      name: action.name,
+      skillId: action.skill,
+      done,
+      total: cap,
+      pct: clampRatio(done, cap),
+    };
+  });
+}
+
+export function itemsLogDetails(state) {
+  const found = [];
+  const missing = [];
+  for (const item of ITEMS) {
+    const row = { id: item.id, name: item.name, found: !!state.discovered?.[item.id] };
+    (row.found ? found : missing).push(row);
+  }
+  return { found, missing };
 }
 
 function featsLogRow(state) {

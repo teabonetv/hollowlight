@@ -29,6 +29,10 @@ export function hydrateState(state) {
   state.store ??= { pressure: {}, pressureAt: {} };
   if (!Number.isFinite(state.lanternIntegrity)) state.lanternIntegrity = 100;
   state.dailies ??= null;
+  state.discovered = (state.discovered && typeof state.discovered === 'object'
+    && !Array.isArray(state.discovered))
+    ? state.discovered
+    : {};
   state.souls ??= 0;
   state.beacons ??= { kindled: ['hearthway'] };
   state.beacons.kindled ??= ['hearthway'];

@@ -11,12 +11,13 @@
 // v2 → v3  S1 combat (souls, beacons, combat blob) — shipped on main as v3
 // v3 → v4  S4 meta (Radiance, perks, feats, dailies) + combat defaults so
 //          S4-only v3 PR saves also pick up the S1 blob
+// v4 → v5  Almanac LOG discovered map (found in play; starter pack excluded)
 
 import { hydrateState } from '../game/hydrate.js';
 import { createCombatState } from '../game/systems/combat.js';
 
 export const SAVE_KEY = 'hollowlight.save';
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 
 function unionCosmetics(state) {
   return {
@@ -70,6 +71,18 @@ export const MIGRATIONS = [
         souls: state.souls ?? 0,
         beacons: state.beacons ?? { kindled: ['hearthway'] },
         combat: state.combat ?? createCombatState(),
+      };
+    },
+  },
+  {
+    from: 4,
+    migrate(state) {
+      return {
+        ...state,
+        discovered: (state.discovered && typeof state.discovered === 'object'
+          && !Array.isArray(state.discovered))
+          ? state.discovered
+          : {},
       };
     },
   },

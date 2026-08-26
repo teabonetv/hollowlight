@@ -13,6 +13,7 @@ import { canReroll, taskProgress } from '../../game/systems/dailies.js';
 import {
   totalCompletion, achievementCompletion,
   closestAchievement, logCategoryStats,
+  skillLogDetails, masteryLogDetails, itemsLogDetails,
 } from '../../game/systems/completion.js';
 import { statsRows } from '../../game/systems/stats.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
@@ -24,7 +25,16 @@ export function renderAlmanacScreen(ctx) {
   if (view === 'stats') return renderStats(ctx);
   if (view === 'dailies') return renderDailies(ctx);
   if (view === 'log') return renderLog(ctx);
+  if (view === 'log-skills') return renderLogSkills(ctx);
+  if (view === 'log-mastery') return renderLogMastery(ctx);
+  if (view === 'log-items') return renderLogItems(ctx);
+  if (view === 'log-feats') return renderLogFeats(ctx);
   return renderOverview(ctx);
+}
+
+function navCurrent(view) {
+  if (view === 'overview' || view === 'log' || String(view).startsWith('log-')) return 'overview';
+  return view;
 }
 
 function subnav(ctx, current) {
@@ -67,7 +77,7 @@ function renderOverview(ctx) {
     el('header', { class: 'screen-head' },
       el('h1', { class: 'screen-title' }, 'Almanac'),
       el('p', { class: 'screen-sub' }, 'What is lit, and what still waits.')),
-    subnav(ctx, 'overview'),
+    subnav(ctx, navCurrent('overview')),
     el('div', { class: 'complete-hero' },
       el('span', { class: 'complete-pct' }, tot.label),
       el('span', { class: 'complete-label' }, 'total completion'),
@@ -83,7 +93,9 @@ function renderOverview(ctx) {
     el('div', { class: 'cat-list' },
       logCats.map((c) => el('button', {
         class: 'cat-row',
-        onclick: () => ctx.openAlmanac(c.id === 'feats' ? 'achievements' : 'overview'),
+        dataset: { logBucket: c.id },
+        'data-log-bucket': c.id,
+        onclick: () => ctx.openAlmanac(`log-${c.id}`),
       },
         el('span', { class: 'cat-name' }, c.name),
         el('span', { class: 'cat-pct' }, `${Math.floor(c.pct * 100)}% · ${c.done}/${c.total}`),
@@ -322,6 +334,7 @@ function dailyCard(ctx, taskId) {
   const btn = el('button', {
     class: 'btn btn-wide daily-claim',
     dataset: { emberId: taskId },
+    'data-ember-id': taskId,
     onclick: () => {
       const slot = ctx.state.dailies?.tasks?.find((t) => t.id === taskId);
       if (!slot || slot.claimed) return;
@@ -329,7 +342,11 @@ function dailyCard(ctx, taskId) {
       if (p.done) ctx.claimDaily(taskId);
     },
   }, '');
-  const card = el('article', { class: 'card daily-card', dataset: { emberId: taskId } },
+  const card = el('article', {
+    class: 'card daily-card',
+    dataset: { emberId: taskId },
+    'data-ember-id': taskId,
+  },
     title,
     hint,
     el('div', { class: 'xp-block' },
@@ -363,6 +380,112 @@ function dailyCard(ctx, taskId) {
   }
   update();
   return { node: card, update, btn, taskId };
+}
+
+function logHero(ctx, bucketId, title, blurb) {
+  const row = logCategoryStats(ctx.state).find((c) => c.id === bucketId);
+  const pct = row ? Math.floor(row.pct * 100) : 0;
+  return [
+    el('header', { class: 'screen-head' },
+      el('h1', { class: 'screen-title' }, title),
+      el('p', { class: 'screen-sub' },
+        row ? `${pct}% · ${row.done}/${row.total} — ${blurb}` : blurb)),
+    subnav(ctx, navCurrent(`log-${bucketId}`)),
+    el('button', {
+      class: 'btn btn-ghost btn-wide log-back',
+      onclick: () => ctx.openAlmanac('overview'),
+    }, '← Completion log'),
+  ];
+}
+
+function detailRow(name, done, total, extra = {}) {
+  const pct = total > 0 ? Math.min(1, done / total) : 0;
+  return el('div', {
+    class: 'log-detail-row',
+    dataset: { logRow: extra.id ?? name },
+    'data-log-row': extra.id ?? name,
+  },
+    el('span', { class: 'log-detail-name' }, name),
+    el('span', { class: 'log-detail-frac' }, extra.frac ?? `${done}/${total}`),
+    el('span', { class: 'bar bar-mini cat-bar' },
+      el('span', { class: 'bar-fill', style: `width:${(pct * 100).toFixed(1)}%` })));
+}
+
+function renderLogSkills(ctx) {
+  const rows = skillLogDetails(ctx.state);
+  return {
+    node: el('section', { class: 'screen almanac' },
+      ...logHero(ctx, 'skills', 'Skills', 'each craft toward lantern-master'),
+      el('div', { class: 'log-detail-list', 'data-log-drill': 'skills' },
+        rows.map((r) => detailRow(r.name, r.done, r.total, { id: r.id })))),
+    update: () => {},
+  };
+}
+
+function renderLogMastery(ctx) {
+  const rows = masteryLogDetails(ctx.state);
+  return {
+    node: el('section', { class: 'screen almanac' },
+      ...logHero(ctx, 'mastery', 'Mastery', 'per-action practice to 99'),
+      el('div', { class: 'log-detail-list', 'data-log-drill': 'mastery' },
+        rows.map((r) => detailRow(r.name, r.done, r.total, { id: r.id })))),
+    update: () => {},
+  };
+}
+
+function renderLogItems(ctx) {
+  const { found, missing } = itemsLogDetails(ctx.state);
+  const foundBlock = found.length
+    ? el('div', { class: 'log-detail-list', 'data-log-drill': 'items-found' },
+      found.map((r) => detailRow(r.name, 1, 1, { id: r.id, frac: 'Found' })))
+    : el('div', { class: 'empty-state log-items-empty' },
+      el('span', { class: 'empty-icon', html: icon('book') }),
+      el('h2', { class: 'empty-title' }, 'Nothing found in play'),
+      el('p', { class: 'empty-text' },
+        'The starter pack does not count. Gather, hunt, or buy — the first pickup writes the line. Spending the last stack never erases it.'));
+  const missingBlock = missing.length
+    ? el('div', { class: 'log-detail-list log-missing', 'data-log-drill': 'items-missing' },
+      missing.map((r) => detailRow(r.name, 0, 1, { id: r.id, frac: 'Missing' })))
+    : el('p', { class: 'footnote muted' }, 'Every name in the book is lit.');
+
+  return {
+    node: el('section', { class: 'screen almanac' },
+      ...logHero(ctx, 'items', 'Items', 'found in play, never un-completed'),
+      el('h2', { class: 'section-title' }, `Found · ${found.length}`),
+      foundBlock,
+      el('h2', { class: 'section-title' }, `Still in the dark · ${missing.length}`),
+      missingBlock),
+    update: () => {},
+  };
+}
+
+function renderLogFeats(ctx) {
+  const { state } = ctx;
+  const ach = achievementCompletion(state);
+  const root = el('section', { class: 'screen almanac' },
+    ...logHero(ctx, 'feats', 'Feats', 'lit names in the book'),
+    el('p', { class: 'muted small' }, `${ach.done} of ${ach.total} · ${Math.floor(ach.pct * 100)}%`));
+
+  for (const cat of ACHIEVEMENT_CATEGORIES) {
+    const list = ACHIEVEMENTS.filter((a) => a.category === cat.id);
+    const done = list.filter((a) => isUnlocked(state, a.id)).length;
+    root.append(el('h2', { class: 'section-title' }, `${cat.name} · ${done}/${list.length}`));
+    const wrap = el('div', { class: 'feat-list log-feat-grid', 'data-log-drill': `feats-${cat.id}` });
+    for (const a of list) {
+      const on = isUnlocked(state, a.id);
+      wrap.append(el('article', {
+        class: `card feat-card ${on ? 'feat-on' : ''}`,
+        dataset: { logRow: a.id },
+        'data-log-row': a.id,
+      },
+        el('div', { class: 'feat-head' },
+          el('h3', { class: 'feat-name' }, a.name),
+          el('span', { class: `chip ${on ? 'chip-gold' : ''}` }, on ? 'Lit' : 'Dark')),
+        el('p', { class: 'muted' }, a.desc)));
+    }
+    root.append(wrap);
+  }
+  return { node: root, update: () => {} };
 }
 
 function renderLog(ctx) {

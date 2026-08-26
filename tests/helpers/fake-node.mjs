@@ -74,6 +74,15 @@ export class FakeNode {
     for (const c of this.children) if (c._walk) c._walk(fn);
   }
   matchesSelector(sel) {
+    const attr = sel.match(/^(\w+)?\[data-([a-z0-9-]+)(?:=["']?([^"'\]]+)["']?)?\]$/i);
+    if (attr) {
+      const [, tag, dataKey, val] = attr;
+      if (tag && this.tagName !== tag.toUpperCase()) return false;
+      const camel = dataKey.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+      const have = this.dataset[camel] ?? this.dataset[dataKey] ?? this.attrs[`data-${dataKey}`];
+      if (val === undefined) return have != null && have !== '';
+      return String(have) === val;
+    }
     // supports '.a.b.c', '#id', 'tag'
     return sel.split(/[.#]/).filter(Boolean).every((tok) => {
       if (sel.trim().startsWith('#')) return this.attrs.id === tok;

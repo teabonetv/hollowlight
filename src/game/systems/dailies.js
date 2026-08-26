@@ -5,6 +5,7 @@ import { createRng } from '../../core/rng.js';
 import {
   DAILY_POOL, DAILY_POOL_BY_ID, DAILY_TASK_COUNT, DAILY_REROLLS_PER_DAY,
 } from '../data/dailies.js';
+import { ACTIONS_BY_ID } from '../data/actions.js';
 
 export function utcDayKey(nowMs) {
   const d = new Date(nowMs);
@@ -23,9 +24,26 @@ function seedFromKey(key, salt = 0) {
   return h >>> 0;
 }
 
-function pickSet(dayKey, salt, exclude = new Set(), count = DAILY_TASK_COUNT) {
+/** True when the save can actually advance this ember (unlockLevel met). */
+export function isDailyProgressable(state, taskId) {
+  const def = DAILY_POOL_BY_ID[taskId];
+  if (!def) return false;
+  if (def.actionId) {
+    const action = ACTIONS_BY_ID[def.actionId];
+    if (!action) return false;
+    const level = state.skills?.[action.skill]?.level ?? 1;
+    if (level < (action.unlockLevel ?? 1)) return false;
+  }
+  return true;
+}
+
+function pickSet(dayKey, salt, exclude = new Set(), count = DAILY_TASK_COUNT, state = null) {
   const rng = createRng(seedFromKey(dayKey, salt));
-  const pool = DAILY_POOL.filter((t) => !exclude.has(t.id));
+  const pool = DAILY_POOL.filter((t) => {
+    if (exclude.has(t.id)) return false;
+    if (state && !isDailyProgressable(state, t.id)) return false;
+    return true;
+  });
   const chosen = [];
   const bag = [...pool];
   while (chosen.length < count && bag.length) {
@@ -38,6 +56,24 @@ function pickSet(dayKey, salt, exclude = new Set(), count = DAILY_TASK_COUNT) {
     reward: t.reward,
     claimed: false,
   }));
+}
+
+function replaceGatedTasks(state) {
+  const tasks = state.dailies?.tasks ?? [];
+  if (!tasks.length) return;
+  const keep = [];
+  let need = 0;
+  for (const t of tasks) {
+    if (t.claimed || isDailyProgressable(state, t.id)) keep.push(t);
+    else need += 1;
+  }
+  if (!need) {
+    state.dailies.tasks = keep;
+    return;
+  }
+  const exclude = new Set(tasks.map((t) => t.id));
+  const fill = pickSet(state.dailies.dayKey, 17, exclude, need, state);
+  state.dailies.tasks = [...keep, ...snapshotBaselines(state, fill)].slice(0, DAILY_TASK_COUNT);
 }
 
 function snapshotBaselines(state, tasks) {
@@ -74,12 +110,13 @@ export function taskProgress(state, task) {
 export function ensureDailies(state, nowMs) {
   const key = utcDayKey(nowMs);
   if (state.dailies?.dayKey === key && Array.isArray(state.dailies.tasks)) {
+    replaceGatedTasks(state);
     return state.dailies;
   }
   state.dailies = {
     dayKey: key,
     rerollsUsed: 0,
-    tasks: snapshotBaselines(state, pickSet(key, 0)),
+    tasks: snapshotBaselines(state, pickSet(key, 0, new Set(), DAILY_TASK_COUNT, state)),
   };
   return state.dailies;
 }
@@ -95,12 +132,12 @@ export function rerollDailies(state, nowMs) {
   const kept = (state.dailies.tasks ?? []).filter((t) => t.claimed);
   const slots = Math.max(0, DAILY_TASK_COUNT - kept.length);
   const exclude = new Set((state.dailies.tasks ?? []).map((t) => t.id));
-  let next = slots > 0 ? pickSet(key, 1, exclude, slots) : [];
+  let next = slots > 0 ? pickSet(key, 1, exclude, slots, state) : [];
   // If the pool is too small to exclude all, pickSet may return fewer — fall
   // back to a salted pick that may overlap unclaimed ids, never claimed ones.
   if (next.length !== slots) {
     const claimedIds = new Set(kept.map((t) => t.id));
-    next = pickSet(key, 99, claimedIds, slots);
+    next = pickSet(key, 99, claimedIds, slots, state);
   }
   const fresh = snapshotBaselines(state, next);
   state.dailies.rerollsUsed += 1;

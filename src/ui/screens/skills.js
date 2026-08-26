@@ -141,6 +141,11 @@ function comingSoon(root, skill) {
   return { node: root, update: () => {} };
 }
 
+function durationChip(st) {
+  const cycle = `${formatSeconds(st.durationMs)} / cycle`;
+  return st.durationCause ? `${cycle} · ${st.durationCause}` : cycle;
+}
+
 function buildActionCard(ctx, action) {
   const status = () => ctx.actionStatus(action.id);
 
@@ -179,7 +184,7 @@ function buildActionCard(ctx, action) {
       xpText = `${(st.xpRaw).toFixed(1)} XP`;
     }
     yieldChips.append(el('span', { class: 'chip chip-xp' }, xpText));
-    yieldChips.append(el('span', { class: 'chip chip-time' }, `${formatSeconds(st.durationMs)} / cycle`));
+    yieldChips.append(el('span', { class: 'chip chip-time' }, durationChip(st)));
   }
 
   function paintToggle() {
@@ -208,7 +213,7 @@ function buildActionCard(ctx, action) {
   function update() {
     const st = status();
     fill.style.width = st.running ? `${(st.frac * 100).toFixed(1)}%` : '0%';
-    const cycle = `${formatSeconds(st.durationMs)} / cycle`;
+    const cycle = durationChip(st);
     timeLabel.textContent = st.running
       ? `${formatSeconds(st.etaMs)} left · ${cycle}`
       : cycle;

@@ -15,7 +15,7 @@ export const DAILY_POOL = [
   { id: 'tend-20', kind: 'cycles', actionId: 'tend-flame', need: 20, reward: 3, label: 'Tend the Flame ×20', hint: 'A longer watch.' },
   { id: 'herbs-10', kind: 'cycles', actionId: 'gather-herbs', need: 10, reward: 2, label: 'Gather Herbs ×10', hint: 'Walk the fog-line a while.' },
   { id: 'herbs-25', kind: 'cycles', actionId: 'gather-herbs', need: 25, reward: 3, label: 'Gather Herbs ×25', hint: 'Fill the satchel.' },
-  { id: 'fungi-8', kind: 'cycles', actionId: 'gather-fungi', need: 8, reward: 3, label: 'Gather Fungi ×8', hint: 'Needs Foraging 5.' },
+  { id: 'fungi-8', kind: 'cycles', actionId: 'gather-fungi', need: 8, reward: 3, label: 'Gather Fungi ×8', hint: 'Needs Foraging 5. Hidden until that unlock is live.' },
   { id: 'any-15', kind: 'cycles', need: 15, reward: 2, label: 'Any work ×15', hint: 'Fifteen cycles of anything.' },
   { id: 'any-40', kind: 'cycles', need: 40, reward: 4, label: 'Any work ×40', hint: 'A proper session.' },
   { id: 'lumen-25', kind: 'lumenEarned', need: 25, reward: 2, label: 'Earn ✦25', hint: 'From work or sales — honestly counted.' },

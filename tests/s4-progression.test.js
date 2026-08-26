@@ -17,6 +17,7 @@ import {
 } from '../src/game/systems/achievements.js';
 import {
   ensureDailies, rerollDailies, canReroll, claimDaily, taskProgress, utcDayKey,
+  isDailyProgressable,
 } from '../src/game/systems/dailies.js';
 import { DAILY_TASK_COUNT, DAILY_POOL } from '../src/game/data/dailies.js';
 import { statsRows, totalCycles, recordCycle } from '../src/game/systems/stats.js';
@@ -25,7 +26,9 @@ import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { computeOfflineProgress } from '../src/core/offline.js';
 import { nextWants, totalCompletion, logCategoryStats } from '../src/game/systems/completion.js';
 import { TAB_OPEN_FEAT_IDS } from '../src/game/data/achievements.js';
-import { serializeSave, deserializeSave } from '../src/core/save.js';
+import { serializeSave, deserializeSave, SAVE_VERSION } from '../src/core/save.js';
+import { markDiscovered } from '../src/game/systems/discovered.js';
+import { bankPay } from '../src/game/systems/bank.js';
 
 test('S4 content volume: ≥60 achievements and 40 constellation perks', () => {
   assert.ok(ACHIEVEMENTS.length >= 60, `have ${ACHIEVEMENTS.length}`);
@@ -335,6 +338,7 @@ test('Drawn Wick rewrites Tend duration in the same eval (4.0s → 3.9s / cycle)
   const after = actionStatus(s, 'tend-flame');
   assert.equal(after.durationMs, Math.round(4000 / 1.02));
   assert.equal(after.durationMs, 3922);
+  assert.equal(after.durationCause, 'Wick');
 });
 
 test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats stay a small %', () => {
@@ -346,7 +350,87 @@ test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats stay a smal
   assert.deepEqual(rows.map((r) => r.name), ['Skills', 'Mastery', 'Items', 'Feats']);
   const feats = rows.find((r) => r.id === 'feats');
   assert.ok(feats.pct < 0.12, `tab-open feats must not be ~15% of Feats, got ${feats.pct}`);
+  const items = rows.find((r) => r.id === 'items');
+  assert.equal(items.done, 0, 'fresh Items is 0 — starter pack is not 4% of the book');
   const tot = totalCompletion(s);
   assert.ok(tot.pct < 0.08, `headline must stay a small early %, got ${tot.pct}`);
   assert.ok(Math.abs(tot.pct - 0.15) > 0.04);
+});
+
+test('discovered items never decrease when the last stack is spent', () => {
+  const s = createState({ nowMs: 0, rngSeed: 1 });
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, 0);
+  assert.equal(Object.keys(s.discovered).length, 0);
+
+  const herbs = ACTIONS_BY_ID['gather-herbs'];
+  completeCycle(s, herbs, createRng(1));
+  const afterFind = logCategoryStats(s).find((r) => r.id === 'items').done;
+  assert.ok(afterFind >= 1, 'first pickup after boot writes the book');
+  assert.equal(!!s.discovered.fogwort, true);
+
+  s.bank.fogwort = 1;
+  assert.equal(bankPay(s.bank, [{ id: 'fogwort', qty: 1 }]), true);
+  assert.equal(s.bank.fogwort, undefined);
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, afterFind);
+  assert.equal(s.discovered.fogwort, true);
+
+  markDiscovered(s, 'tinderscrap');
+  const mid = logCategoryStats(s).find((r) => r.id === 'items').done;
+  s.bank.tinderscrap = 0;
+  delete s.bank.tinderscrap;
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, mid);
+});
+
+test('fresh save never receives a gated daily (Gather Fungi at Foraging 1)', () => {
+  const s = createState({ nowMs: 0, rngSeed: 1 });
+  assert.equal(s.skills.foraging.level, 1);
+  assert.equal(isDailyProgressable(s, 'fungi-8'), false);
+  assert.equal(isDailyProgressable(s, 'tend-8'), true);
+
+  s.dailies = {
+    dayKey: '2026-08-25',
+    rerollsUsed: 0,
+    tasks: [
+      { id: 'fungi-8', need: 8, reward: 3, claimed: false, baseline: 0 },
+      { id: 'tend-8', need: 8, reward: 2, claimed: false, baseline: 0 },
+      { id: 'sit-10', need: 10, reward: 2, claimed: false, baseline: 0 },
+    ],
+  };
+  ensureDailies(s, Date.UTC(2026, 7, 25, 12, 0, 0));
+  assert.ok(!s.dailies.tasks.some((t) => t.id === 'fungi-8'),
+    'ensureDailies replaces a gated ember already on the board');
+
+  for (let day = 1; day <= 40; day++) {
+    const fresh = createState({ nowMs: 0, rngSeed: day });
+    const when = Date.UTC(2026, 7, day, 12, 0, 0);
+    ensureDailies(fresh, when);
+    assert.equal(fresh.dailies.tasks.length, DAILY_TASK_COUNT);
+    for (const t of fresh.dailies.tasks) {
+      assert.equal(isDailyProgressable(fresh, t.id), true, `${t.id} on day ${day}`);
+    }
+    const reroll = rerollDailies(fresh, when);
+    assert.equal(reroll.ok, true);
+    for (const t of fresh.dailies.tasks) {
+      if (t.claimed) continue;
+      assert.equal(isDailyProgressable(fresh, t.id), true, `reroll ${t.id} on day ${day}`);
+    }
+  }
+});
+
+test('v4 saves gain an empty discovered map (v4→v5)', () => {
+  const json = JSON.stringify({
+    version: 4,
+    savedAt: 1,
+    state: {
+      lumen: 22,
+      bank: { tinderscrap: 12, fogwort: 4 },
+      radiance: 3,
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(SAVE_VERSION, 5);
+  assert.deepEqual(state.discovered, {});
+  assert.equal(logCategoryStats(state).find((r) => r.id === 'items').done, 0);
+  assert.equal(state.radiance, 3);
+  assert.equal(state.bank.tinderscrap, 12);
 });

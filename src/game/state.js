@@ -46,6 +46,10 @@ export function createState({ nowMs = 0, rngSeed = 1 } = {}) {
 
     bank: { ...STARTER_BANK },
 
+    // Unique items found in play. The starter pack is a boot grant and
+    // does not count — see balance-notes "Almanac LOG items".
+    discovered: {},
+
     // S2 bank chrome — pins, named loadouts (never extra power).
     bankPins: [],
     bankPresets: [],
