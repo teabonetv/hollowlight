@@ -15,6 +15,7 @@
 import { ACTIONS_BY_ID } from '../data/actions.js';
 import { SKILL_BY_ID } from '../data/skills.js';
 import { ITEMS_BY_ID } from '../data/items.js';
+import { formatMissingChip } from '../../core/format.js';
 import { levelFromXp } from '../../core/xp.js';
 import * as bank from './bank.js';
 import * as mods from './modifiers.js';
@@ -89,7 +90,14 @@ export function applyGains(state, gains) {
 export function completeCycle(state, action, rng) {
   if (!bank.canAfford(state.bank, action.costs)) {
     const missing = (action.costs ?? []).find((c) => !bank.canAfford(state.bank, [c]));
-    return { halted: true, reason: `out of ${ITEMS_BY_ID[missing?.id ?? '']?.name ?? 'materials'}` };
+    const remainingQty = missing ? (state.bank[missing.id] ?? 0) : 0;
+    const name = ITEMS_BY_ID[missing?.id ?? '']?.name ?? 'materials';
+    return {
+      halted: true,
+      reason: formatMissingChip(name, remainingQty),
+      remainingQty,
+      missingId: missing?.id ?? null,
+    };
   }
 
   bank.bankPay(state.bank, action.costs);
@@ -170,7 +178,13 @@ export function tickActions(state, dtMs, rng) {
         if (/tinderscrap/i.test(result.reason ?? '')) {
           state.stats.tinderHalts = (state.stats.tinderHalts ?? 0) + 1;
         }
-        events.push({ type: 'halted', actionId, reason: result.reason });
+        events.push({
+          type: 'halted',
+          actionId,
+          reason: result.reason,
+          remainingQty: result.remainingQty,
+          missingId: result.missingId,
+        });
         progress = 0;
         break;
       }

@@ -65,6 +65,11 @@ body {
 }
 
 @media (min-width: 720px) {
+  .camp { padding-top: 26px; gap: 16px; }
+  .sigil {
+    width: 84px; height: 84px;
+    box-shadow: 0 0 46px 10px rgba(217, 164, 65, 0.33);
+  }
   body::before { /* candle-glow vignette behind the column on desktop */
     content: '';
     position: fixed;
@@ -84,7 +89,7 @@ body {
   #app {
     max-width: 1440px;
     width: 100%;
-    grid-template-columns: 88px 1fr;
+    grid-template-columns: 104px minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     grid-template-areas:
       "top top"
@@ -96,13 +101,29 @@ body {
     border-top: 0;
     border-right: 1px solid var(--line-soft);
     padding-bottom: env(safe-area-inset-bottom);
+    min-width: 0;
+    overflow: hidden;
+    background: rgba(7, 9, 13, 0.96);
   }
   .tabbar button {
     min-height: 56px;
     padding: 10px 6px;
+    max-width: 100%;
+    overflow: hidden;
+  }
+  .tabbar button span {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
   #screen {
-    padding: 22px 24px calc(24px + env(safe-area-inset-bottom));
+    min-width: 0;
+    padding: 22px 28px calc(24px + env(safe-area-inset-bottom)) 28px;
+  }
+  .screen-title {
+    overflow-wrap: anywhere;
   }
 }
 
@@ -127,6 +148,11 @@ body {
   letter-spacing: 0.18em;
   font-size: 15px;
   color: var(--gold-hi);
+  flex: 0 0 auto;
+}
+@media (max-width: 420px) {
+  .brand span { display: none; }
+  .pill { padding: 3px 8px; font-size: 12px; }
 }
 .brand svg { width: 22px; height: 22px; color: var(--gold); }
 
@@ -442,14 +468,16 @@ body {
 .auto-toggle input:focus-visible + .switch { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ── camp ──────────────────────────────────────────────────── */
-.camp { align-items: center; text-align: center; padding-top: 26px; }
+.camp { align-items: center; text-align: center; padding-top: 8px; gap: 10px; }
 .sigil-wrap { margin-bottom: 2px; }
 .sigil {
-  width: 84px; height: 84px; border-radius: 50%;
+  width: 52px; height: 52px; border-radius: 50%;
   background: radial-gradient(circle at 50% 40%, #ffe9b0 0%, var(--gold) 45%, transparent 72%);
-  box-shadow: 0 0 46px 10px rgba(217, 164, 65, 0.33);
+  box-shadow: 0 0 28px 6px rgba(217, 164, 65, 0.33);
   animation: breathe 3.4s ease-in-out infinite;
 }
+.stat-cell.stat-complete { grid-column: 1 / -1; }
+.stat-complete .stat-value { color: var(--gold-hi); font-family: var(--font-display); font-size: 22px; }
 @keyframes breathe {
   0%, 100% { transform: scale(1); opacity: 0.85; }
   50% { transform: scale(1.07); opacity: 1; }

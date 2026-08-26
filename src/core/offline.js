@@ -10,6 +10,7 @@
 // so it works for any future content set without edits.
 
 import { levelFromXp } from './xp.js';
+import { formatMissingChip } from './format.js';
 import {
   xpGrantMultiplier, effectiveDurationMs, lumenGainMultiplier,
   radianceGainMultiplier, masteryXpMultiplier,
@@ -224,7 +225,7 @@ export function formatRecapLine(line, resolveItem = (id) => id) {
   let text = `${line.name} ×${n}`;
   if (line.missingId) {
     const left = Number.isFinite(line.remainingQty) ? line.remainingQty : 0;
-    text += ` — out of ${resolveItem(line.missingId)} ×${left}`;
+    text += ` — ${formatMissingChip(resolveItem(line.missingId), left)}`;
   } else if (line.xp > 0) text += ` · +${line.xp} XP`;
   return text;
 }

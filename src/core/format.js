@@ -57,3 +57,12 @@ export function formatNoun(n, singular, plural = `${singular}s`) {
   const word = count === 1 ? singular : plural;
   return `${formatNumber(count)} ${word}`;
 }
+
+/**
+ * Leftover-stack chip shared by the offline recap and the journal halt line.
+ * Always includes ×N (0 and 1 inclusive) so "out of Tinderscrap" is never chip-less.
+ */
+export function formatMissingChip(itemName, qty) {
+  const n = Number.isFinite(qty) ? Math.max(0, Math.floor(qty)) : 0;
+  return `out of ${itemName} ×${n}`;
+}

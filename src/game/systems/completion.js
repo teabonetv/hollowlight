@@ -223,11 +223,27 @@ function featsLogRow(state) {
   return { id: 'feats', name: 'Feats', done, total: list.length, pct: clampRatio(done, list.length) };
 }
 
+/**
+ * Headline percents must move once practice exists. 7/1089 is ~0.6% — flooring
+ * that to 0% next to Feats 27% made the LOG look like mastery did not count.
+ */
+export function formatCompletionPct(pct) {
+  const n = Math.max(0, Math.min(1, Number(pct) || 0));
+  if (n <= 0) return '0%';
+  const hundred = n * 100;
+  if (hundred < 1) {
+    const tenths = Math.max(0.1, Number(hundred.toFixed(1)));
+    if (tenths >= 1) return '1%';
+    return `${tenths.toFixed(1)}%`;
+  }
+  return `${Math.floor(hundred)}%`;
+}
+
 /** Front-and-centre number: mean of Skills / Mastery / Items / Feats. */
 export function totalCompletion(state) {
   const rows = logCategoryStats(state);
   const pct = rows.length ? rows.reduce((s, r) => s + r.pct, 0) / rows.length : 0;
-  return { pct, label: `${Math.floor(pct * 100)}%` };
+  return { pct, label: formatCompletionPct(pct) };
 }
 
 export function nextAchievementHint(state) {

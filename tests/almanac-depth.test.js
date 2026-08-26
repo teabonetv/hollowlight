@@ -11,7 +11,7 @@ globalThis.document = {
 globalThis.requestAnimationFrame = (fn) => 0;
 try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
 
-const { createState } = await import('../src/game/state.js');
+import { createState, pushLog } from '../src/game/state.js';
 const { createRng } = await import('../src/core/rng.js');
 const runner = await import('../src/game/systems/action-runner.js');
 const { unlockPerk } = await import('../src/game/systems/radiance.js');
@@ -304,4 +304,27 @@ test('recap modal freezes the live runner until Claim', () => {
   assert.match(src, /recapOpen = true;\s*loop\.stop\(\)/);
   assert.match(src, /if \(recapOpen\) return;/);
   assert.match(src, /if \(!recapOpen\) loop\.start\(\)/);
+});
+
+test('journal halt uses the same leftover chip as recap', () => {
+  const empty = createState({ nowMs: 0, rngSeed: 1 });
+  empty.bank.tinderscrap = 0;
+  const none = runner.completeCycle(empty, ACTIONS_BY_ID['tend-flame'], createRng(1));
+  assert.equal(none.halted, true);
+  assert.equal(none.reason, 'out of Tinderscrap ×0');
+  pushLog(empty, `Tend the Flame halted: ${none.reason}.`, 0);
+  const scr = renderAlmanacScreen({
+    state: empty,
+    almanacView: () => 'overview',
+    openAlmanac() {},
+    toast() {},
+  });
+  assert.match(scr.node.textContent ?? '', /out of Tinderscrap ×0/);
+  assert.doesNotMatch(scr.node.textContent ?? '', /halted: out of Tinderscrap\./);
+
+  const one = createState({ nowMs: 0, rngSeed: 1 });
+  one.bank.tinderscrap = 1;
+  one.skills.emberkeeping.level = 10;
+  const last = runner.completeCycle(one, ACTIONS_BY_ID['fan-the-coals'], createRng(1));
+  assert.equal(last.reason, 'out of Tinderscrap ×1');
 });

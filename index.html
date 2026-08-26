@@ -9,6 +9,69 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2307090d'/%3E%3Ccircle cx='16' cy='15' r='7' fill='%23d9a441'/%3E%3Ccircle cx='16' cy='13.5' r='3.4' fill='%23ffe9b0'/%3E%3Crect x='11' y='24' width='10' height='2.4' rx='1.2' fill='%238a6a2a'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="./src/ui/styles.css">
 <link rel="stylesheet" href="./src/ui/combat.css">
+<!-- Fetch the ES module graph in parallel. Returning from a document
+     navigation to items.js used to waterfall ~60 modules past the old 8s
+     crash overlay; preload keeps first paint on the live camp/recap. -->
+<link rel="modulepreload" href="./src/ui/app.js">
+<link rel="modulepreload" href="./src/core/event-bus.js">
+<link rel="modulepreload" href="./src/core/format.js">
+<link rel="modulepreload" href="./src/core/offline.js">
+<link rel="modulepreload" href="./src/core/rng.js">
+<link rel="modulepreload" href="./src/core/save.js">
+<link rel="modulepreload" href="./src/core/tick-loop.js">
+<link rel="modulepreload" href="./src/core/xp.js">
+<link rel="modulepreload" href="./src/game/data/achievements.js">
+<link rel="modulepreload" href="./src/game/data/actions.js">
+<link rel="modulepreload" href="./src/game/data/combat/consumables.js">
+<link rel="modulepreload" href="./src/game/data/combat/styles.js">
+<link rel="modulepreload" href="./src/game/data/combat/vigils.js">
+<link rel="modulepreload" href="./src/game/data/combat/weapons.js">
+<link rel="modulepreload" href="./src/game/data/combat/zones.js">
+<link rel="modulepreload" href="./src/game/data/dailies.js">
+<link rel="modulepreload" href="./src/game/data/enemies/bosses.js">
+<link rel="modulepreload" href="./src/game/data/enemies/index.js">
+<link rel="modulepreload" href="./src/game/data/enemies/regulars.js">
+<link rel="modulepreload" href="./src/game/data/item-glyphs.js">
+<link rel="modulepreload" href="./src/game/data/items.js">
+<link rel="modulepreload" href="./src/game/data/mastery.js">
+<link rel="modulepreload" href="./src/game/data/offerings.js">
+<link rel="modulepreload" href="./src/game/data/perks.js">
+<link rel="modulepreload" href="./src/game/data/repairs.js">
+<link rel="modulepreload" href="./src/game/data/skills.js">
+<link rel="modulepreload" href="./src/game/data/store.js">
+<link rel="modulepreload" href="./src/game/data/upgrades.js">
+<link rel="modulepreload" href="./src/game/hydrate.js">
+<link rel="modulepreload" href="./src/game/state.js">
+<link rel="modulepreload" href="./src/game/systems/achievements.js">
+<link rel="modulepreload" href="./src/game/systems/action-runner.js">
+<link rel="modulepreload" href="./src/game/systems/bank.js">
+<link rel="modulepreload" href="./src/game/systems/combat.js">
+<link rel="modulepreload" href="./src/game/systems/completion.js">
+<link rel="modulepreload" href="./src/game/systems/dailies.js">
+<link rel="modulepreload" href="./src/game/systems/discovered.js">
+<link rel="modulepreload" href="./src/game/systems/lantern-room.js">
+<link rel="modulepreload" href="./src/game/systems/mastery-hooks.js">
+<link rel="modulepreload" href="./src/game/systems/modifiers.js">
+<link rel="modulepreload" href="./src/game/systems/offerings.js">
+<link rel="modulepreload" href="./src/game/systems/radiance.js">
+<link rel="modulepreload" href="./src/game/systems/repairs.js">
+<link rel="modulepreload" href="./src/game/systems/stats.js">
+<link rel="modulepreload" href="./src/game/systems/store.js">
+<link rel="modulepreload" href="./src/game/systems/upgrades.js">
+<link rel="modulepreload" href="./src/ui/dom.js">
+<link rel="modulepreload" href="./src/ui/hud.js">
+<link rel="modulepreload" href="./src/ui/icons.js">
+<link rel="modulepreload" href="./src/ui/item-inspector.js">
+<link rel="modulepreload" href="./src/ui/live-paint.js">
+<link rel="modulepreload" href="./src/ui/modals.js">
+<link rel="modulepreload" href="./src/ui/screens/bank.js">
+<link rel="modulepreload" href="./src/ui/screens/combat.js">
+<link rel="modulepreload" href="./src/ui/screens/meta.js">
+<link rel="modulepreload" href="./src/ui/screens/skills.js">
+<link rel="modulepreload" href="./src/ui/screens/store.js">
+<link rel="modulepreload" href="./src/ui/screens/tabs.js">
+<link rel="modulepreload" href="./src/ui/sell-confirm.js">
+<link rel="modulepreload" href="./src/ui/toast.js">
 </head>
 <body>
 <div id="app">
@@ -22,7 +85,7 @@
       <span class="pill gold" id="hud-lumen" title="Lumen">✦ 20</span>
       <span class="pill radiance" id="hud-radiance" title="Radiance">✧ 0</span>
       <span class="pill flame" id="hud-flame" title="Flame units">0 flame</span>
-      <span class="pill hollow" id="hud-hollow" title="Lantern hollow">0 / 12</span>
+      <span class="pill hollow" id="hud-hollow" title="Lantern hollow">0 / 12 hollow</span>
       <button class="icon-btn" id="btn-settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h13"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="19" cy="17" r="2"/></svg>
       </button>
@@ -59,13 +122,11 @@
 
 </div>
 
-<!-- F1d Fix 3: boot-resilience fallback. If a JS module fails to load (e.g.
-     a transient 503 on GitHub Pages), the page would otherwise stay blank
-     forever. This watchdog is plain inline script with inline styles — it
-     needs no external file — and reveals a styled retry screen if the app
-     hasn't signalled a successful boot within 8 seconds.
-     Do not set display:flex on #boot-fallback alone: ID specificity beats
-     UA [hidden]{display:none}, so the overlay would cover a successful boot. -->
+<!-- Boot resilience: a real module failure (or a 45s hang) reveals this
+     overlay. An 8s timer used to dump it while GitHub Pages was still
+     fetching the graph after a document navigation to items.js — the save
+     was fine; Retry recovered. Kindling waits. Do not set display:flex on
+     #boot-fallback alone: ID specificity beats UA [hidden]{display:none}. -->
 <div id="boot-fallback" hidden role="alertdialog" aria-label="Hollowlight failed to load">
   <style>
     #boot-fallback {
@@ -101,13 +162,35 @@
 <script>
 (function () {
   'use strict';
-  window.setTimeout(function () {
+  function reveal() {
     if (window.__HOLLOWLIGHT_BOOTED) return;
     var f = document.getElementById('boot-fallback');
     if (f) f.hidden = false;
-  }, 8000);
+  }
+  window.__HOLLOWLIGHT_BOOT_FAIL = reveal;
+  try {
+    var raw = window.localStorage.getItem('hollowlight.save');
+    if (raw) {
+      var env = JSON.parse(raw);
+      var st = env && env.state ? env.state : {};
+      function setText(id, text) {
+        var n = document.getElementById(id);
+        if (n) n.textContent = text;
+      }
+      if (typeof st.lumen === 'number') setText('hud-lumen', '✦ ' + st.lumen);
+      if (typeof st.radiance === 'number') setText('hud-radiance', '✧ ' + st.radiance);
+      if (typeof st.flame === 'number') setText('hud-flame', st.flame + ' flame');
+    }
+  } catch (e) {}
+  // Last-resort hang only. Module waterfalls after items.js must be allowed
+  // to finish — an 8s crash overlay raced a healthy save.
+  window.setTimeout(reveal, 45000);
 })();
 </script>
-<script type="module" src="./src/ui/app.js"></script>
+<script type="module">
+import('./src/ui/app.js').catch(function () {
+  if (typeof window.__HOLLOWLIGHT_BOOT_FAIL === 'function') window.__HOLLOWLIGHT_BOOT_FAIL();
+});
+</script>
 </body>
 </html>

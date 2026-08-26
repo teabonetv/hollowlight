@@ -11,7 +11,7 @@ import { uniqueStackCount, lanternRoom } from '../game/systems/bank.js';
 
 /** Persistent HUD chip — Melvor pins slots on every screen, not only Bank. */
 export function formatHollowChip(state) {
-  return `${uniqueStackCount(state?.bank)} / ${lanternRoom(state)}`;
+  return `${uniqueStackCount(state?.bank)} / ${lanternRoom(state)} hollow`;
 }
 
 export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
@@ -25,7 +25,7 @@ export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
   if (hollow) {
     const chip = formatHollowChip(state);
     hollow.textContent = chip;
-    hollow.setAttribute?.('title', `Lantern hollow ${chip}`);
+    hollow.setAttribute?.('title', chip);
     hollow.setAttribute?.('aria-label', `Lantern hollow ${chip}`);
   }
 }

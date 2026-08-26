@@ -390,13 +390,13 @@ test('owned dense names wrap at 12px — never ellipsize; starter pack fits 360'
   assert.ok(nameEl.classList.contains('bank-name-dense'));
 });
 
-test('inspector names catalog vs stall today on first paint; HUD hollow chip is N / MAX', () => {
+test('inspector names catalog vs stall today on first paint; HUD hollow chip is N / MAX hollow', () => {
   const s = createState({ rngSeed: 1 });
   const unit = liveSellUnit(s, 'tinderscrap');
   const line = inspectorPriceLawLine(ITEMS_BY_ID.tinderscrap, unit);
   assert.equal(line, 'catalog ✦1 · stall today ✦1 (Fair Trade / stall pressure)');
-  assert.equal(formatHollowChip(s), `${uniqueStackCount(s.bank)} / ${lanternRoom(s)}`);
-  assert.equal(formatHollowChip(s), '6 / 12');
+  assert.equal(formatHollowChip(s), `${uniqueStackCount(s.bank)} / ${lanternRoom(s)} hollow`);
+  assert.equal(formatHollowChip(s), '6 / 12 hollow');
 });
 
 
