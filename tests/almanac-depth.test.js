@@ -310,11 +310,14 @@ test('offline recap modal names leftover Tinderscrap ×0 and ×1', () => {
 test('recap modal freezes the live runner until Claim', () => {
   const src = readFileSync(new URL('../src/ui/app.js', import.meta.url), 'utf8');
   assert.match(src, /let recapOpen = false/);
-  assert.match(src, /recapOpen = true;\s*loop\.stop\(\)/);
+  assert.match(src, /recapOpen = true;\s*loop\.stop\(\);\s*loop\.reset\(\)/);
   assert.match(src, /if \(recapOpen\) return;/);
   assert.match(src, /if \(!recapOpen\) loop\.start\(\)/);
   assert.match(src, /if \(stamp && !recapOpen\)/,
     'persist must not restamp savedAt while recap is unclaimed');
+  assert.match(src, /shouldOfferOfflineRecap\(res\)/);
+  assert.doesNotMatch(src, /t-off-1/,
+    'idle recap must not be swallowed for the claimed-once feat');
 });
 
 test('persistent modal has no Close; dismissible modal keeps it', () => {

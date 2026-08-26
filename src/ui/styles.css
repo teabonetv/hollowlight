@@ -963,6 +963,7 @@ body {
 .modal-actions { padding: 12px 18px calc(14px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line-soft); }
 
 .offline-away { margin: 0 0 10px; font-size: 15px; }
+.offline-idle { margin: 0 0 10px; font-size: 14.5px; }
 .offline-list { display: flex; flex-direction: column; gap: 6px; }
 .offline-line {
   display: flex;
@@ -977,6 +978,23 @@ body {
 .offline-name { min-width: 0; overflow-wrap: anywhere; }
 .offline-detail { font-variant-numeric: tabular-nums; color: var(--muted); }
 .offline-detail.gold { color: var(--gold-hi); }
+.offline-feat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 28vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.offline-feat {
+  font-size: 13.5px;
+  line-height: 1.35;
+  padding: 7px 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
 
 .settings-row {
   display: flex;

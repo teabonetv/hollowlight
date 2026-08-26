@@ -9,7 +9,9 @@
 // restamping savedAt, so offline windows survive). The 30s interval only
 // covers playtime ticking. Hide still persists; return still computes
 // offline before restamp. While a recap is unclaimed, persist never
-// restamps — reload must still offer the same away window.
+// restamps — reload must still offer the same away window. Idle away
+// (≥ min threshold, including active {}) still opens the recap; Claim
+// is the only close. The runner is frozen (stop + reset) until then.
 //
 // Everything DOM-facing lives behind boot(); importing this module from node
 // stays side-effect free.
@@ -22,7 +24,10 @@ import {
   SAVE_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
   storageGet, storageSet,
 } from '../core/save.js';
-import { computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim } from '../core/offline.js';
+import {
+  computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim,
+  shouldOfferOfflineRecap,
+} from '../core/offline.js';
 import { createState, pushLog } from '../game/state.js';
 import { ACTIONS_BY_ID } from '../game/data/actions.js';
 import { ITEMS_BY_ID } from '../game/data/items.js';
@@ -613,16 +618,15 @@ function boot() {
       lastSavedAt: game.savedAt,
       actionsById: ACTIONS_BY_ID,
     });
+    // Always recap when away ≥ min, including idle / feats-only. Swallowing
+    // empty-away lets persist restamp savedAt and the window never returns.
+    if (!shouldOfferOfflineRecap(res)) return;
     const featPreview = previewOfflineClaim(res);
-    if (!res.hasReport && featPreview.feats.length === 0) return;
-    // Don't pop a recap solely for the "claimed once" feat when nothing ran.
-    if (!res.hasReport && featPreview.feats.length === 1 && featPreview.feats[0].id === 't-off-1') {
-      return;
-    }
 
     const levels = [...res.levelUps];
     recapOpen = true;
     loop.stop();
+    loop.reset();
     showOfflineModal(modalRoot, { ...res, featPreview }, {
       onClaim: () => {
         recapOpen = false;
