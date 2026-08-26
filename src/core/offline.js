@@ -17,6 +17,8 @@ import {
 } from '../game/systems/modifiers.js';
 import { grantRadianceFromXp } from '../game/systems/radiance.js';
 import { tryBankAdd } from '../game/systems/bank.js';
+import { cascadeAchievements } from '../game/systems/achievements.js';
+import { pushLog } from '../game/state.js';
 
 export const OFFLINE_CAP_HOURS = 12;
 export const OFFLINE_MIN_AWAY_MS = 60_000;
@@ -27,8 +29,9 @@ function clampPositive(n) { return Math.max(0, Math.floor(n)); }
  * @returns {{
  *   awayMs:number, creditedMs:number, capped:boolean,
  *   gains:{ items:{id:string,name:string,qty:number}, lumen:number, flame:number,
- *           xp:Object<string,number>, actions:Array },
- *   levelUps:Array<{skillId:string,level:number}>,
+ *           radiance:number, xp:Object<string,number>, actions:Array },
+ *   levelUps:Array<{skillId:string,from:number,to:number,level:number}>,
+ *   masteryUps:Array<{actionId:string,name:string,skillId:string,from:number,to:number}>,
  *   nextState:object,
  * }}
  */
@@ -51,8 +54,10 @@ export function computeOfflineProgress({
   const xpGains = {};
   const actionLines = [];
   const idleNotes = [];
+  const masteryUps = [];
   let lumenGained = 0;
   let flameGained = 0;
+  let radianceGained = 0;
   const levelsBefore = {};
   for (const [id, s] of Object.entries(next.skills)) levelsBefore[id] = s.level;
 
@@ -97,6 +102,7 @@ export function computeOfflineProgress({
 
       // expected-value yields
       const skill = next.skills[action.skill];
+      const masteryFrom = skill.mastery[actionId]?.level ?? 1;
       if (!skill.mastery[actionId]) skill.mastery[actionId] = { xp: 0, level: 1 };
       const mastery = skill.mastery[actionId];
       const lumenMult = lumenGainMultiplier(next);
@@ -141,10 +147,18 @@ export function computeOfflineProgress({
       const xpGain = perCycle * completions; // identical rounding to live play
       skill.xp += xpGain;
       xpGains[action.skill] = (xpGains[action.skill] ?? 0) + xpGain;
-      grantRadianceFromXp(next, action.xp * completions, radianceGainMultiplier(next));
+      radianceGained += grantRadianceFromXp(
+        next, action.xp * completions, radianceGainMultiplier(next),
+      );
       const masteryPer = Math.round(action.masteryXp * masteryXpMultiplier(next));
       mastery.xp += masteryPer * completions;
       mastery.level = levelFromXp(mastery.xp);
+      if (mastery.level > masteryFrom) {
+        masteryUps.push({
+          actionId, name: action.name, skillId: action.skill,
+          from: masteryFrom, to: mastery.level,
+        });
+      }
       next.actions.completed[actionId] = (next.actions.completed[actionId] ?? 0) + completions;
       next.stats.actionsDone = (next.stats.actionsDone ?? 0) + completions;
 
@@ -164,12 +178,16 @@ export function computeOfflineProgress({
     // Assign the earned level into the save (D1 fix): XP alone is not enough —
     // startAction gates on skill.level, so an unassigned level locks skills.
     s.level = lvl;
-    if (lvl > levelsBefore[id]) levelUps.push({ skillId: id, level: lvl });
+    if (lvl > levelsBefore[id]) {
+      levelUps.push({ skillId: id, from: levelsBefore[id], to: lvl, level: lvl });
+    }
   }
 
-  // Wall-clock that produced credited work lands in playtime so the HUD
-  // cannot go backwards on Claim (S4 honesty bug).
-  if (creditedMs >= OFFLINE_MIN_AWAY_MS) {
+  // Credited wall-clock lands in playtime only when cycles actually ran.
+  // A feats-only / fuel-halt rewind must not stuff idle hours into
+  // "Time by the Flame" or light "The Work Went On".
+  const hasGains = actionLines.length > 0;
+  if (hasGains) {
     next.stats.playtimeMs = originalPlaytimeMs + creditedMs;
   }
 
@@ -182,15 +200,17 @@ export function computeOfflineProgress({
       items: Object.values(itemGains),
       lumen: lumenGained,
       flame: flameGained,
+      radiance: radianceGained,
       xp: xpGains,
       actions: actionLines,
     },
     levelUps,
+    masteryUps,
     nextState: next,
     idleNotes,
     recapLines: mergeRecapLines(actionLines, idleNotes),
-    hasGains: actionLines.length > 0,
-    hasReport: actionLines.length > 0 || idleNotes.length > 0,
+    hasGains,
+    hasReport: hasGains || idleNotes.length > 0,
   };
 }
 
@@ -228,4 +248,60 @@ export function formatRecapLine(line, resolveItem = (id) => id) {
     text += ` — ${formatMissingChip(resolveItem(line.missingId), left)}`;
   } else if (line.xp > 0) text += ` · +${line.xp} XP`;
   return text;
+}
+
+/** `Foraging 1 → 21` — skill name resolved by the caller (data-free engine). */
+export function formatLevelUpLine(lu, resolveSkill = (id) => id) {
+  const from = lu.from ?? 1;
+  const to = lu.to ?? lu.level;
+  return `${resolveSkill(lu.skillId)} ${from} → ${to}`;
+}
+
+/**
+ * Single-action recaps say `Mastery 1 → 18`. Multiple actions name the craft.
+ * @param {{name:string, from:number, to:number}} mu
+ * @param {{named?:boolean}} [opts]
+ */
+export function formatMasteryUpLine(mu, { named = false } = {}) {
+  const label = named ? `${mu.name} mastery` : 'Mastery';
+  return `${label} ${mu.from} → ${mu.to}`;
+}
+
+/** Always-on cap chip. Short enough for a 360 away-line. */
+export function formatOfflineCapNote(capHours = OFFLINE_CAP_HOURS) {
+  return `Cap ${capHours}h.`;
+}
+
+/**
+ * Wallet + feats Claim will apply on top of `res.nextState`.
+ * OfflineClaims (and "The Work Went On") only fire when cycles actually ran.
+ */
+export function previewOfflineClaim(res) {
+  const preview = structuredClone(res.nextState);
+  preview.stats ??= {};
+  if (res.hasGains) {
+    preview.stats.offlineClaims = (preview.stats.offlineClaims ?? 0) + 1;
+  }
+  const beforeL = preview.lumen;
+  const beforeR = preview.radiance ?? 0;
+  const newly = cascadeAchievements(preview, {
+    onUnlock(a) {
+      pushLog(preview, `Feat lit: ${a.name}.`, preview.stats.playtimeMs ?? 0);
+    },
+  });
+  return {
+    feats: newly,
+    lumen: preview.lumen - beforeL,
+    radiance: (preview.radiance ?? 0) - beforeR,
+    state: preview,
+  };
+}
+
+/** Recap arithmetic: action wallet + feat wallet. Matches post-Claim HUD. */
+export function recapWalletDelta(res, featPreview) {
+  return {
+    lumen: (res.gains?.lumen ?? 0) + (featPreview?.lumen ?? 0),
+    radiance: (res.gains?.radiance ?? 0) + (featPreview?.radiance ?? 0),
+    flame: res.gains?.flame ?? 0,
+  };
 }

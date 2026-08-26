@@ -970,6 +970,7 @@ body {
   background: var(--bg-2);
   font-size: 13.5px;
 }
+.offline-name { min-width: 0; overflow-wrap: anywhere; }
 .offline-detail { font-variant-numeric: tabular-nums; color: var(--muted); }
 .offline-detail.gold { color: var(--gold-hi); }
 
