@@ -114,10 +114,11 @@ export function renderBankScreen(ctx) {
 
   const tabBar = el('div', { class: 'bank-tabs', role: 'tablist', 'aria-label': 'Bank categories' });
   function paintTabs() {
-    const allowed = new Set(visibleBankTabs(ctx.state.bank).map(([id]) => id));
+    const tabs = visibleBankTabs(ctx.state.bank, ctx.state);
+    const allowed = new Set(tabs.map(([id]) => id));
     if (!allowed.has(filter.tab)) filter.tab = DEFAULT_BANK_TAB;
     clear(tabBar);
-    for (const [id, label] of visibleBankTabs(ctx.state.bank)) {
+    for (const [id, label] of tabs) {
       const on = id === filter.tab;
       const b = el('button', {
         class: `bank-tab${on ? ' active' : ''}`,
@@ -322,7 +323,7 @@ export function renderBankScreen(ctx) {
     tile.title = qty > 0 ? `${action} ${it.name}` : known ? `${it.name}, none in the pack` : it.flavor;
     tile.setAttribute('aria-label', `${it.name}, ${qty} owned${sellBit}${stallBit}${lockBit}${knownBit}`);
     qtyEl.textContent = qty > 0 ? formatNumber(qty) : known ? '0' : '—';
-    qtyEl.className = dense ? 'bank-qty visually-hidden' : 'bank-qty';
+    qtyEl.className = dense && qty > 0 ? 'bank-qty visually-hidden' : 'bank-qty';
     chromeEl.textContent = qty > 0 ? itemTileChrome(it, qty) : '';
     chromeEl.className = dense && qty > 0 ? 'bank-chrome' : 'bank-chrome visually-hidden';
     stallEl.textContent = stallPip;
@@ -345,6 +346,7 @@ export function renderBankScreen(ctx) {
       tab: filter.tab,
       query: filter.query,
       pins,
+      state: ctx.state,
     });
     const want = new Set(visible.map((i) => i.id));
     for (const [id, rec] of tiles) {

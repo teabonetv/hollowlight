@@ -27,7 +27,7 @@ const {
 } = await import('../src/ui/screens/bank.js');
 const { inspectorPriceLawLine, inspectorStackStatsLine } = await import('../src/ui/item-inspector.js');
 const { liveSellUnit, addSellPressure } = await import('../src/game/systems/store.js');
-const { formatHollowChip } = await import('../src/ui/hud.js');
+const { formatHollowChip, formatKnownChip, paintHud } = await import('../src/ui/hud.js');
 const { readFileSync } = await import('node:fs');
 const modals = await import('../src/ui/modals.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
@@ -394,7 +394,7 @@ test('owned dense names wrap at 12px — never ellipsize; starter pack fits 360'
   assert.ok(nameEl.classList.contains('bank-name-dense'));
 });
 
-test('inspector names catalog vs stall today on first paint; HUD hollow chip is Hollow N/MAX', () => {
+test('inspector names catalog vs stall today on first paint; HUD chips are Known N/N and Hollow N/MAX', () => {
   const s = createState({ rngSeed: 1 });
   const unit = liveSellUnit(s, 'tinderscrap');
   const line = inspectorPriceLawLine(ITEMS_BY_ID.tinderscrap, unit);
@@ -402,6 +402,9 @@ test('inspector names catalog vs stall today on first paint; HUD hollow chip is 
   assert.equal(formatHollowChip(s), `Hollow ${uniqueStackCount(s.bank)}/${lanternRoom(s)}`);
   assert.equal(formatHollowChip(s), 'Hollow 6/12');
   assert.match(formatHollowChip(s), /^Hollow \d+\/\d+$/);
+  assert.equal(formatKnownChip(s), `Known ${knownItemCount(s)}/${ITEMS.length}`);
+  assert.equal(formatKnownChip(s), 'Known 6/137');
+  assert.match(formatKnownChip(s), /^Known \d+\/\d+$/);
 });
 
 test('Catalogue Fungi do not share one mushroom — each has a unique filled mark', () => {
@@ -601,9 +604,20 @@ test('dump a unique starter stack decrements Hollow occupancy, not known', () =>
   assert.equal(itemTimesFound(s, loafId), priorFound, 'Times Found is not un-counted');
   assert.equal(uniqueStackCount(s.bank), beforeOcc - 1);
   assert.equal(formatHollowChip(s), `Hollow ${beforeOcc - 1}/${lanternRoom(s)}`);
+  assert.equal(formatHollowChip(s), 'Hollow 5/12');
+  assert.equal(formatKnownChip(s), `Known ${beforeKnown}/${ITEMS.length}`);
+  assert.equal(formatKnownChip(s), 'Known 6/137');
   assert.equal(knownItemCount(s), beforeKnown);
   assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, beforeKnown,
     'Almanac items found stays known after a dump');
+
+  const hudKnown = new FakeNode('span');
+  const hudHollow = new FakeNode('span');
+  paintHud(new FakeNode('span'), new FakeNode('span'), s, new FakeNode('span'), { hudKnown, hudHollow });
+  assert.equal(hudKnown.textContent, 'Known 6/137');
+  assert.equal(hudHollow.textContent, 'Hollow 5/12');
+  assert.equal(hudKnown.getAttribute('aria-label'), 'Known 6/137');
+  assert.equal(hudHollow.getAttribute('aria-label'), 'Hollow 5/12');
 
   const opened = [];
   const toasts = [];
@@ -616,6 +630,16 @@ test('dump a unique starter stack decrements Hollow occupancy, not known', () =>
   assert.match(header, new RegExp(`${beforeOcc - 1} / ${lanternRoom(s)}`));
   assert.equal(scr.node.querySelectorAll('.bank-tile').length, beforeOcc - 1,
     'dumped loaf leaves the working pack');
+  const labels = scr.node.querySelectorAll('.bank-tab').map((t) => t.textContent);
+  assert.ok(labels.includes('Food'), 'dumping the last loaf does not drop the Food tab');
+  const food = scr.node.querySelectorAll('.bank-tab').find((t) => t.textContent === 'Food');
+  food.click();
+  const foodLoaf = tileByName(scr.node, 'Lantern-loaf');
+  assert.ok(foodLoaf, 'Food tab keeps the dumped loaf');
+  assert.ok(foodLoaf.classList.contains('known-empty'));
+  assert.equal(foodLoaf.classList.contains('unowned'), false);
+  assert.equal(foodLoaf.querySelector('.bank-qty').textContent, '0');
+  assert.equal(foodLoaf.querySelector('.bank-name').textContent, 'Lantern-loaf');
 
   const cat = scr.node.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
   cat.click();
@@ -668,13 +692,24 @@ test('stall pip paints when catalog ≠ stall on owned and Catalogue tiles', () 
   assert.equal(catPip.textContent, `stall ✦${live}`);
 });
 
-test('Food tab stays on the starter row; tab chips wrap instead of dropping', () => {
+test('Food tab stays on the starter row after dump; HUD chips and tab chips wrap instead of clipping', () => {
   const s = createState({ rngSeed: 1 });
   const scr = tabs.renderBankScreen(makeCtx(s));
   const labels = scr.node.querySelectorAll('.bank-tab').map((t) => t.textContent);
   assert.ok(labels.includes('Food'), 'Lantern-loaf keeps Food on the chip row');
+  sellItems(s, 'lantern-loaf', s.bank['lantern-loaf']);
+  scr.update();
+  const after = scr.node.querySelectorAll('.bank-tab').map((t) => t.textContent);
+  assert.ok(after.includes('Food'), 'Food tab follows known, not occupancy');
   const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
   assert.match(css, /\.bank-tabs\s*\{[^}]*flex-wrap:\s*wrap/s);
+  assert.match(css, /\.hud-counts\s*\{[^}]*flex-wrap:\s*nowrap/s);
+  assert.match(css, /\.pill\.known[\s\S]{0,220}white-space:\s*nowrap/);
+  assert.match(css, /\.pill\.hollow[\s\S]{0,220}white-space:\s*nowrap/);
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  assert.match(html, /id="hud-known"/);
+  assert.match(html, /id="hud-hollow"/);
+  assert.match(html, /Known 0\/137/);
 });
 
 

@@ -8,6 +8,8 @@
 
 import { formatNumber } from '../core/format.js';
 import { uniqueStackCount, lanternRoom } from '../game/systems/bank.js';
+import { ITEMS } from '../game/data/items.js';
+import { knownItemCount } from '../game/systems/completion.js';
 
 /**
  * Persistent HUD chip — Melvor pins `Bank N/MAX` on every screen.
@@ -18,6 +20,21 @@ export function formatHollowChip(state) {
   return `Hollow ${uniqueStackCount(state?.bank)}/${lanternRoom(state)}`;
 }
 
+/**
+ * Persistent HUD chip — Melvor pins Completion Log % beside Bank N/MAX.
+ * Known is ever-found (`itemFound > 0` or discovered), not occupancy.
+ */
+export function formatKnownChip(state) {
+  return `Known ${knownItemCount(state)}/${ITEMS.length}`;
+}
+
+function paintChip(node, chip) {
+  if (!node) return;
+  node.textContent = chip;
+  node.setAttribute?.('title', chip);
+  node.setAttribute?.('aria-label', chip);
+}
+
 export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
   const radiance = formatNumber(state.radiance ?? 0);
   if (hudLumen) hudLumen.textContent = `✦ ${formatNumber(state.lumen)}`;
@@ -25,11 +42,6 @@ export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
   if (hudRadiance) hudRadiance.textContent = `✧ ${radiance}`;
   const unspent = extras.unspentRadiance;
   if (unspent) unspent.textContent = `${radiance} Radiance unspent`;
-  const hollow = extras.hudHollow;
-  if (hollow) {
-    const chip = formatHollowChip(state);
-    hollow.textContent = chip;
-    hollow.setAttribute?.('title', chip);
-    hollow.setAttribute?.('aria-label', chip);
-  }
+  paintChip(extras.hudKnown, formatKnownChip(state));
+  paintChip(extras.hudHollow, formatHollowChip(state));
 }

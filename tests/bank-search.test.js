@@ -40,7 +40,18 @@ test('filterItems: owned / pinned / category / query compose', () => {
   const ghosts = filterItems({ items: ITEMS, bank, tab: 'all', query: '', pins: [] });
   assert.ok(ghosts.some((i) => (bank[i.id] ?? 0) === 0), 'Catalogue still lists unowned items');
   const workingHerbs = filterItems({ items: ITEMS, bank, tab: 'herb', query: '', pins: [] });
-  assert.ok(workingHerbs.every((i) => (bank[i.id] ?? 0) > 0), 'category tabs are working-pack owned-only');
+  assert.ok(workingHerbs.every((i) => (bank[i.id] ?? 0) > 0), 'without state, category tabs fall back to occupancy');
+});
+
+test('category tabs follow known, not occupancy', () => {
+  const s = createState({ rngSeed: 1 });
+  delete s.bank['lantern-loaf'];
+  const food = filterItems({ items: ITEMS, bank: s.bank, tab: 'consumable', query: '', state: s });
+  assert.ok(food.some((i) => i.id === 'lantern-loaf'), 'dumped loaf stays on Food');
+  const ids = visibleBankTabs(s.bank, s).map(([id]) => id);
+  assert.ok(ids.includes('consumable'));
+  assert.equal(ids.includes('fish'), false);
+  assert.equal(ids.includes('gem'), false);
 });
 
 test('visibleBankTabs keep core chips and drop empty categories', () => {
