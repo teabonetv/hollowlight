@@ -114,6 +114,7 @@ function assertHudEqualsSave(label) {
   assert.equal(chip.used, uniqueStackCount(state.bank), `${label}: HUD hollow used == save`);
   assert.equal(chip.cap, lanternRoom(state), `${label}: HUD hollow cap == save`);
   assert.equal(elements['hud-hollow'].textContent, formatHollowChip(state));
+  assert.match(elements['hud-hollow'].textContent, /^Hollow \d+\/\d+$/);
 }
 
 await import('../src/ui/app.js?same-eval');

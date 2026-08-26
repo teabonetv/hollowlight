@@ -42,6 +42,14 @@ export const ICONS = {
   parsley: svg('<path d="M12 21V10"/><path d="M12 10c-2.8-1.2-5.4.2-5.6 3M12 10c2.8-1.2 5.4.2 5.6 3M12 10c0-3.2-1.6-5.6-3.2-6.4"/>'),
   lanternleaf: svg('<path d="M12 3.4c3.8 0 6.6 3.6 6.6 8.2S15.8 20 12 20 5.4 16.2 5.4 11.6 8.2 3.4 12 3.4z"/><path d="M10 9h4v1.4h1v6.2H9V10.4h1z"/>'),
   myrrh: svg('<path d="M12 20.5V11L7 5.2M12 11l5-5.8"/><circle cx="6.4" cy="4.8" r="1.2"/><circle cx="17.6" cy="4.8" r="1.2"/><circle cx="12" cy="10.6" r="1"/>'),
+  morel: svg('<path d="M12 4.2c2.2 0 3.6 2.4 3.6 5.4 0 2-1 3.4-1.6 4.2H10c-.6-.8-1.6-2.2-1.6-4.2 0-3 1.4-5.4 3.6-5.4z"/><path d="M10 13.8h4V20h-4z"/><circle cx="11" cy="7.2" r="0.7"/><circle cx="13.2" cy="8.6" r="0.7"/><circle cx="11.4" cy="10.4" r="0.7"/>'),
+  inkcap: svg('<path d="M9.2 11c0-4 1.2-7.4 2.8-7.4S14.8 7 14.8 11"/><path d="M9.2 11h5.6v2.2c0 1.2-.8 2-2 2.4L12 20"/><path d="M12 20l-1.4 1.6M12 20l1.6 1.4"/>'),
+  puffball: svg('<circle cx="12" cy="11.5" r="6.2"/><path d="M12 17.7V21"/><path d="M9.5 8.4c.4.5 1 .8 1.6.5M14.2 9.2c.3.6 1 .9 1.6.5"/>'),
+  earfungus: svg('<path d="M16.5 6.5c3 3 3.2 8.4 0 11.4-2.4 2.2-6.2 2-8.4-.6-2.4-2.8-1.8-7.4 1-9.6 2.2-1.8 5.2-1.8 7.4-1.2"/><path d="M14.2 9.2c1.8 1.8 2 5.2 0 7.2"/>'),
+  sporecloud: svg('<circle cx="8" cy="9" r="2.2"/><circle cx="13.5" cy="7" r="2.8"/><circle cx="16.5" cy="11.5" r="2.1"/><circle cx="10.5" cy="13.2" r="2.4"/><circle cx="7.2" cy="15.6" r="1.6"/><circle cx="14.8" cy="16.2" r="1.8"/>'),
+  bracket: svg('<path d="M6 19V5"/><path d="M6 7h11a1 1 0 0 1 1 1v2.2a1 1 0 0 1-1 1H6"/><path d="M6 12.6h9.5a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1H6"/>'),
+  lichen: svg('<path d="M12 20V11"/><path d="M12 11l-4.2-4.6M12 11l4.2-4.6"/><path d="M7.8 6.4l-2.4-2M7.8 6.4l-1.2 2.4M16.2 6.4l2.4-2M16.2 6.4l1.2 2.4"/><circle cx="12" cy="11" r="1.1"/>'),
+  lock: svg('<rect x="6" y="10" width="12" height="10" rx="1.6"/><path d="M8.5 10V7.4a3.5 3.5 0 0 1 7 0V10"/><circle cx="12" cy="15.2" r="1.1"/>'),
 };
 
 /** High-contrast packed silhouettes for the owned bank grid (≥32px). */
@@ -78,6 +86,14 @@ export const FILLED_ICONS = {
   parsley: svgFill('<rect x="11.1" y="10.4" width="1.8" height="10.4" rx="0.8"/><ellipse cx="12" cy="5.8" rx="2.2" ry="4.4"/><ellipse cx="6.8" cy="10.2" rx="2.4" ry="4.2" transform="rotate(-48 6.8 10.2)"/><ellipse cx="17.2" cy="10.2" rx="2.4" ry="4.2" transform="rotate(48 17.2 10.2)"/>'),
   lanternleaf: svgFill('<path fill-rule="evenodd" d="M12 2.4c5 0 8.4 4.6 8.4 10s-3.4 10-8.4 10S3.6 17.8 3.6 12.4 7 2.4 12 2.4zM10 8.2h4v1.4h1.2v7.2H8.8V9.6H10zm1.4 3.2v3.4h1.2v-3.4z"/>'),
   myrrh: svgFill('<path d="M11.1 20.6V11.4L6 5.2l1.8-1.6 4.2 5.2 4.2-5.2 1.8 1.6-5.1 6.2v9.2z"/><circle cx="6.2" cy="4.6" r="2"/><circle cx="17.8" cy="4.6" r="2"/><circle cx="12" cy="10.4" r="1.8"/>'),
+  morel: svgFill('<path d="M12 2.8c2.8 0 4.6 2.8 4.6 6.2 0 2.4-1.2 4.2-2 5.2H9.4c-.8-1-2-2.8-2-5.2 0-3.4 1.8-6.2 4.6-6.2z"/><rect x="9.4" y="14" width="5.2" height="7.4" rx="1"/><circle cx="10.6" cy="6.4" r="1"/><circle cx="13.4" cy="8" r="1"/><circle cx="11.2" cy="10" r="0.9"/>'),
+  inkcap: svgFill('<path d="M8.6 11.2C8.6 6.4 10 2.8 12 2.8s3.4 3.6 3.4 8.4H8.6z"/><path d="M9.2 11.2h5.6c0 1.6-1 2.6-2.2 3.2L12 21.2 10.8 14.4c-1.2-.6-1.6-1.6-1.6-3.2z"/><path d="M11.2 20.4l-1.8 2.2h1.6z"/>'),
+  puffball: svgFill('<circle cx="12" cy="11.2" r="7"/><rect x="11" y="17.8" width="2" height="3.6" rx="0.6"/><circle cx="9.6" cy="8.6" r="1.1"/><circle cx="14.2" cy="9.4" r="0.9"/>'),
+  earfungus: svgFill('<path fill-rule="evenodd" d="M17.2 5.8c3.4 3.4 3.6 9.6 0 13-2.8 2.6-7.4 2.4-10-.8-2.8-3.4-2-8.8 1.4-11.4 2.6-2 6.2-2 8.6-.8zM14.4 9.6c2.2 2.2 2.4 6.2 0 8.4-1.6 1.6-4.2 1.4-5.6-.4-1.6-2-1.2-5.2.8-6.8 1.6-1.2 3.6-1.2 4.8-1.2z"/>'),
+  sporecloud: svgFill('<circle cx="8" cy="8.8" r="2.6"/><circle cx="13.6" cy="6.6" r="3.2"/><circle cx="17" cy="11.6" r="2.4"/><circle cx="10.6" cy="13.4" r="2.8"/><circle cx="6.8" cy="16" r="1.9"/><circle cx="15.2" cy="16.4" r="2.1"/>'),
+  bracket: svgFill('<rect x="4.6" y="4.2" width="2.2" height="16.2" rx="0.7"/><rect x="6.6" y="6.2" width="12.4" height="4.2" rx="1.2"/><rect x="6.6" y="12.2" width="10.2" height="4.2" rx="1.2"/>'),
+  lichen: svgFill('<rect x="11.1" y="11" width="1.8" height="10" rx="0.8"/><path d="M12 11.4L6.4 5.2l1.6-1.4 4 4.4 4-4.4 1.6 1.4z"/><circle cx="6.2" cy="4.4" r="1.8"/><circle cx="17.8" cy="4.4" r="1.8"/><circle cx="4.8" cy="8.2" r="1.4"/><circle cx="19.2" cy="8.2" r="1.4"/>'),
+  lock: svgFill('<path fill-rule="evenodd" d="M8 10V7.2a4 4 0 1 1 8 0V10h1.6A1.6 1.6 0 0 1 19.2 11.6v8A1.6 1.6 0 0 1 17.6 21.2H6.4A1.6 1.6 0 0 1 4.8 19.6v-8A1.6 1.6 0 0 1 6.4 10H8zm2 0h4V7.2a2 2 0 1 0-4 0V10z"/>'),
 };
 
 export function icon(name, cls = '') {

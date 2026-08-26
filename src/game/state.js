@@ -50,9 +50,10 @@ export function createState({ nowMs = 0, rngSeed = 1 } = {}) {
     // does not count — see balance-notes "Almanac LOG items".
     discovered: {},
 
-    // S2 bank chrome — pins, named loadouts (never extra power).
+    // S2 bank chrome — pins, named loadouts (never extra power), item locks.
     bankPins: [],
     bankPresets: [],
+    bankLocks: [],
 
     // Stall selling-pressure (recovered from playtime, not wall-clock).
     store: { pressure: {}, pressureAt: {} },

@@ -47,7 +47,15 @@ export const ITEM_GLYPH = {
   'lantern-loaf': 'loaf',
   'wick-oil': 'vial',
   'wick-knife': 'sword',
+
   palecap: 'mushroom',
+  'ghost-morel': 'morel',
+  inkcap: 'inkcap',
+  'bell-puff': 'puffball',
+  'widow-ear': 'earfungus',
+  'glow-spore': 'sporecloud',
+  'rust-bracket': 'bracket',
+  'choir-lichen': 'lichen',
 };
 
 export function itemGlyph(item) {

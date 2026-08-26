@@ -16,16 +16,17 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
 
 const { createState, STARTER_BANK } = await import('../src/game/state.js');
 const { DEFAULT_BANK_TAB, ITEMS, ITEMS_BY_ID } = await import('../src/game/data/items.js');
-const { filterItems, sellItems, bankCount, bankSellValue, uniqueStackCount, lanternRoom } = await import('../src/game/systems/bank.js');
+const { filterItems, sellItems, bankCount, bankSellValue, uniqueStackCount, lanternRoom,
+  toggleLock, isLocked, sellQtyForMode, tryBankAdd } = await import('../src/game/systems/bank.js');
 const { itemGlyph } = await import('../src/game/data/item-glyphs.js');
 const { ICONS, FILLED_ICONS, filledIcon } = await import('../src/ui/icons.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const {
-  prefersDockedInspector, itemTileGlyph, itemTileChrome,
+  prefersDockedInspector, itemTileGlyph, itemTileChrome, itemTileStallPip,
   ownedNameFits, ownedNameClientWidth, OWNED_NAME_LAYOUT,
 } = await import('../src/ui/screens/bank.js');
-const { inspectorPriceLawLine } = await import('../src/ui/item-inspector.js');
-const { liveSellUnit } = await import('../src/game/systems/store.js');
+const { inspectorPriceLawLine, inspectorStackStatsLine } = await import('../src/ui/item-inspector.js');
+const { liveSellUnit, addSellPressure } = await import('../src/game/systems/store.js');
 const { formatHollowChip } = await import('../src/ui/hud.js');
 const { readFileSync } = await import('node:fs');
 const modals = await import('../src/ui/modals.js');
@@ -390,13 +391,164 @@ test('owned dense names wrap at 12px — never ellipsize; starter pack fits 360'
   assert.ok(nameEl.classList.contains('bank-name-dense'));
 });
 
-test('inspector names catalog vs stall today on first paint; HUD hollow chip is N / MAX hollow', () => {
+test('inspector names catalog vs stall today on first paint; HUD hollow chip is Hollow N/MAX', () => {
   const s = createState({ rngSeed: 1 });
   const unit = liveSellUnit(s, 'tinderscrap');
   const line = inspectorPriceLawLine(ITEMS_BY_ID.tinderscrap, unit);
   assert.equal(line, 'catalog ✦1 · stall today ✦1 (Fair Trade / stall pressure)');
-  assert.equal(formatHollowChip(s), `${uniqueStackCount(s.bank)} / ${lanternRoom(s)} hollow`);
-  assert.equal(formatHollowChip(s), '6 / 12 hollow');
+  assert.equal(formatHollowChip(s), `Hollow ${uniqueStackCount(s.bank)}/${lanternRoom(s)}`);
+  assert.equal(formatHollowChip(s), 'Hollow 6/12');
+  assert.match(formatHollowChip(s), /^Hollow \d+\/\d+$/);
 });
+
+test('Catalogue Fungi do not share one mushroom — each has a unique filled mark', () => {
+  const fungi = ITEMS.filter((it) => it.category === 'fungi');
+  const glyphs = fungi.map((it) => itemTileGlyph(it));
+  assert.equal(new Set(glyphs).size, fungi.length, 'no two fungi share a glyph');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID.palecap), 'mushroom');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID['ghost-morel']), 'morel');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID.inkcap), 'inkcap');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID['bell-puff']), 'puffball');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID['widow-ear']), 'earfungus');
+  assert.equal(itemTileGlyph(ITEMS_BY_ID['glow-spore']), 'sporecloud');
+  assert.notEqual(FILLED_ICONS.mushroom, FILLED_ICONS.morel);
+  assert.notEqual(FILLED_ICONS.inkcap, FILLED_ICONS.puffball);
+  assert.notEqual(FILLED_ICONS.earfungus, FILLED_ICONS.sporecloud);
+  assert.notEqual(FILLED_ICONS.bracket, FILLED_ICONS.lichen);
+  const herbs = ITEMS.filter((it) => it.category === 'herb');
+  assert.equal(new Set(herbs.map((it) => itemTileGlyph(it))).size, herbs.length, 'herbs stay unique');
+
+  const s = createState({ rngSeed: 1 });
+  for (const it of fungi) s.bank[it.id] = 1;
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const pale = tileByName(scr.node, 'Pale-cap');
+  const morel = tileByName(scr.node, 'Ghost-morel');
+  const ink = tileByName(scr.node, 'Inkcap');
+  assert.ok(pale && morel && ink);
+  const paleSvg = pale.querySelector('.bank-glyph').innerHTML ?? '';
+  const morelSvg = morel.querySelector('.bank-glyph').innerHTML ?? '';
+  const inkSvg = ink.querySelector('.bank-glyph').innerHTML ?? '';
+  assert.notEqual(paleSvg, morelSvg);
+  assert.notEqual(morelSvg, inkSvg);
+  assert.notEqual(paleSvg, inkSvg);
+  assert.match(paleSvg, /fill="currentColor"/);
+  assert.match(morelSvg, /width="32"/);
+});
+
+test('All-but-1 sells owned minus one; Dump still clears the unique-stack hollow', () => {
+  assert.equal(sellQtyForMode('keep1', 8), 7);
+  assert.equal(sellQtyForMode('keep1', 1), 0);
+  assert.equal(sellQtyForMode('dump', 8), 8);
+  const s = createState({ rngSeed: 6 });
+  const beforeKinds = uniqueStackCount(s.bank);
+  let scr;
+  const ctx = makeCtx(s, {
+    sell(id, qty) {
+      const res = sellItems(s, id, qty);
+      scr.update();
+      return res;
+    },
+  });
+  scr = tabs.renderBankScreen(ctx);
+  scr.node.querySelector('.bank-sell-toggle').click();
+  const keep = scr.node.querySelectorAll('.bank-sell-qty-btn')
+    .find((b) => /All-but-1/.test(b.textContent ?? ''));
+  const dump = scr.node.querySelectorAll('.bank-sell-qty-btn')
+    .find((b) => /Dump/.test(b.textContent ?? ''));
+  assert.ok(keep && dump, 'All-but-1 sits beside Dump');
+  keep.click();
+  const tinder = tileByName(scr.node, 'Tinderscrap');
+  tinder.click();
+  tinder.click();
+  assert.equal(bankCount(s.bank, 'tinderscrap'), 1, 'All-but-1 keeps a single stack');
+  dump.click();
+  tileByName(scr.node, 'Wick-knife').click();
+  assert.equal(s.bank['wick-knife'], undefined);
+  assert.equal(uniqueStackCount(s.bank), beforeKinds - 1);
+  assert.equal(formatHollowChip(s), `Hollow ${beforeKinds - 1}/${lanternRoom(s)}`);
+});
+
+test('item lock survives a feat remount and refuses sell; hollowlight.ui mirrors it', () => {
+  const s = createState({ rngSeed: 8 });
+  const ui = { sellMode: false, sellQtyMode: '1', bankLocks: [] };
+  let scr;
+  const ctx = {
+    get state() { return s; },
+    toast() {},
+    openSellSheet() {},
+    get sellMode() { return ui.sellMode; },
+    setSellMode(v) { ui.sellMode = !!v; },
+    get sellQtyMode() { return ui.sellQtyMode; },
+    setSellQtyMode(v) { ui.sellQtyMode = v; },
+    toggleLock(id) {
+      toggleLock(s, id);
+      ui.bankLocks = [...(s.bankLocks ?? [])];
+    },
+    sell(id, qty) {
+      const res = sellItems(s, id, qty);
+      cascadeAchievements(s);
+      scr = tabs.renderBankScreen(ctx);
+      return res;
+    },
+  };
+  scr = tabs.renderBankScreen(ctx);
+  ctx.toggleLock('tinderscrap');
+  assert.equal(isLocked(s, 'tinderscrap'), true);
+  scr.update();
+  const lockedTile = tileByName(scr.node, 'Tinderscrap');
+  assert.ok(lockedTile.classList.contains('locked'));
+  scr.node.querySelector('.bank-sell-toggle').click();
+  const before = bankCount(s.bank, 'tinderscrap');
+  tileByName(scr.node, 'Tinderscrap').click();
+  assert.equal(bankCount(s.bank, 'tinderscrap'), before, 'locked stack is not sold');
+  const blocked = sellItems(s, 'tinderscrap', 1);
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.error ?? '', /locked/i);
+
+  scr = tabs.renderBankScreen(ctx);
+  assert.ok(tileByName(scr.node, 'Tinderscrap').classList.contains('locked'), 'lock survives remount');
+  assert.deepEqual(ui.bankLocks, ['tinderscrap']);
+});
+
+test('dense owned tile keeps catalog chrome and paints a stall pip when they diverge', () => {
+  const s = createState({ rngSeed: 1 });
+  assert.equal(itemTileStallPip(ITEMS_BY_ID.fogwort, 3), '');
+  assert.equal(itemTileStallPip(ITEMS_BY_ID.fogwort, 2), 'stall ✦2');
+  addSellPressure(s, 'fogwort', 20);
+  const live = liveSellUnit(s, 'fogwort');
+  assert.ok(live < ITEMS_BY_ID.fogwort.sell, 'pressure drops fogwort below catalog');
+  const scr = tabs.renderBankScreen(makeCtx(s));
+  const fog = tileByName(scr.node, 'Fogwort');
+  assert.equal(fog.querySelector('.bank-chrome').textContent, itemTileChrome(ITEMS_BY_ID.fogwort, 4));
+  const pip = fog.querySelector('.bank-stall-pip').textContent ?? '';
+  assert.equal(pip, `stall ✦${live}`);
+  assert.ok(fog.classList.contains('stall-divergent'));
+  const tinder = tileByName(scr.node, 'Tinderscrap');
+  assert.equal(tinder.querySelector('.bank-stall-pip').classList.contains('visually-hidden'), true);
+});
+
+test('inspector stack stats pull times found / sold / lumen taken without a version bump', () => {
+  const s = createState({ rngSeed: 1 });
+  assert.equal(inspectorStackStatsLine(s, 'palecap'), 'times found 0 · sold 0 · lumen taken ✦0');
+  tryBankAdd(s, 'palecap', 3);
+  assert.equal(inspectorStackStatsLine(s, 'palecap'), 'times found 3 · sold 0 · lumen taken ✦0');
+  const sold = sellItems(s, 'palecap', 2);
+  assert.equal(sold.ok, true);
+  assert.equal(
+    inspectorStackStatsLine(s, 'palecap'),
+    `times found 3 · sold 2 · lumen taken ✦${sold.gained}`,
+  );
+  const prev = globalThis.window;
+  globalThis.window = { matchMedia: (q) => ({ matches: /min-width:\s*900px/.test(q) }) };
+  const scr = tabs.renderBankScreen(makeCtx(s, { sell: (id, qty) => sellItems(s, id, qty) }));
+  tileByName(scr.node, 'Pale-cap').click();
+  const dock = scr.node.querySelector('.bank-inspector').textContent ?? '';
+  assert.match(dock, /times found 3/);
+  assert.match(dock, /sold 2/);
+  assert.match(dock, /lumen taken ✦/);
+  assert.match(dock, /catalog ✦4 · stall today ✦/);
+  globalThis.window = prev;
+});
+
 
 

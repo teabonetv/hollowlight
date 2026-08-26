@@ -9,9 +9,13 @@
 import { formatNumber } from '../core/format.js';
 import { uniqueStackCount, lanternRoom } from '../game/systems/bank.js';
 
-/** Persistent HUD chip — Melvor pins slots on every screen, not only Bank. */
+/**
+ * Persistent HUD chip — Melvor pins `Bank N/MAX` on every screen.
+ * The noun is visible text, not title/aria only. Bank is the workplace;
+ * this chip names the lantern's hollow (unique-stack cap).
+ */
 export function formatHollowChip(state) {
-  return `${uniqueStackCount(state?.bank)} / ${lanternRoom(state)} hollow`;
+  return `Hollow ${uniqueStackCount(state?.bank)}/${lanternRoom(state)}`;
 }
 
 export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
@@ -26,6 +30,6 @@ export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
     const chip = formatHollowChip(state);
     hollow.textContent = chip;
     hollow.setAttribute?.('title', chip);
-    hollow.setAttribute?.('aria-label', `Lantern hollow ${chip}`);
+    hollow.setAttribute?.('aria-label', chip);
   }
 }
