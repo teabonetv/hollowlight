@@ -497,7 +497,7 @@ body {
 .bank-grids { width: 100%; }
 .bank-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; width: 100%; }
 .bank-grid-owned {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
 }
 .bank-tile {
