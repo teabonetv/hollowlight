@@ -43,8 +43,8 @@ export const COMBAT_360 = {
   souls: 32,
   zoneChips: 44,
   huntCardAboveBtn: 140,
-  logLine: 17,
-  logPadY: 12,
+  logLine: 15,
+  logPadY: 6,
   logLinesLeftover: 4,
 };
 
@@ -56,7 +56,7 @@ export function cockpitLogVsTab(kind = 'leftover') {
   const screenBottom = tabTop - C.screenPadBottom;
   const cockpitTop = screenTop + C.detailHead + 4;
   const rows = kind === 'leftover'
-    ? [C.kicker, C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.loot, C.hunt]
+    ? [C.kicker, C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.loot]
     : [C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.keep];
   const chrome = rows.reduce((a, b) => a + b, 0) + C.gap * Math.max(0, rows.length - 1);
   const logTop = cockpitTop + chrome;
@@ -569,6 +569,7 @@ function buildFight(ctx, st, paint) {
   });
   wrap.append(keep);
 
+  wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(st.log));
   return wrap;
 }
@@ -583,12 +584,13 @@ function fighterBlock({ title, hp, max, fillClass, compact = false }) {
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
 }
 
-function eatRow(ctx, st, paint, { flee = false } = {}) {
+function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {}) {
   const row = el('div', { class: 'eat-row' });
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
     row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
     if (flee) row.append(fleeButton(ctx, paint));
+    if (hunt) row.append(leftoverHunt(ctx, hunt, dry, paint));
     return row;
   }
   const n = bankCount(ctx.state.bank, id);
@@ -626,6 +628,7 @@ function eatRow(ctx, st, paint, { flee = false } = {}) {
     },
   }, 'Eat'));
   if (flee) slot.append(fleeButton(ctx, paint));
+  if (hunt) slot.append(leftoverHunt(ctx, hunt, dry, paint));
   row.append(slot);
   return row;
 }
@@ -661,12 +664,12 @@ function leftoverStation(ctx, st, paint) {
   const dry = sips <= 0;
   wrap.append(el('p', { class: `oil-line ${dry ? 'danger leftover-dry' : 'muted'}` },
     dry ? 'Need oil' : `${formatNoun(sips, 'lantern sip')} remaining`));
-  wrap.append(eatRow(ctx, st, paint));
+  wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
   wrap.append(handChip(ctx, st, paint));
   wrap.append(styleRow(ctx, st, paint));
   const loot = leftoverLootRow(last);
   if (loot) wrap.append(loot);
-  wrap.append(leftoverHunt(ctx, last, dry, paint));
+  wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
   return wrap;
 }
@@ -696,7 +699,7 @@ function leftoverHunt(ctx, last, dry, paint) {
   const enemy = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
   const name = last.enemyName ?? enemy?.name ?? 'this foe';
   return el('button', {
-    class: `btn btn-wide leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    class: `btn leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
     'aria-disabled': dry ? 'true' : 'false',
     onclick: () => {
       if (!last.enemyId) return;
