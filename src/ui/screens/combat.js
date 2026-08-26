@@ -74,8 +74,7 @@ function buildHub(ctx, st, paint) {
   const spilled = deathBanner(ctx, st, paint);
   if (spilled) wrap.append(spilled);
   wrap.append(vigilCard(ctx, st, paint));
-  wrap.append(leftover ? handChip(ctx, st, paint) : handSlot(ctx, st, paint));
-  if (leftover) wrap.append(styleRow(ctx, st, paint));
+  if (!leftover) wrap.append(handSlot(ctx, st, paint));
 
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
   wrap.append(zonePicker(ctx, zoneId, paint));
@@ -576,9 +575,12 @@ function leftoverStation(ctx, st, paint) {
   wrap.append(el('p', { class: `oil-line ${dry ? 'danger leftover-dry' : 'muted'}` },
     dry ? 'Need oil' : `${formatNoun(sips, 'lantern sip')} remaining`));
   wrap.append(eatRow(ctx, st, paint));
+  wrap.append(handChip(ctx, st, paint));
+  wrap.append(styleRow(ctx, st, paint));
   const loot = leftoverLootRow(last);
   if (loot) wrap.append(loot);
   wrap.append(leftoverHunt(ctx, last, dry, paint));
+  wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
   return wrap;
 }
 
@@ -595,6 +597,12 @@ function leftoverLootRow(last) {
   }
   if (!chips.length) chips.push(el('span', { class: 'chip' }, 'nothing but quiet'));
   return chipRow('leftover-loot chips', chips);
+}
+
+function leftoverLog(st) {
+  const pinned = st.lastStation?.log;
+  if (Array.isArray(pinned) && pinned.length) return pinned;
+  return st.log ?? [];
 }
 
 function leftoverHunt(ctx, last, dry, paint) {
@@ -616,15 +624,15 @@ function leftoverHunt(ctx, last, dry, paint) {
   }, dry ? 'Need oil' : `Hunt ${name}`);
 }
 
-function logPanel(log) {
-  const lines = [...(log ?? [])].slice(-12).reverse();
+function logPanel(log, { lines = 12 } = {}) {
+  const shown = [...(log ?? [])].slice(-lines).reverse();
   const box = el('div', { class: 'combat-log', 'aria-label': 'Combat log' });
-  if (!lines.length) {
+  if (!shown.length) {
     box.append(el('p', { class: 'muted' }, 'The fog holds its breath.'));
-    return el('div', {}, el('h3', { class: 'log-h' }, 'Log'), box);
+    return el('div', { class: 'log-wrap' }, el('h3', { class: 'log-h' }, 'Log'), box);
   }
-  for (const line of lines) {
+  for (const line of shown) {
     box.append(el('p', { class: `log-line log-${line.kind ?? 'info'}` }, line.text));
   }
-  return el('div', {}, el('h3', { class: 'log-h' }, 'Log'), box);
+  return el('div', { class: 'log-wrap' }, el('h3', { class: 'log-h' }, 'Log'), box);
 }
