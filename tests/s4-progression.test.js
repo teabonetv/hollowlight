@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createState, pushLog } from '../src/game/state.js';
+import { createState, pushLog, STARTER_BANK } from '../src/game/state.js';
 import { createRng } from '../src/core/rng.js';
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_ID } from '../src/game/data/achievements.js';
 import { PERKS } from '../src/game/data/perks.js';
@@ -397,7 +397,8 @@ test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats do not pad 
   const feats = rows.find((r) => r.id === 'feats');
   const items = rows.find((r) => r.id === 'items');
   const mastery = rows.find((r) => r.id === 'mastery');
-  assert.equal(items.done, 0, 'fresh Items is 0 — starter pack is not 4% of the book');
+  assert.equal(items.done, Object.keys(STARTER_BANK).length,
+    'fresh Items is Times Found known, not occupancy-as-zero');
   assert.equal(mastery.done, 0, 'unpracticed mastery is 0, not fake 1/99');
   const tot = totalCompletion(s);
   assert.equal(tot.label, before.label, 'tab-open feats must not move the headline');
@@ -425,15 +426,16 @@ test('practiced mastery 7/1089 prints 0.6%, not 0%, next to Feats', () => {
   assert.equal(formatCompletionPct(0), '0%');
 });
 
-test('discovered items never decrease when the last stack is spent', () => {
+test('known items never decrease when the last stack is spent', () => {
   const s = createState({ nowMs: 0, rngSeed: 1 });
-  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, 0);
+  const starterKnown = Object.keys(STARTER_BANK).length;
+  assert.equal(logCategoryStats(s).find((r) => r.id === 'items').done, starterKnown);
   assert.equal(Object.keys(s.discovered).length, 0);
 
   const herbs = ACTIONS_BY_ID['gather-herbs'];
   completeCycle(s, herbs, createRng(1));
   const afterFind = logCategoryStats(s).find((r) => r.id === 'items').done;
-  assert.ok(afterFind >= 1, 'first pickup after boot writes the book');
+  assert.ok(afterFind >= starterKnown, 'live pickup does not un-know the starter pack');
   assert.equal(!!s.discovered.fogwort, true);
 
   s.bank.fogwort = 1;
@@ -500,7 +502,8 @@ test('v4 saves gain an empty discovered map (v4→v5)', () => {
   assert.deepEqual(state.discovered, {});
   assert.equal(state.combat.foodId, null);
   assert.equal(state.combat.lastStation, null);
-  assert.equal(logCategoryStats(state).find((r) => r.id === 'items').done, 0);
+  assert.equal(logCategoryStats(state).find((r) => r.id === 'items').done, 2,
+    'held stacks floor Times Found so v4 goods stay known');
   assert.equal(state.radiance, 3);
   assert.equal(state.bank.tinderscrap, 12);
   assert.deepEqual(state.bankLocks, []);

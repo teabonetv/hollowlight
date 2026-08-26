@@ -11,6 +11,8 @@ import {
 } from '../../game/systems/bank.js';
 import { formatNumber } from '../../core/format.js';
 import { liveSellUnit } from '../../game/systems/store.js';
+import { isItemKnown } from '../../game/systems/stats.js';
+import { knownItemCount } from '../../game/systems/completion.js';
 import { createItemInspector, soldToastMessage } from '../item-inspector.js';
 import {
   sellConfirmPending, clearSellConfirm, armSellConfirm, SELL_CONFIRM_WINDOW_MS,
@@ -211,7 +213,7 @@ export function renderBankScreen(ctx) {
       mountDocked(itemId);
       return;
     }
-    if (q > 0) ctx.openSellSheet(itemId);
+    if (q > 0 || isItemKnown(ctx.state, itemId)) ctx.openSellSheet(itemId);
     else {
       const it = [...tiles.values()].find((r) => r.item.id === itemId)?.item;
       ctx.toast(`${it?.name ?? itemId}: not yet found. ${it?.flavor ?? ''}`, 'info');
@@ -292,16 +294,18 @@ export function renderBankScreen(ctx) {
   function paintTile(rec, dense) {
     const { item: it, tile, qtyEl, chromeEl, stallEl, pinMark, lockMark, glyphEl, nameEl } = rec;
     const qty = bankCount(ctx.state.bank, it.id);
+    const known = isItemKnown(ctx.state, it.id);
     const pinned = isPinned(ctx.state, it.id);
     const held = isLocked(ctx.state, it.id);
     const rarity = it.unique ? 'unique' : it.rare ? 'rare' : `tier-${it.tier ?? 1}`;
     const glyph = itemTileGlyph(it);
     const live = qty > 0 ? liveSellUnit(ctx.state, it.id) : it.sell;
     const stallPip = qty > 0 ? itemTileStallPip(it, live) : '';
+    const holdClass = qty > 0 ? 'owned' : known ? 'known-empty' : 'unowned';
     tile.className = [
       'bank-tile',
       dense ? 'bank-tile-dense' : 'bank-tile-catalogue',
-      qty > 0 ? 'owned' : 'unowned',
+      holdClass,
       pinned ? 'pinned' : '',
       held ? 'locked' : '',
       stallPip ? 'stall-divergent' : '',
@@ -313,15 +317,16 @@ export function renderBankScreen(ctx) {
     const sellBit = qty > 0 ? `, catalog ✦${it.sell} each` : '';
     const stallBit = stallPip ? `, ${stallPip}` : '';
     const lockBit = held ? ', locked' : '';
+    const knownBit = !qty && known ? ', known' : '';
     const action = sellMode && qty > 0 ? (held ? 'Locked' : 'Sell') : 'Inspect';
-    tile.title = qty > 0 ? `${action} ${it.name}` : it.flavor;
-    tile.setAttribute('aria-label', `${it.name}, ${qty} owned${sellBit}${stallBit}${lockBit}`);
-    qtyEl.textContent = qty > 0 ? formatNumber(qty) : '—';
+    tile.title = qty > 0 ? `${action} ${it.name}` : known ? `${it.name}, none in the pack` : it.flavor;
+    tile.setAttribute('aria-label', `${it.name}, ${qty} owned${sellBit}${stallBit}${lockBit}${knownBit}`);
+    qtyEl.textContent = qty > 0 ? formatNumber(qty) : known ? '0' : '—';
     qtyEl.className = dense ? 'bank-qty visually-hidden' : 'bank-qty';
     chromeEl.textContent = qty > 0 ? itemTileChrome(it, qty) : '';
     chromeEl.className = dense && qty > 0 ? 'bank-chrome' : 'bank-chrome visually-hidden';
     stallEl.textContent = stallPip;
-    stallEl.className = dense && stallPip ? 'bank-stall-pip' : 'bank-stall-pip visually-hidden';
+    stallEl.className = stallPip ? 'bank-stall-pip' : 'bank-stall-pip visually-hidden';
     pinMark.textContent = pinned ? '★' : '';
     lockMark.innerHTML = held ? filledIcon('lock') : '';
     lockMark.className = held ? 'bank-lock' : 'bank-lock visually-hidden';
@@ -444,12 +449,11 @@ export function renderBankScreen(ctx) {
   paintSellBar();
 
   function update() {
-    let discovered = 0;
-    for (const it of ITEMS) if (bankCount(ctx.state.bank, it.id) > 0) discovered++;
+    const known = knownItemCount(ctx.state);
     const used = uniqueStackCount(ctx.state.bank);
     const cap = lanternRoom(ctx.state);
     headerSub.textContent =
-      `${discovered} of ${ITEMS.length} known · ${used} / ${cap} · catalog worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
+      `${known} of ${ITEMS.length} known · ${used} / ${cap} · catalog worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
     paintTabs();
     paintSellBar();
     syncGrid();

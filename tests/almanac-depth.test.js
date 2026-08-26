@@ -138,7 +138,7 @@ test('LOG screen lists Skills / Mastery / Items / Feats rows', () => {
   assert.deepEqual(names, ['Skills', 'Mastery', 'Items', 'Feats']);
   const rows = logCategoryStats(state);
   assert.equal(rows.length, 4);
-  assert.equal(rows.find((r) => r.id === 'items').done, 0, 'starter pack is not 4% of the book');
+  assert.equal(rows.find((r) => r.id === 'items').done, 6, 'starter Times Found is known, not occupancy-zero');
   assert.equal(rows.find((r) => r.id === 'mastery').done, 0, 'fresh mastery is 0');
   assert.ok(totalCompletion(state).pct < 0.08);
   assert.match(COMPLETION_HONESTY_RULE, /True completion must not move when you open the Almanac/i);
