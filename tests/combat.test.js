@@ -593,5 +593,114 @@ test('dismissLastStation clears leftover without starting a fight', () => {
   assert.equal(s.combat.lastStation?.enemyId, 'wick-thief');
   combat.dismissLastStation(s);
   assert.equal(s.combat.lastStation, null);
+  assert.deepEqual(s.combat.lootTray, []);
   assert.equal(s.combat.fighting, false);
+});
+
+function killPaleMoth(s, encounterSeed = 1) {
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (s.combat.foe) s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  return kill;
+}
+
+test('loot tray holds prior kill chips across the next hunt until Take all', () => {
+  const s = createState({ rngSeed: 4 });
+  assert.ok(killPaleMoth(s, 1));
+  const first = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
+  assert.ok(first.length >= 1, 'first kill fills the visible pile');
+  assert.ok(first.some((e) => e.kind === 'soul'));
+  assert.ok(first.some((e) => e.kind === 'lumen'));
+  const lumenAfterFirst = s.lumen;
+  const soulsAfterFirst = s.souls;
+  const bankAfterFirst = { ...s.bank };
+
+  assert.ok(killPaleMoth(s, 2));
+  const tray = s.combat.lootTray;
+  assert.ok(tray.some((e) => e.kind === 'soul' && e.qty >= 2), 'souls stack across hunts');
+  for (const row of first) {
+    const hit = tray.find((t) => t.kind === row.kind && (row.kind !== 'item' || t.id === row.id));
+    assert.ok(hit, `prior ${row.kind} ${row.name ?? row.id ?? ''} still in the pile`);
+    assert.ok(hit.qty >= row.qty);
+  }
+
+  const lumen = s.lumen;
+  const souls = s.souls;
+  const res = combat.takeAllLootTray(s);
+  assert.equal(res.ok, true);
+  assert.equal(res.granted.length, 0, 'kill loot was already banked');
+  assert.deepEqual(s.combat.lootTray, []);
+  assert.equal(s.lumen, lumen);
+  assert.equal(s.souls, souls);
+  assert.ok(s.lumen >= lumenAfterFirst);
+  assert.ok(s.souls >= soulsAfterFirst);
+  for (const [id, n] of Object.entries(bankAfterFirst)) {
+    assert.ok((s.bank[id] ?? 0) >= n, `${id} stayed earned`);
+  }
+});
+
+test('Take all pays only pending tray rows, never a second grant', () => {
+  const s = createState({ rngSeed: 4 });
+  assert.ok(killPaleMoth(s, 1));
+  s.combat.lootTray.push({ kind: 'lumen', qty: 3, name: 'Lumen', granted: false });
+  const lumen = s.lumen;
+  const souls = s.souls;
+  const fang = s.bank['pall-fang'] ?? 0;
+  const res = combat.takeAllLootTray(s);
+  assert.equal(res.ok, true);
+  assert.equal(s.lumen, lumen + 3);
+  assert.equal(s.souls, souls);
+  assert.equal(s.bank['pall-fang'] ?? 0, fang);
+  assert.deepEqual(s.combat.lootTray, []);
+});
+
+test('Fall back keeps the loot tray; Hunt another dismisses it', () => {
+  const s = createState({ rngSeed: 4 });
+  assert.ok(killPaleMoth(s, 1));
+  const before = s.combat.lootTray.map((e) => ({ ...e }));
+  assert.ok(before.length >= 1);
+  combat.startFight(s, 'pale-moth', { encounterSeed: 9 });
+  combat.fleeFight(s);
+  assert.equal(s.combat.lastStation?.ended, 'flee');
+  assert.equal(s.combat.lootTray.length, before.length);
+  for (const row of before) {
+    const hit = s.combat.lootTray.find((t) => t.kind === row.kind && t.id === row.id);
+    assert.ok(hit);
+    assert.equal(hit.qty, row.qty);
+  }
+  combat.dismissLastStation(s);
+  assert.equal(s.combat.lastStation, null);
+  assert.deepEqual(s.combat.lootTray, []);
+});
+
+test('v5 hydrate unions lootTray without a SAVE_VERSION bump', () => {
+  const json = JSON.stringify({
+    version: 5,
+    savedAt: 1,
+    state: {
+      lumen: 22,
+      combat: {
+        fighting: false,
+        lastStation: {
+          enemyId: 'pale-moth',
+          enemyName: 'Pale Moth',
+          ended: 'kill',
+          souls: 1,
+          loot: [{ kind: 'lumen', qty: 2, name: 'Lumen' }],
+        },
+      },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(JSON.parse(serializeSave(state, 1)).version, 5);
+  assert.ok(Array.isArray(state.combat.lootTray));
+  assert.ok(state.combat.lootTray.some((e) => e.kind === 'soul' && e.qty === 1));
+  assert.ok(state.combat.lootTray.some((e) => e.kind === 'lumen' && e.qty === 2));
+  assert.equal(state.combat.lastStation?.enemyId, 'pale-moth');
 });
