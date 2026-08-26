@@ -75,12 +75,34 @@ export function hydrateStats(stats, nowMs = 0) {
   for (const k of STAT_KEYS) {
     if (!Number.isFinite(out[k])) out[k] = base[k];
   }
-  // Per-stack inspector counters (Melvor Times Found). Missing maps stay
-  // empty — we do not invent history from current qty or capped journal logs.
+  // Per-stack inspector counters (Melvor Times Found). Maps stay empty here
+  // (no bank to read). hydrateState floors found up to held qty so a stack
+  // you hold is never 0 — that is not invented sold+held history.
   out.itemFound = hydrateCountMap(out.itemFound);
   out.itemSold = hydrateCountMap(out.itemSold);
   out.itemLumen = hydrateCountMap(out.itemLumen);
   return out;
+}
+
+/**
+ * Times Found is never 0 for a stack in the bank. Raise found to held qty
+ * when the counter lagged (starter pack, old v5 saves). Do not invent
+ * history: found 10 with 1 held stays 10.
+ */
+export function floorItemFoundToHeld(state) {
+  if (!state || typeof state !== 'object') return state;
+  state.stats ??= {};
+  state.stats.itemFound ??= {};
+  const bank = state.bank && typeof state.bank === 'object' && !Array.isArray(state.bank)
+    ? state.bank
+    : {};
+  for (const [id, qty] of Object.entries(bank)) {
+    const n = Math.floor(Number(qty));
+    if (!Number.isFinite(n) || n <= 0) continue;
+    const found = state.stats.itemFound[id] ?? 0;
+    if (n > found) state.stats.itemFound[id] = n;
+  }
+  return state;
 }
 
 export function itemTimesFound(state, itemId) {

@@ -11,7 +11,7 @@ import {
 } from '../../game/systems/bank.js';
 import { formatNumber } from '../../core/format.js';
 import { liveSellUnit } from '../../game/systems/store.js';
-import { createItemInspector } from '../item-inspector.js';
+import { createItemInspector, soldToastMessage } from '../item-inspector.js';
 import {
   sellConfirmPending, clearSellConfirm, armSellConfirm, SELL_CONFIRM_WINDOW_MS,
 } from '../sell-confirm.js';
@@ -243,7 +243,7 @@ export function renderBankScreen(ctx) {
     const res = ctx.sell(itemId, qty);
     clearSellConfirm(itemId);
     if (!res.ok) { ctx.toast(res.error ?? 'Could not sell.', 'warn'); return; }
-    ctx.toast(`Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`, 'success');
+    ctx.toast(soldToastMessage(item, res), 'success');
     if (prefersDockedInspector()) mountDocked(itemId);
   }
 

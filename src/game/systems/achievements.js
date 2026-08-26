@@ -14,6 +14,14 @@ export function featToastMessage(a) {
   return `Feat: ${a.name}.`;
 }
 
+/** One mutation, one toast: keep the action line and any feat unlocks together. */
+export function actionFeatToast(actionLine, feats) {
+  const featPart = (feats ?? []).map(featToastMessage).filter(Boolean).join(' ');
+  const action = String(actionLine ?? '').trim();
+  if (action && featPart) return `${action} ${featPart}`;
+  return action || featPart;
+}
+
 export function achievementBonus(state, stat) {
   let sum = 0;
   for (const id of Object.keys(state.achievements?.unlocked ?? {})) {

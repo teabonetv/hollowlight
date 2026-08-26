@@ -9,6 +9,7 @@ import { bankCount, needsSellConfirm, isPinned, isLocked, sellQtyForMode } from 
 import { liveSellUnit } from '../game/systems/store.js';
 import { sparksFor } from '../game/systems/offerings.js';
 import { itemTimesFound, itemTimesSold, itemLumenTaken } from '../game/systems/stats.js';
+import { actionFeatToast } from '../game/systems/achievements.js';
 import {
   sellConfirmPending, clearSellConfirm, armSellConfirm, SELL_CONFIRM_WINDOW_MS,
 } from './sell-confirm.js';
@@ -24,6 +25,12 @@ export function inspectorStackStatsLine(state, itemId) {
   const sold = itemTimesSold(state, itemId);
   const taken = itemLumenTaken(state, itemId);
   return `times found ${formatNumber(found)} · sold ${formatNumber(sold)} · lumen taken ✦${formatNumber(taken)}`;
+}
+
+/** Grid / inspector sell copy. Feats from the same mutation ride on this line. */
+export function soldToastMessage(item, res) {
+  const line = `Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`;
+  return actionFeatToast(line, res.feats);
 }
 
 function itemMeta(item) {
@@ -139,7 +146,7 @@ export function createItemInspector(ctx, itemId, {
     const res = ctx.sell(itemId, qtyRequested);
     if (!res.ok) { ctx.toast(res.error ?? 'Could not sell.', 'warn'); paintButtons(); return; }
     clearSellConfirm(itemId);
-    ctx.toast(`Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`, 'success');
+    ctx.toast(soldToastMessage(item, res), 'success');
     paintButtons();
     paintOffer();
     paintLock();
