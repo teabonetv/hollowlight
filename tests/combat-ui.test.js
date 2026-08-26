@@ -43,6 +43,7 @@ function makeCtx(state) {
     setCombatAutoContinue: (on) => { state.combat.autoContinue = !!on; },
     selectFood: (id) => combat.selectFood(state, id),
     cycleFood: () => combat.cycleFood(state),
+    dismissLastStation: () => combat.dismissLastStation(state),
   };
 }
 
@@ -720,4 +721,94 @@ test('leftover log-wrap CSS is 96px+ and leftover-live does not scroll the lobby
   assert.match(css, /\.leftover-station\s*\{[^}]*height:\s*100%/);
   assert.match(css, /\.screen\.leftover-live\s*\{[^}]*flex:\s*1 1 0/);
   assert.match(css, /\.cockpit-fill\s*\{[^}]*flex:\s*1/);
+});
+
+test('live panel.update keeps Eat and Fall back nodes; eatFood and fleeFight still run', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'wick-thief', { encounterSeed: 1 });
+  combat.resumeCombat(state);
+  const max = combat.playerMaxHp(state);
+  state.combat.player.hp = Math.max(8, max - 20);
+  const loafBefore = state.bank['lantern-loaf'] ?? 0;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const eatBtn = scr.node.querySelector('.eat-btn');
+  const fleeBtn = scr.node.querySelector('.flee-btn');
+  const strike = scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Strike');
+  const keep = scr.node.querySelector('.combat-keep');
+  const back = scr.node.querySelector('.icon-btn');
+  const hand = scr.node.querySelector('.hand-chip');
+  assert.ok(eatBtn && fleeBtn && strike && keep && back && hand);
+  for (let i = 0; i < 10; i++) {
+    if (state.combat.foe) state.combat.foe.hp = Math.max(4, state.combat.foe.hp);
+    combat.tickCombat(state, 100);
+    assert.equal(state.combat.fighting, true);
+    scr.update();
+    assert.equal(scr.node.querySelector('.eat-btn'), eatBtn, 'Eat node must survive ticks');
+    assert.equal(scr.node.querySelector('.flee-btn'), fleeBtn, 'Fall back node must survive ticks');
+    assert.equal(scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Strike'), strike);
+    assert.equal(scr.node.querySelector('.combat-keep'), keep);
+    assert.equal(scr.node.querySelector('.icon-btn'), back);
+    assert.equal(scr.node.querySelector('.hand-chip'), hand);
+  }
+  const hpBefore = state.combat.player.hp;
+  eatBtn.click();
+  assert.ok(state.combat.player.hp > hpBefore, 'eatFood must run after live updates');
+  assert.ok((state.bank['lantern-loaf'] ?? 0) < loafBefore);
+
+  const fleeAfterEat = scr.node.querySelector('.flee-btn');
+  assert.ok(fleeAfterEat);
+  for (let i = 0; i < 6; i++) {
+    if (state.combat.foe) state.combat.foe.hp = Math.max(4, state.combat.foe.hp);
+    combat.tickCombat(state, 100);
+    scr.update();
+    assert.equal(scr.node.querySelector('.flee-btn'), fleeAfterEat);
+  }
+  fleeAfterEat.click();
+  assert.equal(state.combat.fighting, false);
+  assert.equal(state.combat.lastStation?.ended, 'flee');
+});
+
+function leftoverDoorToHuntList(state) {
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  assert.equal(scr.node.querySelector('.hunt-list'), null);
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover);
+  assert.ok(leftover.querySelector('.leftover-hunt'), 'Hunt-this-foe stays');
+  const door = leftover.querySelector('.leftover-another');
+  assert.ok(door, 'leftover exposes a door off this foe');
+  assert.match(door.textContent ?? '', /Hunt another/);
+  door.click();
+  assert.equal(state.combat.lastStation, null);
+  assert.equal(scr.node.classList.contains('leftover-live'), false);
+  assert.equal(scr.node.querySelector('.leftover-station'), null);
+  const list = scr.node.querySelector('.hunt-list');
+  assert.ok(list, 'hunt list is back');
+  const cards = scr.node.querySelectorAll('.hunt-card');
+  assert.ok(cards.length >= 2, 'more than one foe on the stretch');
+  assert.ok(cards.some((c) => /Pale Moth/.test(c.textContent ?? '')));
+  assert.ok(cards.some((c) => /Wick-thief/.test(c.textContent ?? '')));
+  return scr;
+}
+
+test('leftover after Fall back exposes Hunt another and returns the zone hunt list', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'wick-thief', { encounterSeed: 1 });
+  combat.fleeFight(state);
+  leftoverDoorToHuntList(state);
+});
+
+test('leftover after kill exposes Hunt another and can start a different foe', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  leftoverDoorToHuntList(state);
+});
+
+test('Eat, Fall back, and Hunt another stay 44px taps and do not shrink under the food label', () => {
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  assert.match(css, /\.eat-btn\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.flee-btn\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.leftover-another\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.eat-slot\s*\{[^}]*flex-wrap:\s*nowrap/);
+  assert.match(css, /\.eat-row\s*\{[^}]*flex-shrink:\s*0/);
 });

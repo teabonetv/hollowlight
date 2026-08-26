@@ -585,3 +585,13 @@ test('cycleFood walks owned foods in FOOD_ORDER', () => {
   assert.equal(combat.foodHeal('lantern-loaf'), 14);
   assert.equal(combat.foodHeal('fogwort'), 5);
 });
+
+test('dismissLastStation clears leftover without starting a fight', () => {
+  const s = createState({ rngSeed: 4 });
+  combat.startFight(s, 'wick-thief', { encounterSeed: 1 });
+  combat.fleeFight(s);
+  assert.equal(s.combat.lastStation?.enemyId, 'wick-thief');
+  combat.dismissLastStation(s);
+  assert.equal(s.combat.lastStation, null);
+  assert.equal(s.combat.fighting, false);
+});

@@ -370,6 +370,13 @@ export function leftoverKicker(last) {
   return name ? `${name} fell` : 'After the hunt';
 }
 
+/** Drop leftover so the hunt list can offer a different foe. Does not flee. */
+export function dismissLastStation(state) {
+  ensureCombat(state);
+  state.combat.lastStation = null;
+  return { ok: true };
+}
+
 export function pushCombatLog(state, text, kind = 'info') {
   const c = ensureCombat(state);
   c.log.push({ t: state.stats.playtimeMs, text, kind });
