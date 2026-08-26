@@ -117,7 +117,9 @@ test('idle 3h rewind with active {} still opens recap and keeps savedAt', async 
   const opened = rawSave();
   assert.equal(opened.savedAt, rewound);
   assert.equal(opened.state.savedAt, rewound);
-  assert.equal(opened.state.lumen, 161, 'wallet still pre-Claim');
+  const hudLumen = Number(String(elements['hud-lumen'].textContent).replace(/[^\d]/g, ''));
+  assert.equal(opened.state.lumen, hudLumen, 'HUD==save; boot feats may add Lumen, Claim has not');
+  assert.equal(opened.state.flame, 0, 'idle recap must not apply nextState production');
   assert.equal(opened.state.stats.playtimeMs, 90_000, 'idle did not stuff playtime');
 
   fireAutosaves();

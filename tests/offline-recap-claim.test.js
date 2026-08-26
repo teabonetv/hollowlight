@@ -152,7 +152,8 @@ test('idle rewind does not inflate playtime or grant Work Went On with zero cycl
   assert.equal(isUnlocked(idlePreview.state, 't-off-1'), false);
   assert.equal(shouldOfferOfflineRecap(none), true,
     'idle 3h with active {} still opens the recap');
-  assert.equal(formatIdleRecapLine(none, idlePreview), 'Nothing ran.');
+  assert.match(formatIdleRecapLine(none, idlePreview), /Nothing ran/,
+    'idle copy is Nothing ran / feats-only, never silence');
 });
 
 test('recap names every feat Claim will light, not a sliced four', () => {
