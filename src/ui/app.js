@@ -11,7 +11,8 @@
 // offline before restamp. While a recap is unclaimed, persist never
 // restamps — reload must still offer the same away window. Idle away
 // (≥ min threshold, including active {}) still opens the recap; Claim
-// is the only close. The runner is frozen (stop + reset) until then.
+// is the only close. The runner is frozen (stop + reset) until Claim,
+// then held one beat so the HUD stays on the recap numbers.
 //
 // Everything DOM-facing lives behind boot(); importing this module from node
 // stays side-effect free.
@@ -61,6 +62,8 @@ import { ensureDailies, rerollDailies, claimDaily } from '../game/systems/dailie
 import { shouldRebuildScreen } from './live-paint.js';
 
 const AUTOSAVE_MS = 30_000;
+/** Hold live ticks after Claim so HUD stays on recap numbers for a beat. */
+export const RECAP_THAW_MS = 800;
 const UI_KEY = 'hollowlight.ui';
 const UI_TABS = new Set(['camp', 'skills', 'bank', 'map', 'journal']);
 const SELL_QTY_MODES = new Set(['1', '10', 'keep1', 'dump']);
@@ -87,6 +90,30 @@ function boot() {
   let rng = createRng(1);
   let lastPackFullToastAt = 0;
   let recapOpen = false;
+  let recapHold = false;
+  let thawTimer = 0;
+
+  function runnerFrozen() {
+    return recapOpen || recapHold;
+  }
+
+  function freezeRunner() {
+    recapHold = true;
+    loop.stop();
+    loop.reset();
+  }
+
+  function thawRunner() {
+    recapHold = false;
+    thawTimer = 0;
+    if (!recapOpen && !document.hidden) loop.start();
+  }
+
+  function holdRunnerAfterClaim() {
+    freezeRunner();
+    if (thawTimer) clearTimeout(thawTimer);
+    thawTimer = setTimeout(thawRunner, RECAP_THAW_MS);
+  }
 
   // ── save / load / adopt ────────────────────────────────────────
   function persist({ stamp = true } = {}) {
@@ -627,20 +654,18 @@ function boot() {
 
     const levels = [...res.levelUps];
     recapOpen = true;
-    loop.stop();
-    loop.reset();
+    freezeRunner();
     showOfflineModal(modalRoot, { ...res, featPreview }, {
       onClaim: () => {
         recapOpen = false;
-        const livePlay = game.stats.playtimeMs;
         game = hydrateState(res.nextState);
         combat.ensureCombat(game);
         rng = createRng(game.rngState ?? 1);
         ensureDailies(game, Date.now());
         applyMotionClass();
-        const extraLive = Math.max(0, livePlay - (res.originalPlaytimeMs ?? livePlay));
-        game.stats.playtimeMs += extraLive;
         // Work Went On tracks real idle labour, not a feats-only / fuel-halt pop.
+        // Recap-open wall time is not play — do not merge leaked ticks into
+        // Time by the Flame. Claim is the only apply.
         if (res.hasGains) {
           game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
           pushLog(game,
@@ -653,7 +678,7 @@ function boot() {
         }
         for (const lu of levels) bus.emit('levelup', lu);
         afterMutation({ redraw: true });
-        loop.start();
+        holdRunnerAfterClaim();
       },
     });
   }
@@ -662,7 +687,7 @@ function boot() {
   const loop = createTickLoop({
     stepMs: TICK_MS,
     onTick(dtMs) {
-      if (recapOpen) return;
+      if (runnerFrozen()) return;
       const events = runner.tickActions(game, dtMs, rng);
       events.push(...combat.tickCombat(game, dtMs));
       game.stats.playtimeMs += dtMs;
@@ -706,7 +731,7 @@ function boot() {
       // the modal still up keeps the away window instead of a zero-away boot.
       if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
       persist();
-      if (!recapOpen) loop.start();
+      if (!runnerFrozen()) loop.start();
     }
   });
   window.addEventListener('pagehide', persist);
@@ -745,7 +770,7 @@ function boot() {
     staleFallback.setAttribute('hidden', '');
   }
   if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
-  if (!recapOpen) loop.start();
+  if (!runnerFrozen()) loop.start();
 }
 
 if (typeof document !== 'undefined') {

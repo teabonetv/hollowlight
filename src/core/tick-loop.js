@@ -43,8 +43,12 @@ export function createTickLoop({ stepMs = TICK_MS, onTick, maxTicksPerFrame = 12
   }
 
   function frame(now) {
+    // Stop must kill the chain: an in-flight frame that still scheduled the
+    // next rAF would restart ticks on the following start() (double cadence)
+    // and could mint behind an open recap.
+    if (!running) return;
     processFrame(now);
-    frameId = requestAnimationFrame(frame);
+    if (running) frameId = requestAnimationFrame(frame);
   }
 
   function start(now = null) {

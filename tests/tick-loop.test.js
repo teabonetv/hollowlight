@@ -60,6 +60,33 @@ test('tick loop: 10s of wall time yields exactly 100 ticks at default step', () 
   assert.equal(ticks, 100);
 });
 
+test('tick loop: stop() does not keep a rAF chain alive', () => {
+  const queued = [];
+  let nextId = 0;
+  const origRAF = globalThis.requestAnimationFrame;
+  const origCAF = globalThis.cancelAnimationFrame;
+  globalThis.requestAnimationFrame = (cb) => {
+    const id = ++nextId;
+    queued[id] = cb;
+    return id;
+  };
+  globalThis.cancelAnimationFrame = (id) => { queued[id] = null; };
+  try {
+    let ticks = 0;
+    const loop = createTickLoop({ onTick: () => ticks++ });
+    loop.start();
+    const stale = queued[1];
+    loop.stop();
+    stale?.(0);
+    const live = Object.values(queued).filter((cb) => typeof cb === 'function');
+    assert.equal(live.length, 0, 'in-flight frame after stop must not reschedule');
+    assert.equal(ticks, 0);
+  } finally {
+    globalThis.requestAnimationFrame = origRAF;
+    globalThis.cancelAnimationFrame = origCAF;
+  }
+});
+
 test('tick loop: stop() halts processing; processFrame is inert afterwards', () => {
   let ticks = 0;
   const loop = createTickLoop({ onTick: () => ticks++ });

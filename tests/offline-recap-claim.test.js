@@ -26,6 +26,7 @@ import { hydrateState } from '../src/game/hydrate.js';
 import {
   computeOfflineProgress, previewOfflineClaim, recapWalletDelta,
   formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, formatIdleRecapLine,
+  formatIdleRecapStillness, IDLE_RECAP_STILLNESS,
   formatOfflineHourRate, shouldOfferOfflineRecap, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
 } from '../src/core/offline.js';
 
@@ -152,8 +153,9 @@ test('idle rewind does not inflate playtime or grant Work Went On with zero cycl
   assert.equal(isUnlocked(idlePreview.state, 't-off-1'), false);
   assert.equal(shouldOfferOfflineRecap(none), true,
     'idle 3h with active {} still opens the recap');
-  assert.match(formatIdleRecapLine(none, idlePreview), /Nothing ran/,
-    'idle copy is Nothing ran / feats-only, never silence');
+  assert.equal(formatIdleRecapLine(none, idlePreview), 'Nothing ran.',
+    'idle headline stays Nothing ran.');
+  assert.equal(formatIdleRecapStillness(none), IDLE_RECAP_STILLNESS);
 });
 
 test('recap names every feat Claim will light, not a sliced four', () => {
@@ -181,8 +183,17 @@ test('recap names every feat Claim will light, not a sliced four', () => {
     featPreview: { feats, lumen: 98, radiance: 11 },
   }, { onClaim() {} });
   const text = mount.textContent ?? '';
-  assert.ok(mount.querySelector('.offline-feat-list'), 'feat names scroll in their own list');
+  assert.ok(mount.querySelector('.offline-feat-list'), 'feat names live in their own list');
+  assert.ok(mount.querySelector('.offline-feat-list').classList.contains('is-collapsed'),
+    'names start collapsed so Claim stays pinned');
   assert.equal(mount.querySelectorAll('.offline-feat').length, feats.length);
+  const toggle = mount.querySelector('.offline-feat-toggle');
+  assert.ok(toggle, 'N feats toggle');
+  assert.match(toggle.textContent ?? '', /12 feats/);
+  assert.equal(toggle.getAttribute('aria-expanded'), 'false');
+  toggle.click();
+  assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+  assert.ok(!mount.querySelector('.offline-feat-list').classList.contains('is-collapsed'));
   for (const a of feats) {
     assert.ok(text.includes(a.name), `recap names ${a.name}`);
   }
@@ -235,11 +246,35 @@ test('idle recap modal prints time away, Cap 12h, and Nothing ran', () => {
   assert.equal(mount.querySelector('.modal-title')?.textContent, 'While You Were Away…');
   assert.match(text, /Cap 12h/);
   assert.match(text, /Nothing ran/);
+  assert.match(text, /No queued action/);
+  assert.match(text, /Time by the Flame not stuffed/);
+  assert.match(text, /Dailies frozen/);
+  assert.ok(mount.querySelector('.offline-idle'), 'Nothing ran. stays the headline');
+  assert.ok(mount.querySelector('.offline-idle-still'), 'stillness line is present');
   assert.equal(
     mount.querySelectorAll('button').filter((b) => b.getAttribute('aria-label') === 'Close').length,
     0,
   );
   mount.querySelector('.modal-overlay')?.click();
   assert.equal(mount.querySelector('.modal-title')?.textContent, 'While You Were Away…');
+});
+
+test('halted recap keeps its chip and does not use the idle stillness line', () => {
+  const s = createState({ nowMs: 0, rngSeed: 6 });
+  s.bank.tinderscrap = 0;
+  s.actions.active['tend-flame'] = { progressMs: 0 };
+  const res = computeOfflineProgress({
+    state: s, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(formatIdleRecapLine(res), null);
+  assert.equal(formatIdleRecapStillness(res), null);
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, { ...res, featPreview: { feats: [], lumen: 0, radiance: 0 } }, {
+    onClaim() {},
+  });
+  const text = mount.textContent ?? '';
+  assert.match(text, /out of Tinderscrap/);
+  assert.doesNotMatch(text, /No queued action/);
+  assert.doesNotMatch(text, /Nothing ran/);
 });
 

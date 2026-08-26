@@ -225,14 +225,27 @@ export function shouldOfferOfflineRecap(res) {
   return (res?.awayMs ?? 0) >= OFFLINE_MIN_AWAY_MS;
 }
 
+function isIdleRecap(res) {
+  return !res?.hasGains && (res?.idleNotes?.length ?? 0) === 0;
+}
+
 /**
- * Idle / feats-only copy. Halted actions already have recap lines, so they
- * return null. Never hide an empty-away behind silence.
+ * Idle / feats-only headline. Halted actions already have recap lines, so they
+ * return null. Never hide an empty-away behind silence. Feats-only still uses
+ * this headline — names live under Feats on Claim, not in the title.
  */
-export function formatIdleRecapLine(res, featPreview) {
-  if (res?.hasGains || (res?.idleNotes?.length ?? 0) > 0) return null;
-  const n = featPreview?.feats?.length ?? 0;
-  return n > 0 ? 'Nothing ran — feats only.' : 'Nothing ran.';
+export function formatIdleRecapLine(res, _featPreview) {
+  if (!isIdleRecap(res)) return null;
+  return 'Nothing ran.';
+}
+
+/** What did not move on an idle away. One line; not a novel. */
+export const IDLE_RECAP_STILLNESS =
+  'No queued action. Time by the Flame not stuffed. Dailies frozen.';
+
+export function formatIdleRecapStillness(res) {
+  if (!isIdleRecap(res)) return null;
+  return IDLE_RECAP_STILLNESS;
 }
 
 /** `+3,240 · 1,080/h` — honest EV rate from credited window. */
