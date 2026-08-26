@@ -24,7 +24,7 @@ export function formatHollowChip(state) {
 /**
  * Persistent HUD chip — Melvor pins Completion Log % beside Bank N/MAX.
  * Known is ever-found (`itemFound > 0` or discovered), not occupancy.
- * It is a door to Bank Catalogue (the item log), not wallpaper.
+ * It is a door to Almanac Items (the found-log), not Bank Catalogue.
  */
 export function formatKnownChip(state) {
   return `Known ${knownItemCount(state)}/${ITEMS.length}`;

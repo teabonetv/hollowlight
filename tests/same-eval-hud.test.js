@@ -79,7 +79,7 @@ globalThis.setTimeout = () => 0;
 if (!globalThis.navigator) globalThis.navigator = {};
 
 const { SAVE_KEY, serializeSave, deserializeSave } = await import('../src/core/save.js');
-const { createState } = await import('../src/game/state.js');
+const { createState, STARTER_BANK } = await import('../src/game/state.js');
 const { ensureDailies, claimDaily, taskProgress } = await import('../src/game/systems/dailies.js');
 const { paintHud, formatHollowChip, formatKnownChip } = await import('../src/ui/hud.js');
 const { formatNumber } = await import('../src/core/format.js');
@@ -88,6 +88,8 @@ const { pushLog } = await import('../src/game/state.js');
 const { unlockPerk } = await import('../src/game/systems/radiance.js');
 const { bankSellValue, bankCount, uniqueStackCount, lanternRoom } = await import('../src/game/systems/bank.js');
 const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
+const { itemTimesFound } = await import('../src/game/systems/stats.js');
+const { SAVE_VERSION } = await import('../src/core/save.js');
 
 function hudNum(node) {
   const m = String(node.textContent ?? '').replace(/,/g, '').match(/(\d+)/);
@@ -271,7 +273,7 @@ function activeBankTab() {
   return elements.screen.querySelectorAll('.bank-tab').find((t) => t.classList.contains('active'));
 }
 
-test('tapping Known chip leaves Camp for Bank Catalogue (item log)', () => {
+test('tapping Known chip leaves Camp for Almanac Items (found-log)', () => {
   const campTab = tabButtons.find((b) => b.dataset.tab === 'camp');
   campTab.click();
   assert.ok(elements.screen.querySelector('.camp'), 'start on Camp');
@@ -281,16 +283,30 @@ test('tapping Known chip leaves Camp for Bank Catalogue (item log)', () => {
   elements['hud-known'].click();
 
   assert.equal(elements.screen.querySelector('.camp'), null, 'Known is a door — leave Camp');
-  assert.ok(elements.screen.querySelector('.bank-screen'), 'land on Bank');
-  const cat = activeBankTab();
-  assert.ok(cat, 'a bank tab is selected');
-  assert.match(cat.textContent ?? '', /Catalogue/);
-  assert.equal(cat.getAttribute('aria-selected'), 'true');
-  const tiles = elements.screen.querySelectorAll('.bank-tile');
-  assert.ok(tiles.length >= 100, 'catalogue is a list of items, not a postcard');
-  assert.ok(tiles.some((t) => t.classList.contains('unowned')), 'unfound rows are in the log');
-  assert.ok(tiles.some((t) => /Lantern-loaf/.test(t.textContent ?? '')), 'found names are on the list');
-  assertHudEqualsSave('after Known chip → Catalogue');
+  assert.equal(elements.screen.querySelector('.bank-screen'), null, 'do not land on Bank Catalogue');
+  assert.ok(elements.screen.querySelector('.almanac'), 'land on Almanac');
+  assert.ok(elements.screen.querySelector('.log-items'), 'Items lane selected');
+  const title = elements.screen.querySelector('.screen-title')?.textContent ?? '';
+  assert.equal(title, 'Items');
+  assert.doesNotMatch(title, /Catalogue/i);
+  assert.equal(elements.screen.querySelector('.bank-tab'), null, 'no Catalogue chip on the found-log');
+  assert.doesNotMatch(elements['hud-known'].getAttribute('title') ?? '', /Catalogue/i);
+  assert.doesNotMatch(elements['hud-known'].getAttribute('aria-label') ?? '', /Catalogue/i);
+  const text = elements.screen.textContent ?? '';
+  assert.match(text, /Found · \d+/);
+  assert.match(text, /Still in the dark · \d+/);
+  const found = elements.screen.querySelector('[data-log-drill="items-found"]');
+  const missing = elements.screen.querySelector('[data-log-drill="items-missing"]');
+  assert.ok(found, 'Found grid is on the page');
+  assert.ok(missing, 'Still in the dark grid is on the page');
+  assert.match(found.textContent ?? '', /Lantern-loaf/);
+  assert.match(missing.textContent ?? '', /\?/);
+  assert.equal((missing.textContent ?? '').includes('Bog-moss'), false);
+  const logTab = elements.screen.querySelectorAll('.almanac-tab').find((t) => t.classList.contains('active'));
+  assert.match(logTab?.textContent ?? '', /Log/i);
+  const journalTab = tabButtons.find((b) => b.dataset.tab === 'journal');
+  assert.equal(journalTab.classList.contains('active'), true, 'Almanac tab is selected');
+  assertHudEqualsSave('after Known chip → Almanac Items');
 });
 
 test('tapping Hollow chip opens the owned Bank grid', () => {
@@ -335,6 +351,10 @@ test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () 
 
   assert.equal(elements['hud-known'].textContent, 'Known 6/137');
   assert.equal(elements['hud-hollow'].textContent, 'Hollow 5/12');
+  const { state } = deserializeSave(storage.getItem(SAVE_KEY));
+  assert.equal(itemTimesFound(state, 'lantern-loaf'), STARTER_BANK['lantern-loaf'],
+    'Times Found is not un-counted');
+  assert.equal(SAVE_VERSION, 5);
   assertHudEqualsSave('after dump loaf');
 
   campTab.click();
@@ -343,8 +363,18 @@ test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () 
   assert.equal(elements['hud-hollow'].textContent, 'Hollow 5/12');
 
   elements['hud-known'].click();
-  assert.ok(elements.screen.querySelector('.bank-screen'));
-  assert.match(activeBankTab()?.textContent ?? '', /Catalogue/);
+  assert.ok(elements.screen.querySelector('.almanac.log-items'), 'Known still opens the found-log');
+  assert.equal(elements.screen.querySelector('.bank-screen'), null);
+  assert.equal(elements.screen.querySelector('.screen-title')?.textContent, 'Items');
+  const found = elements.screen.querySelector('[data-log-drill="items-found"]');
+  assert.match(found.textContent ?? '', /Lantern-loaf/);
+  const missing = elements.screen.querySelector('[data-log-drill="items-missing"]');
+  assert.equal((missing?.textContent ?? '').includes('Lantern-loaf'), false);
+
+  const bankTab = tabButtons.find((b) => b.dataset.tab === 'bank');
+  bankTab.click();
+  const cat = elements.screen.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
+  cat.click();
   let catLoaf;
   elements.screen._walk?.((n) => {
     if (catLoaf || n === elements.screen) return;
@@ -353,4 +383,15 @@ test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () 
   assert.ok(catLoaf, 'dumped loaf still named in Catalogue');
   assert.ok(catLoaf.classList.contains('known-empty'));
   assert.equal(catLoaf.querySelector('.bank-qty')?.textContent, '0');
+  assert.equal(catLoaf.querySelector('.bank-name')?.textContent, 'Lantern-loaf');
+});
+
+test('Known and Hollow chips stay on-screen buttons on every tab', () => {
+  for (const tab of ['camp', 'skills', 'bank', 'map', 'journal']) {
+    tabButtons.find((b) => b.dataset.tab === tab).click();
+    assert.equal(elements['hud-known'].tagName, 'BUTTON', `${tab}: Known is a button`);
+    assert.equal(elements['hud-hollow'].tagName, 'BUTTON', `${tab}: Hollow is a button`);
+    assert.match(elements['hud-known'].textContent ?? '', /^Known \d+\/\d+$/, `${tab}: Known noun`);
+    assert.match(elements['hud-hollow'].textContent ?? '', /^Hollow \d+\/\d+$/, `${tab}: Hollow noun`);
+  }
 });

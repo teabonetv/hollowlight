@@ -50,6 +50,7 @@ export const ICONS = {
   bracket: svg('<path d="M6 19V5"/><path d="M6 7h11a1 1 0 0 1 1 1v2.2a1 1 0 0 1-1 1H6"/><path d="M6 12.6h9.5a1 1 0 0 1 1 1V16a1 1 0 0 1-1 1H6"/>'),
   lichen: svg('<path d="M12 20V11"/><path d="M12 11l-4.2-4.6M12 11l4.2-4.6"/><path d="M7.8 6.4l-2.4-2M7.8 6.4l-1.2 2.4M16.2 6.4l2.4-2M16.2 6.4l1.2 2.4"/><circle cx="12" cy="11" r="1.1"/>'),
   lock: svg('<rect x="6" y="10" width="12" height="10" rx="1.6"/><path d="M8.5 10V7.4a3.5 3.5 0 0 1 7 0V10"/><circle cx="12" cy="15.2" r="1.1"/>'),
+  mystery: svg('<circle cx="12" cy="12" r="8"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.2 2.4c-.7.4-1.3.8-1.3 1.7V14"/><circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/>'),
 };
 
 /** High-contrast packed silhouettes for the owned bank grid (≥32px). */

@@ -168,7 +168,7 @@ export function isCatalogueTab(tab) {
   return tab === 'all' || tab === 'catalogue';
 }
 
-/** HUD Known opens Catalogue (`all`); Hollow opens Owned. Category chips stay local. */
+/** Catalogue is `all`; Hollow HUD opens Owned. Category chips stay local. */
 export function resolveBankTab(tab) {
   if (isCatalogueTab(tab)) return 'all';
   if (tab === 'pinned') return 'pinned';

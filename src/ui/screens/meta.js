@@ -489,7 +489,7 @@ function renderLogItems(ctx) {
     : el('p', { class: 'footnote muted' }, 'Every name in the book is lit.');
 
   return {
-    node: el('section', { class: 'screen almanac' },
+    node: el('section', { class: 'screen almanac log-items' },
       ...logHero(ctx, 'items', 'Items', 'known by Times Found, never un-completed'),
       el('h2', { class: 'section-title' }, `Found · ${found.length}`),
       foundBlock,

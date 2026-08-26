@@ -2,7 +2,7 @@
 // Catalogue stays opt-in; desktop docks an inspector; phone uses a sheet.
 
 import { el, clear } from '../dom.js';
-import { filledIcon } from '../icons.js';
+import { filledIcon, icon } from '../icons.js';
 import { ITEMS, ITEM_CATEGORIES, DEFAULT_BANK_TAB } from '../../game/data/items.js';
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import {
@@ -70,6 +70,10 @@ export function itemTileInitials(item) {
   const compact = words[0] ?? '?';
   return compact.slice(0, 2).toUpperCase();
 }
+
+/** Never-found Catalogue copy. Known-empty keeps the real name. */
+export const UNKNOWN_ITEM_MARK = '?';
+export const STILL_IN_THE_DARK = 'Still in the dark';
 
 /** Catalog chrome on an owned tile — never live stall, never feat bonus. */
 export function itemTileChrome(item, qty) {
@@ -207,6 +211,12 @@ export function renderBankScreen(ctx) {
       rec.tile.classList.toggle('selected', rec.item.id === itemId);
     }
     const q = bankCount(ctx.state.bank, itemId);
+    const known = isItemKnown(ctx.state, itemId);
+    if (!q && !known) {
+      ctx.toast(STILL_IN_THE_DARK, 'info');
+      if (prefersDockedInspector()) paintInspectorEmpty();
+      return;
+    }
     if (sellMode && q > 0) {
       sellFromGrid(itemId);
       return;
@@ -215,11 +225,7 @@ export function renderBankScreen(ctx) {
       mountDocked(itemId);
       return;
     }
-    if (q > 0 || isItemKnown(ctx.state, itemId)) ctx.openSellSheet(itemId);
-    else {
-      const it = [...tiles.values()].find((r) => r.item.id === itemId)?.item;
-      ctx.toast(`${it?.name ?? itemId}: not yet found. ${it?.flavor ?? ''}`, 'info');
-    }
+    ctx.openSellSheet(itemId);
   }
 
   function sellFromGrid(itemId) {
@@ -297,6 +303,7 @@ export function renderBankScreen(ctx) {
     const { item: it, tile, qtyEl, chromeEl, stallEl, pinMark, lockMark, glyphEl, nameEl } = rec;
     const qty = bankCount(ctx.state.bank, it.id);
     const known = isItemKnown(ctx.state, it.id);
+    const revealed = qty > 0 || known;
     const pinned = isPinned(ctx.state, it.id);
     const held = isLocked(ctx.state, it.id);
     const rarity = it.unique ? 'unique' : it.rare ? 'rare' : `tier-${it.tier ?? 1}`;
@@ -312,18 +319,24 @@ export function renderBankScreen(ctx) {
       held ? 'locked' : '',
       stallPip ? 'stall-divergent' : '',
       selectedId === it.id ? 'selected' : '',
-      `cat-${it.category}`,
-      `glyph-${glyph}`,
-      rarity,
+      revealed ? `cat-${it.category}` : 'cat-unknown',
+      revealed ? `glyph-${glyph}` : 'glyph-mystery',
+      revealed ? rarity : '',
     ].filter(Boolean).join(' ');
     const sellBit = qty > 0 ? `, catalog ✦${it.sell} each` : '';
     const stallBit = stallPip ? `, ${stallPip}` : '';
     const lockBit = held ? ', locked' : '';
     const knownBit = !qty && known ? ', known' : '';
     const action = sellMode && qty > 0 ? (held ? 'Locked' : 'Sell') : 'Inspect';
-    tile.title = qty > 0 ? `${action} ${it.name}` : known ? `${it.name}, none in the pack` : it.flavor;
-    tile.setAttribute('aria-label', `${it.name}, ${qty} owned${sellBit}${stallBit}${lockBit}${knownBit}`);
-    qtyEl.textContent = qty > 0 ? formatNumber(qty) : known ? '0' : '—';
+    const hint = revealed
+      ? (qty > 0 ? `${action} ${it.name}` : `${it.name}, none in the pack`)
+      : STILL_IN_THE_DARK;
+    tile.title = hint;
+    tile.setAttribute('title', hint);
+    tile.setAttribute('aria-label', revealed
+      ? `${it.name}, ${qty} owned${sellBit}${stallBit}${lockBit}${knownBit}`
+      : STILL_IN_THE_DARK);
+    qtyEl.textContent = qty > 0 ? formatNumber(qty) : known ? '0' : UNKNOWN_ITEM_MARK;
     qtyEl.className = dense && qty > 0 ? 'bank-qty visually-hidden' : 'bank-qty';
     chromeEl.textContent = qty > 0 ? itemTileChrome(it, qty) : '';
     chromeEl.className = dense && qty > 0 ? 'bank-chrome' : 'bank-chrome visually-hidden';
@@ -332,10 +345,16 @@ export function renderBankScreen(ctx) {
     pinMark.textContent = pinned ? '★' : '';
     lockMark.innerHTML = held ? filledIcon('lock') : '';
     lockMark.className = held ? 'bank-lock' : 'bank-lock visually-hidden';
-    glyphEl.className = `bank-glyph bank-glyph-fill glyph-${glyph}`;
-    glyphEl.innerHTML = filledIcon(glyph);
-    if (!glyphEl.innerHTML) glyphEl.textContent = itemTileInitials(it);
-    nameEl.textContent = it.name;
+    if (revealed) {
+      glyphEl.className = `bank-glyph bank-glyph-fill glyph-${glyph}`;
+      glyphEl.innerHTML = filledIcon(glyph);
+      if (!glyphEl.innerHTML) glyphEl.textContent = itemTileInitials(it);
+      nameEl.textContent = it.name;
+    } else {
+      glyphEl.className = 'bank-glyph bank-glyph-mystery';
+      glyphEl.innerHTML = icon('mystery');
+      nameEl.textContent = UNKNOWN_ITEM_MARK;
+    }
     nameEl.className = dense ? 'bank-name bank-name-dense' : 'bank-name';
   }
 
