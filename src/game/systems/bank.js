@@ -6,8 +6,16 @@ import { ITEMS, ITEMS_BY_ID, BANK_TABS } from '../data/items.js';
 import { liveSellUnit, addSellPressure } from './store.js';
 import { recordSell } from './stats.js';
 import { markDiscovered, isDiscovered } from './discovered.js';
+import {
+  BASE_LANTERN_ROOM, SATCHEL_ROOM_PER_TIER, PACK_FULL_MSG,
+  uniqueStackCount, lanternRoom, canAcceptStack,
+} from './lantern-room.js';
 
 export { markDiscovered, isDiscovered };
+export {
+  BASE_LANTERN_ROOM, SATCHEL_ROOM_PER_TIER, PACK_FULL_MSG,
+  uniqueStackCount, lanternRoom, canAcceptStack,
+};
 
 const CORE_TAB_IDS = new Set(['owned', 'pinned', 'all', 'catalogue']);
 
@@ -19,6 +27,21 @@ export function bankAdd(bank, itemId, qty, state) {
   if (!Number.isFinite(qty) || qty <= 0) return;
   bank[itemId] = (bank[itemId] ?? 0) + Math.floor(qty);
   if (state) markDiscovered(state, itemId);
+}
+
+/**
+ * Live grant path. Existing stacks always grow; a new unique is refused when
+ * the lantern's hollow is full. `bankAdd` stays unbounded for fixtures.
+ */
+export function tryBankAdd(state, itemId, qty) {
+  if (!state?.bank) return { ok: false, added: 0, reason: 'no-bank' };
+  if (!Number.isFinite(qty) || qty <= 0) return { ok: false, added: 0, reason: 'none' };
+  if (!canAcceptStack(state, itemId)) {
+    return { ok: false, added: 0, reason: 'pack-full', error: PACK_FULL_MSG };
+  }
+  const n = Math.floor(qty);
+  bankAdd(state.bank, itemId, n, state);
+  return { ok: true, added: n };
 }
 
 export function canAfford(bank, costs) {

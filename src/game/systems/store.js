@@ -6,6 +6,7 @@
 import { ITEMS_BY_ID } from '../data/items.js';
 import { recordLumenSpend } from './stats.js';
 import { markDiscovered } from './discovered.js';
+import { canAcceptStack, PACK_FULL_MSG } from './lantern-room.js';
 import {
   ALWAYS_STOCK, KINDLING_BUNDLE, BANK_THEMES,
   catalogBuyPrice, sellUnitPrice, buyUnitPrice, recoveredPressure,
@@ -92,6 +93,9 @@ export function buyFromStore(state, itemId, qty = 1) {
   const unit = liveBuyUnit(state, itemId);
   const total = unit * n;
   if (state.lumen < total) return { ok: false, error: 'Not enough Lumen.' };
+  if (!canAcceptStack(state, itemId)) {
+    return { ok: false, error: PACK_FULL_MSG };
+  }
   state.lumen -= total;
   recordLumenSpend(state, total);
   bankAdd(state.bank, itemId, n, state);
@@ -101,6 +105,9 @@ export function buyFromStore(state, itemId, qty = 1) {
 export function buyKindlingBundle(state) {
   const { cost, grants } = KINDLING_BUNDLE;
   if (state.lumen < cost) return { ok: false, error: 'Not enough Lumen.' };
+  for (const g of grants) {
+    if (!canAcceptStack(state, g.id)) return { ok: false, error: PACK_FULL_MSG };
+  }
   state.lumen -= cost;
   recordLumenSpend(state, cost);
   for (const g of grants) bankAdd(state.bank, g.id, g.qty, state);

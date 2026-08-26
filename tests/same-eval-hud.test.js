@@ -219,6 +219,11 @@ test('Sell 1 from the Owned grid: HUD lumen == save.lumen same-eval', () => {
       tinderAfter.querySelector('.bank-chrome')?.textContent ?? '',
       /✦6/,
       'tile chrome stays on catalog ✦1');
+    const selling = findButton(elements.screen, /^Selling$/);
+    assert.ok(selling, 'Sell Mode survived the Fair Trade remount');
+    assert.equal(selling.getAttribute('aria-pressed'), 'true');
+    const uiSaved = JSON.parse(storage.getItem('hollowlight.ui') ?? '{}');
+    assert.equal(uiSaved.sellMode, true);
   } else {
     assert.equal(state.lumen, lumenBefore + catalogDrop);
   }

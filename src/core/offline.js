@@ -15,6 +15,7 @@ import {
   radianceGainMultiplier, masteryXpMultiplier,
 } from '../game/systems/modifiers.js';
 import { grantRadianceFromXp } from '../game/systems/radiance.js';
+import { tryBankAdd } from '../game/systems/bank.js';
 
 export const OFFLINE_CAP_HOURS = 12;
 export const OFFLINE_MIN_AWAY_MS = 60_000;
@@ -106,14 +107,15 @@ export function computeOfflineProgress({
         const qty = clampPositive(weighted);
         if (qty <= 0) continue;
         if (o.kind === 'item') {
+          const granted = tryBankAdd(next, o.id, qty);
+          if (!granted.ok) continue;
           const slot = (itemGains[o.id] ??= {
             id: o.id,
             name: o.id,
             qty: 0,
           });
-          slot.qty += qty;
-          next.bank[o.id] = (next.bank[o.id] ?? 0) + qty;
-          next.stats.itemsGathered = (next.stats.itemsGathered ?? 0) + qty;
+          slot.qty += granted.added;
+          next.stats.itemsGathered = (next.stats.itemsGathered ?? 0) + granted.added;
         } else if (o.kind === 'lumen') {
           // Live applyGains rounds per cycle, then the runner repeats.
           // Flooring the whole batch (clampPositive(weighted * mult)) drifts

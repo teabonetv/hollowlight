@@ -59,10 +59,15 @@ export function rollOutputs(action, rng, { extraYieldChance = 0 } = {}) {
 /** Apply gains to the state; returns a human-readable summary list. */
 export function applyGains(state, gains) {
   const applied = [];
+  let packFull = false;
   for (const g of gains) {
     if (g.kind === 'item') {
-      bank.bankAdd(state.bank, g.id, g.qty, state);
-      applied.push({ kind: 'item', id: g.id, name: ITEMS_BY_ID[g.id]?.name ?? g.id, qty: g.qty });
+      const res = bank.tryBankAdd(state, g.id, g.qty);
+      if (!res.ok) {
+        if (res.reason === 'pack-full') packFull = true;
+        continue;
+      }
+      applied.push({ kind: 'item', id: g.id, name: ITEMS_BY_ID[g.id]?.name ?? g.id, qty: res.added });
     } else if (g.kind === 'lumen') {
       const qty = Math.max(0, Math.round(g.qty * mods.lumenGainMultiplier(state)));
       state.lumen += qty;
@@ -72,6 +77,7 @@ export function applyGains(state, gains) {
       applied.push({ kind: 'resource', id: g.id, qty: g.qty });
     }
   }
+  applied.packFull = packFull;
   return applied;
 }
 
@@ -92,6 +98,7 @@ export function completeCycle(state, action, rng) {
   recordCycle(state, applied);
 
   const events = [];
+  if (applied.packFull) events.push({ type: 'pack-full' });
   const skill = state.skills[action.skill];
   const mastery = ensureMastery(skill, action.id);
   const beforeLevel = skill.level;
