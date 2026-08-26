@@ -97,9 +97,12 @@ test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
   assert.ok(iFighter >= 0 && iKit > iFighter && iOil > iKit && iEat > iOil, 'HP then kit then oil then eat');
   assert.ok(iHand > iEat, 'weapon chip sits after the cockpit');
   assert.equal(classes.filter((c) => /\bfighter\b/.test(c)).length, 2);
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
+  assert.equal(classes.filter((c) => /\bflee-btn\b/.test(c) && /\bbtn-wide\b/.test(c)).length, 0);
   assert.match(fight.textContent ?? '', /You/);
   assert.match(fight.textContent ?? '', /Pale Moth/);
   assert.match(fight.textContent ?? '', /Lantern-loaf/);
+  assert.equal(/weak to/.test(fight.textContent ?? ''), false, 'flavor stays off the first fight frame');
   const hand = fight.querySelector('.hand-chip')?.textContent ?? '';
   assert.equal(/\bHand\b/.test(hand), false);
   assert.match(hand, /Wick-knife/);
@@ -148,7 +151,7 @@ test('in-fight Acc chip moves when Knife is dropped or style shifts', () => {
   rite.click();
   const riteAcc = accOf();
   assert.ok(riteAcc.line !== bare.line, `${bare.line} → ${riteAcc.line}`);
-  assert.match(riteAcc.line, /Acc \d+% · \d+–\d+ \/ they \d+% · \d+–\d+/);
+  assert.match(riteAcc.line, /Acc \d+% · \d+–\d+(?: · [\d.]+s)? \/ they \d+% · \d+–\d+/);
 });
 
 test('hand card hit % changes when the wick-knife is unequipped', () => {
@@ -323,6 +326,7 @@ test('hunt-from-scrolled-hub first paint contains You / Acc / they / oil / eat',
   assert.match(first, /Lantern fed|Lantern dry|sip/);
   assert.match(first, /Eat/);
   assert.match(first, /Lantern-loaf/);
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
   const classes = fight.children.map((c) => c.className);
   const iYou = classes.findIndex((c) => /\bfighter\b/.test(c));
   const iAcc = classes.findIndex((c) => /\bacc-station\b/.test(c));
@@ -330,6 +334,7 @@ test('hunt-from-scrolled-hub first paint contains You / Acc / they / oil / eat',
   const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
   assert.ok(iYou === 0 || iYou === 1, 'You/Foe HP open the fight');
   assert.ok(iAcc > iYou && iOil > iAcc && iEat > iOil);
+  assert.match(fight.querySelector('.acc-station')?.textContent ?? '', /Acc \d+% · \d+–\d+ · [\d.]+s/);
 });
 
 test('hand-chip text does not contain Unarmed twice', () => {
@@ -380,6 +385,9 @@ test('hub after kill still shows compact fight chrome', () => {
   assert.match(text, /Lantern-loaf \+14 · 8|Eat|No food/);
   assert.equal(/\+0/.test(leftover.querySelector('.eat-row')?.textContent ?? ''), false);
   assert.match(leftover.querySelector('.leftover-kicker')?.textContent ?? '', /Pale Moth fell/);
+  assert.match(text, /✦|soul/);
+  assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth|Need oil/);
+  assert.equal(scr.node.querySelectorAll('.combat-meta').length, 0, 'no duplicate souls/dry/sips row under leftover');
   assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
   assert.ok(scr.node.querySelector('.hand-chip'));
 });
@@ -435,7 +443,7 @@ test('leftover Acc moves when Knife is unequipped or style shifts to Rite', () =
   rite.click();
   const riteAcc = accOf();
   assert.ok(riteAcc.line !== bare.line, `style must move Acc: ${bare.line} → ${riteAcc.line}`);
-  assert.match(riteAcc.line, /Acc \d+% · \d+–\d+ \/ they \d+% · \d+–\d+/);
+  assert.match(riteAcc.line, /Acc \d+% · \d+–\d+(?: · [\d.]+s)? \/ they \d+% · \d+–\d+/);
 });
 
 test('leftover station states Need oil in-frame at 0 sips', () => {
@@ -448,6 +456,10 @@ test('leftover station states Need oil in-frame at 0 sips', () => {
   const oil = leftover.querySelector('.leftover-dry')?.textContent ?? leftover.querySelector('.oil-line')?.textContent ?? '';
   assert.match(oil, /Need oil/);
   assert.equal(/Need oil/.test(leftover.textContent ?? ''), true);
+  const hunt = leftover.querySelector('.leftover-hunt');
+  assert.ok(hunt);
+  assert.match(hunt.textContent ?? '', /Need oil/);
+  assert.equal(hunt.getAttribute('aria-disabled'), 'true');
 });
 
 test('one-slot eat picker cycles lantern-loaf to fogwort', () => {
@@ -460,4 +472,49 @@ test('one-slot eat picker cycles lantern-loaf to fogwort', () => {
   pick.click();
   const next = scr.node.querySelector('.eat-pick')?.textContent ?? '';
   assert.match(next, /Fogwort \+5 · 4/);
+});
+
+test('fight-live first frame is a compact cockpit with an XP chip, not Combat skill chrome', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('fight-live'));
+  const chip = scr.node.querySelector('.fight-xp-chip');
+  assert.ok(chip);
+  assert.match(chip.textContent ?? '', /Lv \d+ · .+ XP/);
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
+  assert.match(fight.querySelector('.acc-station')?.textContent ?? '', /Acc \d+% · \d+–\d+ · [\d.]+s \/ they \d+% · \d+–\d+ · [\d.]+s/);
+  assert.equal(fight.querySelector('.flee-btn')?.classList.contains('btn-wide'), false);
+});
+
+test('eat-pick is not armed when only one food is owned', () => {
+  const state = createState({ rngSeed: 4 });
+  state.bank.fogwort = 0;
+  state.bank.palecap = 0;
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  state.combat.player.hp = 32;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const pick = scr.node.querySelector('.eat-pick');
+  assert.ok(pick);
+  assert.equal(pick.tagName, 'SPAN');
+  assert.equal(pick.classList.contains('btn'), false);
+  assert.equal(pick.classList.contains('btn-primary'), false);
+  assert.equal(pick.classList.contains('on'), false);
+  assert.match(pick.textContent ?? '', /Lantern-loaf \+14 · 8/);
+  const eatBtn = scr.node.querySelector('.eat-btn');
+  assert.ok(eatBtn.classList.contains('btn-primary'));
+  assert.equal(eatBtn.classList.contains('btn-disabled'), false);
+});
+
+test('leftover hub is leftover-live and has no duplicate souls chips', () => {
+  const state = createState({ rngSeed: 4 });
+  killMoth(state);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  assert.equal(scr.node.classList.contains('fight-live'), false);
+  assert.equal(scr.node.querySelectorAll('.combat-meta').length, 0);
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.match(leftover?.querySelector('.leftover-loot')?.textContent ?? leftover?.textContent ?? '', /✦|soul/);
+  assert.match(leftover?.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
 });

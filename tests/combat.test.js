@@ -481,6 +481,9 @@ test('selected food skips empty stacks and lastStation snapshots a kill', () => 
   assert.equal(s.combat.lastStation?.hitPct, kit.hitPct);
   assert.equal(s.combat.lastStation?.foeHitPct, kit.foeHitPct);
   assert.equal(s.combat.lastStation?.playerMinHit, kit.playerMinHit);
+  assert.equal(s.combat.lastStation?.souls, 1);
+  assert.ok(Array.isArray(s.combat.lastStation?.loot));
+  assert.ok(s.combat.lastStation.loot.some((d) => d.kind === 'lumen' && d.qty >= 1));
 });
 
 test('flee snapshots lastStation as flee, not a kill', () => {

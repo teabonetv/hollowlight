@@ -64,7 +64,14 @@ export function renderSkillDetail(ctx, skillId) {
   const live = skill.wave === 0;
 
   const fighting = skillId === 'combat' && !!ctx.state.combat?.fighting;
-  const root = el('section', { class: `screen${fighting ? ' fight-live' : ''}` });
+  const leftover = skillId === 'combat' && !fighting && !!ctx.state.combat?.lastStation;
+  const root = el('section', {
+    class: `screen${fighting ? ' fight-live' : ''}${leftover ? ' leftover-live' : ''}`,
+  });
+
+  const fightXpChip = skillId === 'combat'
+    ? el('span', { class: 'chip chip-xp fight-xp-chip' }, compactXpLabel(progFor(sk)))
+    : null;
 
   root.append(el('header', { class: 'detail-head' },
     el('button', {
@@ -74,9 +81,10 @@ export function renderSkillDetail(ctx, skillId) {
     el('div', { class: 'detail-title' },
       el('h1', { class: 'screen-title' }, skill.name),
       el('p', { class: 'screen-sub' }, skill.tagline)),
+    fightXpChip,
   ));
 
-  const prog = levelProgress(sk.xp);
+  const prog = progFor(sk);
   const xpWrap = el('div', { class: 'xp-block' },
     el('div', { class: 'xp-line' },
       el('span', { class: 'xp-level' }, `Level ${prog.level}`),
@@ -100,7 +108,11 @@ export function renderSkillDetail(ctx, skillId) {
         xpWrap.querySelector('.xp-count').textContent = p.span === Infinity
           ? `${formatNumber(p.into)} XP` : `${formatNumber(p.into)} / ${formatNumber(p.span)} XP`;
         xpWrap.querySelector('.xp-fill').style.width = `${(p.frac * 100).toFixed(1)}%`;
-        root.classList.toggle('fight-live', !!ctx.state.combat?.fighting);
+        const live = !!ctx.state.combat?.fighting;
+        const after = !live && !!ctx.state.combat?.lastStation;
+        root.classList.toggle('fight-live', live);
+        root.classList.toggle('leftover-live', after);
+        if (fightXpChip) fightXpChip.textContent = compactXpLabel(p);
         panel.update();
       },
     };
@@ -129,6 +141,14 @@ export function renderSkillDetail(ctx, skillId) {
       xpWrap.querySelector('.xp-fill').style.width = `${(p.frac * 100).toFixed(1)}%`;
     },
   };
+}
+
+function progFor(sk) {
+  return levelProgress(sk.xp);
+}
+
+function compactXpLabel(prog) {
+  return `Lv ${prog.level} · ${formatNumber(prog.into)} XP`;
 }
 
 function comingSoon(root, skill) {
