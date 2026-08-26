@@ -14,6 +14,74 @@ import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemie
 import { bankCount } from '../../game/systems/bank.js';
 import * as combat from '../../game/systems/combat.js';
 
+/**
+ * 360×640 fight / leftover budget. Must stay in lockstep with combat.css:
+ * topbar ≈52, --tab-h 62, fight-live #screen pad 8, detail-head 44, 44px taps.
+ */
+export const COMBAT_360 = {
+  viewportH: 640,
+  topbarH: 52,
+  tabbarH: 62,
+  screenPadTop: 8,
+  screenPadBottom: 8,
+  lobbyPadTop: 18,
+  screenGap: 16,
+  detailHead: 44,
+  xpBlock: 40,
+  lobbyHead: 50,
+  gap: 3,
+  kicker: 16,
+  fighter: 30,
+  acc: 28,
+  oil: 16,
+  eat: 44,
+  hand: 44,
+  styles: 44,
+  keep: 44,
+  hunt: 44,
+  loot: 22,
+  souls: 32,
+  zoneChips: 44,
+  huntCardAboveBtn: 140,
+  logLine: 15,
+  logPadY: 6,
+  logLinesLeftover: 4,
+};
+
+/** Log box vs tab bar on a 360×640 fight or leftover cockpit (flex-pinned). */
+export function cockpitLogVsTab(kind = 'leftover') {
+  const C = COMBAT_360;
+  const screenTop = C.topbarH + C.screenPadTop;
+  const tabTop = C.viewportH - C.tabbarH;
+  const screenBottom = tabTop - C.screenPadBottom;
+  const cockpitTop = screenTop + C.detailHead + 4;
+  const rows = kind === 'leftover'
+    ? [C.kicker, C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.loot]
+    : [C.fighter, C.fighter, C.acc, C.oil, C.eat, C.hand, C.styles, C.keep];
+  const chrome = rows.reduce((a, b) => a + b, 0) + C.gap * Math.max(0, rows.length - 1);
+  const logTop = cockpitTop + chrome;
+  const lines = kind === 'leftover' ? C.logLinesLeftover : 6;
+  const logH = C.logPadY + lines * C.logLine;
+  const logBottom = screenBottom;
+  return {
+    logTop,
+    logBottom,
+    tabTop,
+    chrome,
+    logH,
+    fits: logTop + logH <= screenBottom && logBottom < tabTop,
+  };
+}
+
+/** Pale Moth Hunt button bottom on the 360 combat lobby (no leftover). */
+export function lobbyFirstHuntBottom() {
+  const C = COMBAT_360;
+  /* Hunt sits on the card head, not under flavor. */
+  const y = C.topbarH + C.lobbyPadTop + C.lobbyHead + C.screenGap + C.xpBlock + C.screenGap
+    + C.souls + 14 + C.zoneChips + 8 + 12 + C.hunt;
+  return { huntBottom: y, tabTop: C.viewportH - C.tabbarH, fits: y < C.viewportH - C.tabbarH };
+}
+
 /** Zero #screen and fight-adjacent scrollers so the cockpit is the first 360 frame. */
 export function resetHuntScrollers(root) {
   const zero = (node) => {
@@ -64,21 +132,35 @@ export function renderCombatPanel(ctx) {
 }
 
 function buildHub(ctx, st, paint) {
-  const wrap = el('div', { class: 'combat-hub' });
   const leftover = leftoverStation(ctx, st, paint);
-  if (leftover) wrap.append(leftover);
-  else wrap.append(el('p', { class: 'combat-intro muted' },
-    'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
+  if (leftover) {
+    const wrap = el('div', { class: 'combat-hub leftover-hub' });
+    wrap.append(leftover);
+    wrap.append(buildLobby(ctx, st, paint, { afterLeftover: true }));
+    return wrap;
+  }
+  return buildLobby(ctx, st, paint, { afterLeftover: false });
+}
 
-  if (!leftover) wrap.append(soulsLine(ctx, st));
+function buildLobby(ctx, st, paint, { afterLeftover = false } = {}) {
+  const wrap = el('div', { class: `combat-lobby${afterLeftover ? ' combat-lobby-after' : ''}` });
+  if (!afterLeftover) wrap.append(soulsLine(ctx, st));
   const spilled = deathBanner(ctx, st, paint);
   if (spilled) wrap.append(spilled);
-  wrap.append(vigilCard(ctx, st, paint));
-  if (!leftover) wrap.append(handSlot(ctx, st, paint));
-
+  const dry = combat.oilSipsRemaining(ctx.state) <= 0;
+  if (!afterLeftover && dry) {
+    wrap.append(el('p', { class: 'oil-line danger lobby-oil' }, 'Need oil'));
+  }
   const zoneId = ctx.state.combat.zoneId || 'hearthway';
-  wrap.append(zonePicker(ctx, zoneId, paint));
-  wrap.append(zoneBody(ctx, zoneId, paint));
+  wrap.append(zonePicker(ctx, zoneId, paint, { heading: false }));
+  wrap.append(huntList(ctx, zoneId, paint));
+  if (!afterLeftover) {
+    wrap.append(el('p', { class: 'combat-intro muted' },
+      'Strike, Shot, or Rite — pick a stretch, keep the lantern fed, and do not let the pale-things finish a sentence.'));
+  }
+  wrap.append(vigilCard(ctx, st, paint));
+  if (!afterLeftover) wrap.append(handSlot(ctx, st, paint));
+  wrap.append(zoneFlavor(ctx, zoneId));
   return wrap;
 }
 
@@ -262,7 +344,7 @@ function vigilCard(ctx, st, paint) {
   return card;
 }
 
-function zonePicker(ctx, zoneId, paint) {
+function zonePicker(ctx, zoneId, paint, { heading = true } = {}) {
   const list = el('div', { class: 'zone-chips' });
   for (const z of ZONES) {
     const unlock = combat.zoneUnlock(ctx.state, z.id);
@@ -275,31 +357,41 @@ function zonePicker(ctx, zoneId, paint) {
     }, z.settlement);
     list.append(btn);
   }
+  if (!heading) return list;
   return el('div', {},
     el('h2', { class: 'section-title combat-h' }, 'Stretches'),
     el('p', { class: 'section-sub muted' }, 'Twelve beacons. Only Hearthway is kindled.'),
     list);
 }
 
-function zoneBody(ctx, zoneId, paint) {
+function huntList(ctx, zoneId, paint) {
+  const unlock = combat.zoneUnlock(ctx.state, zoneId);
+  if (!unlock.ok) {
+    return el('div', { class: 'empty-state' },
+      el('span', { class: 'empty-icon', html: icon('sword') }),
+      el('h2', { class: 'empty-title' }, 'Unkindled'),
+      el('p', { class: 'empty-text' }, unlock.reason));
+  }
+  const list = el('div', { class: 'hunt-list' });
+  for (const enemy of enemiesInZone(zoneId)) {
+    list.append(huntCard(ctx, enemy, paint));
+  }
+  return list;
+}
+
+function zoneFlavor(ctx, zoneId) {
   const z = ZONE_BY_ID[zoneId];
   const unlock = combat.zoneUnlock(ctx.state, zoneId);
   const wrap = el('div', { class: 'zone-body' });
   wrap.append(
+    el('h2', { class: 'section-title combat-h' }, 'Stretches'),
+    el('p', { class: 'section-sub muted' }, 'Twelve beacons. Only Hearthway is kindled.'),
     el('h3', { class: 'track-name' }, z.stretch),
     el('p', { class: 'action-desc' }, z.flavor),
     el('p', { class: 'muted small' },
       `Requires Combat ${z.levelReq}${z.kindled ? '' : ' · kindled beacon'}.`),
   );
-
-  if (!unlock.ok) {
-    wrap.append(el('div', { class: 'empty-state' },
-      el('span', { class: 'empty-icon', html: icon('sword') }),
-      el('h2', { class: 'empty-title' }, 'Unkindled'),
-      el('p', { class: 'empty-text' }, unlock.reason)));
-    return wrap;
-  }
-
+  if (!unlock.ok) return wrap;
   const stretch = combat.ensureCombat(ctx.state).stretchKills[zoneId] ?? 0;
   const boss = bossOfZone(zoneId);
   wrap.append(el('p', { class: 'muted small' },
@@ -308,12 +400,6 @@ function zoneBody(ctx, zoneId, paint) {
         ? `${boss.name} will stand.`
         : `${boss.name} stirs after ${boss.stirKills} kills on this stretch (${stretch}/${boss.stirKills}).`)
       : ''));
-
-  const list = el('div', { class: 'hunt-list' });
-  for (const enemy of enemiesInZone(zoneId)) {
-    list.append(huntCard(ctx, enemy, paint));
-  }
-  wrap.append(list);
   return wrap;
 }
 
@@ -325,9 +411,7 @@ function huntCard(ctx, enemy, paint) {
   const blocked = lockedBoss || dry;
   const btnLabel = lockedBoss
     ? `Locked · ${enemy.stirKills} kills`
-    : dry
-      ? 'Need oil'
-      : enemy.boss ? 'Challenge' : 'Hunt';
+    : enemy.boss ? 'Challenge' : 'Hunt';
 
   const start = () => {
     if (lockedBoss) {
@@ -344,9 +428,15 @@ function huntCard(ctx, enemy, paint) {
   };
 
   return el('article', { class: `card hunt-card ${enemy.boss ? 'boss-card' : ''}` },
-    el('div', { class: 'action-head' },
-      el('h2', { class: 'action-name' }, enemy.name),
-      el('span', { class: 'mastery-badge' }, enemy.boss ? 'Guardian' : enemy.category)),
+    el('div', { class: 'hunt-head' },
+      el('div', { class: 'hunt-who' },
+        el('h2', { class: 'action-name' }, enemy.name),
+        el('span', { class: 'mastery-badge' }, enemy.boss ? 'Guardian' : enemy.category)),
+      el('button', {
+        class: `btn hunt-go ${blocked ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+        onclick: start,
+        'aria-disabled': blocked ? 'true' : 'false',
+      }, btnLabel)),
     el('p', { class: 'action-desc' }, enemy.flavor),
     chipRow('chips', [
       el('span', { class: 'chip' }, `${enemy.hp} HP`),
@@ -356,13 +446,7 @@ function huntCard(ctx, enemy, paint) {
       el('span', { class: 'chip' }, `weak to ${STYLE_BY_ID[enemy.weakness]?.name ?? enemy.weakness}`),
       el('span', { class: 'chip' }, `resists ${STYLE_BY_ID[enemy.resist]?.name ?? enemy.resist}`),
       kills ? el('span', { class: 'chip' }, `${kills} slain`) : null,
-      el('span', { class: `chip ${dry ? 'chip-warn' : ''}` }, `${formatNoun(sips, 'sip')} before Hunt`),
-    ]),
-    el('button', {
-      class: `btn btn-wide ${blocked ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
-      onclick: start,
-      'aria-disabled': blocked ? 'true' : 'false',
-    }, btnLabel));
+    ]));
 }
 
 function lanternCopy(st, state) {
@@ -485,9 +569,7 @@ function buildFight(ctx, st, paint) {
   });
   wrap.append(keep);
 
-  wrap.append(el('p', { class: 'muted small' },
-    'Auto-eat and auto-brew will arrive with a later camp purchase. Until then, eat with your own hand.'));
-
+  wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(st.log));
   return wrap;
 }
@@ -502,12 +584,13 @@ function fighterBlock({ title, hp, max, fillClass, compact = false }) {
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
 }
 
-function eatRow(ctx, st, paint, { flee = false } = {}) {
+function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {}) {
   const row = el('div', { class: 'eat-row' });
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
     row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
     if (flee) row.append(fleeButton(ctx, paint));
+    if (hunt) row.append(leftoverHunt(ctx, hunt, dry, paint));
     return row;
   }
   const n = bankCount(ctx.state.bank, id);
@@ -545,6 +628,7 @@ function eatRow(ctx, st, paint, { flee = false } = {}) {
     },
   }, 'Eat'));
   if (flee) slot.append(fleeButton(ctx, paint));
+  if (hunt) slot.append(leftoverHunt(ctx, hunt, dry, paint));
   row.append(slot);
   return row;
 }
@@ -559,14 +643,20 @@ function fleeButton(ctx, paint) {
 function leftoverStation(ctx, st, paint) {
   const last = st.lastStation;
   if (!last) return null;
-  const wrap = el('article', { class: 'card leftover-station', 'aria-label': 'After the hunt' });
+  const wrap = el('article', { class: 'combat-fight leftover-station', 'aria-label': 'After the hunt' });
   wrap.append(el('p', { class: 'leftover-kicker' }, combat.leftoverKicker(last)));
   wrap.append(fighterBlock({
     title: 'You',
     hp: st.playerHp,
     max: st.playerMaxHp,
     fillClass: 'hp-you',
-    compact: true,
+  }));
+  const foe = combat.leftoverFoeVitals(last);
+  wrap.append(fighterBlock({
+    title: foe.name,
+    hp: foe.hp,
+    max: foe.max,
+    fillClass: 'hp-foe',
   }));
   const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
   wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
@@ -574,12 +664,12 @@ function leftoverStation(ctx, st, paint) {
   const dry = sips <= 0;
   wrap.append(el('p', { class: `oil-line ${dry ? 'danger leftover-dry' : 'muted'}` },
     dry ? 'Need oil' : `${formatNoun(sips, 'lantern sip')} remaining`));
-  wrap.append(eatRow(ctx, st, paint));
+  wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
   wrap.append(handChip(ctx, st, paint));
   wrap.append(styleRow(ctx, st, paint));
   const loot = leftoverLootRow(last);
   if (loot) wrap.append(loot);
-  wrap.append(leftoverHunt(ctx, last, dry, paint));
+  wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
   return wrap;
 }
@@ -609,7 +699,7 @@ function leftoverHunt(ctx, last, dry, paint) {
   const enemy = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
   const name = last.enemyName ?? enemy?.name ?? 'this foe';
   return el('button', {
-    class: `btn btn-wide leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
+    class: `btn leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
     'aria-disabled': dry ? 'true' : 'false',
     onclick: () => {
       if (!last.enemyId) return;
@@ -621,7 +711,7 @@ function leftoverHunt(ctx, last, dry, paint) {
       if (!res.ok) ctx.toast(res.error, 'warn');
       paint();
     },
-  }, dry ? 'Need oil' : `Hunt ${name}`);
+  }, `Hunt ${name}`);
 }
 
 function logPanel(log, { lines = 12 } = {}) {

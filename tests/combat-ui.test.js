@@ -17,6 +17,7 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 */ }
 const { createState } = await import('../src/game/state.js');
 const { serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { renderSkillDetail, renderSkillsScreen } = await import('../src/ui/screens/skills.js');
+const { cockpitLogVsTab, lobbyFirstHuntBottom } = await import('../src/ui/screens/combat.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const combat = await import('../src/game/systems/combat.js');
 
@@ -193,7 +194,6 @@ test('hub HTML does not print null when deathSite is empty', () => {
   assert.equal(html.includes('>null<'), false);
   assert.equal(/\bnull\b/.test(text), false);
   assert.match(text, /lantern sip/);
-  assert.match(text, /before Hunt/);
   assert.match(text, /Wick-knife/);
 });
 
@@ -256,12 +256,13 @@ test('Hunt at 0 lantern sips is not a normal pull', () => {
   ctx.toast = (m) => toasts.push(m);
   const scr = renderSkillDetail(ctx, 'combat');
   const hunts = scr.node.querySelectorAll('button').filter((b) => (b.textContent ?? '') === 'Hunt');
-  assert.equal(hunts.length, 0, 'no primary Hunt at 0 sips');
-  const need = scr.node.querySelectorAll('button').filter((b) => /Need oil/.test(b.textContent ?? ''));
-  assert.ok(need.length >= 1);
-  assert.equal(need[0].classList.contains('btn-primary'), false);
-  assert.equal(need[0].getAttribute('aria-disabled'), 'true');
-  need[0].click();
+  assert.ok(hunts.length >= 1, 'stretch Hunt stays labelled Hunt');
+  assert.equal(hunts[0].classList.contains('btn-primary'), false);
+  assert.equal(hunts[0].getAttribute('aria-disabled'), 'true');
+  const needBtns = scr.node.querySelectorAll('button').filter((b) => /Need oil/.test(b.textContent ?? ''));
+  assert.equal(needBtns.length, 0, 'Need oil is not a Hunt label');
+  assert.equal((scr.node.textContent.match(/Need oil/g) ?? []).length, 1, 'one Need oil CTA');
+  hunts[0].click();
   assert.equal(state.combat.fighting, false);
   assert.ok(toasts.some((t) => /dry|oil/i.test(t)));
 });
@@ -386,12 +387,17 @@ test('hub after kill still shows compact fight chrome', () => {
   assert.equal(/\+0/.test(leftover.querySelector('.eat-row')?.textContent ?? ''), false);
   assert.match(leftover.querySelector('.leftover-kicker')?.textContent ?? '', /Pale Moth fell/);
   assert.match(text, /✦|soul/);
-  assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth|Need oil/);
+  assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
+  assert.equal(/Need oil/.test(leftover.querySelector('.leftover-hunt')?.textContent ?? ''), false);
   assert.equal(scr.node.querySelectorAll('.combat-meta').length, 0, 'no duplicate souls/dry/sips row under leftover');
   assert.equal(scr.node.querySelectorAll('.weapon-card').length, 0);
   assert.ok(leftover.querySelector('.hand-chip'), 'Knife/Unarmed sits in leftover, not under Vigil');
   assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
   assert.ok(leftover.querySelector('.style-row'));
+  assert.equal(leftover.querySelectorAll('.fighter').length, 2, 'You vs last foe');
+  assert.match(leftover.querySelectorAll('.fighter')[1]?.textContent ?? '', /Pale Moth/);
+  assert.equal(leftover.querySelectorAll('.vigil-card').length, 0, 'Vigil is not inside the cockpit');
+  assert.equal(leftover.querySelectorAll('.zone-chips').length, 0, 'Stretches are not inside the cockpit');
   const logLines = leftover.querySelectorAll('.log-line');
   assert.ok(logLines.length >= 1, 'leftover fight log is not empty');
   assert.ok(logLines.length <= 4);
@@ -460,15 +466,20 @@ test('leftover station states Need oil in-frame at 0 sips', () => {
   killMoth(state);
   state.bank['wick-oil'] = 0;
   state.bank['lamp-oil'] = 0;
-  const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover);
   const oil = leftover.querySelector('.leftover-dry')?.textContent ?? leftover.querySelector('.oil-line')?.textContent ?? '';
   assert.match(oil, /Need oil/);
-  assert.equal(/Need oil/.test(leftover.textContent ?? ''), true);
   const hunt = leftover.querySelector('.leftover-hunt');
   assert.ok(hunt);
-  assert.match(hunt.textContent ?? '', /Need oil/);
+  assert.match(hunt.textContent ?? '', /Hunt Pale Moth/);
+  assert.equal(/Need oil/.test(hunt.textContent ?? ''), false);
   assert.equal(hunt.getAttribute('aria-disabled'), 'true');
+  assert.equal((leftover.textContent.match(/Need oil/g) ?? []).length, 1, 'Need oil once in leftover');
+  const stretchNeed = scr.node.querySelectorAll('button').filter((b) => /Need oil/.test(b.textContent ?? ''));
+  assert.equal(stretchNeed.length, 0);
+  assert.equal((scr.node.textContent.match(/Need oil/g) ?? []).length, 1, 'Need oil once on the whole combat screen');
 });
 
 test('one-slot eat picker cycles lantern-loaf to fogwort', () => {
@@ -529,4 +540,70 @@ test('leftover hub is leftover-live and has no duplicate souls chips', () => {
   assert.match(leftover?.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
   assert.ok(Array.isArray(state.combat.lastStation.log));
   assert.ok(state.combat.lastStation.log.length >= 1);
+});
+
+function assertLeftoverCockpit(leftover, { foe = /Pale Moth/, kicker }) {
+  assert.ok(leftover, 'leftover cockpit');
+  const text = leftover.textContent ?? '';
+  assert.match(text, /You/);
+  assert.match(text, foe);
+  assert.match(leftover.querySelector('.eat-row')?.textContent ?? '', /Eat|Lantern-loaf|No food/);
+  assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
+  assert.ok(leftover.querySelector('.combat-log'));
+  assert.ok(leftover.querySelectorAll('.log-line').length >= 1);
+  assert.ok(leftover.querySelectorAll('.log-line').length <= 4);
+  assert.equal(leftover.querySelectorAll('.fighter').length, 2);
+  assert.equal(leftover.querySelectorAll('.vigil-card').length, 0);
+  assert.equal(leftover.querySelectorAll('.zone-chips').length, 0);
+  if (kicker) assert.match(leftover.querySelector('.leftover-kicker')?.textContent ?? '', kicker);
+}
+
+test('leftover after kill is a 360 cockpit with You/foe/Eat/Knife/log above the tab bar', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
+  assertLeftoverCockpit(leftover, { kicker: /Pale Moth fell/ });
+  const box = cockpitLogVsTab('leftover');
+  assert.ok(box.fits, `log ${box.logTop}+${box.logH} vs tab ${box.tabTop}`);
+  assert.ok(box.logBottom < box.tabTop, `log bottom ${box.logBottom} >= tab ${box.tabTop}`);
+});
+
+test('leftover after Fall back is the same 360 cockpit, not a lobby kicker', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 9 });
+  combat.fleeFight(state);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assertLeftoverCockpit(leftover, { kicker: /Fell back from Pale Moth/ });
+  assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Pale Moth/);
+  const lobby = scr.node.querySelector('.combat-lobby-after');
+  assert.ok(lobby, 'Vigil/Stretches wait below the cockpit');
+  assert.ok(lobby.querySelector('.vigil-card'));
+  const box = cockpitLogVsTab('leftover');
+  assert.ok(box.fits);
+  assert.ok(box.logBottom < box.tabTop);
+});
+
+test('first Hunt Pale Moth is above the 360 fold on the combat lobby', () => {
+  const state = createState({ rngSeed: 2 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.equal(scr.node.classList.contains('leftover-live'), false);
+  const lobby = scr.node.querySelector('.combat-lobby');
+  assert.ok(lobby);
+  const cards = lobby.querySelectorAll('.hunt-card');
+  assert.ok(cards.length >= 1);
+  assert.match(cards[0].textContent ?? '', /Pale Moth/);
+  assert.match(cards[0].querySelector('.hunt-go')?.textContent ?? '', /Hunt/);
+  const vigil = lobby.querySelector('.vigil-card');
+  const vigilIdx = lobby.children.indexOf(vigil);
+  const huntIdx = lobby.children.indexOf(lobby.querySelector('.hunt-list'));
+  assert.ok(huntIdx >= 0 && vigilIdx > huntIdx, 'hunts before Vigil');
+  const fold = lobbyFirstHuntBottom();
+  assert.ok(fold.fits, `Hunt bottom ${fold.huntBottom} vs tab ${fold.tabTop}`);
+});
+
+test('fight log budget sits above the 360 tab bar', () => {
+  const box = cockpitLogVsTab('fight');
+  assert.ok(box.fits, `fight log ${box.logTop}+${box.logH} vs tab ${box.tabTop}`);
+  assert.ok(box.logBottom < box.tabTop);
 });

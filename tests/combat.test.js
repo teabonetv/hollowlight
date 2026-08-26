@@ -524,6 +524,32 @@ test('first Hunt waits the opening windup; Pale Moth is still up at 400ms', () =
   assert.equal(s.combat.log.some((l) => l.kind === 'kill'), false);
 });
 
+test('kill and flee pin leftover foe vitals for the cockpit', () => {
+  const s = createState({ rngSeed: 4 });
+  s.combat.autoContinue = false;
+  combat.startFight(s, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (s.combat.foe) s.combat.foe.hp = 1;
+    s.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(s, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.ok(kill);
+  const dead = combat.leftoverFoeVitals(s.combat.lastStation);
+  assert.equal(dead.name, 'Pale Moth');
+  assert.equal(dead.hp, 0);
+  assert.equal(dead.max, 16);
+
+  combat.startFight(s, 'pale-moth', { encounterSeed: 9 });
+  s.combat.foe.hp = 11;
+  combat.fleeFight(s);
+  const fled = combat.leftoverFoeVitals(s.combat.lastStation);
+  assert.equal(fled.name, 'Pale Moth');
+  assert.equal(fled.hp, 11);
+  assert.equal(fled.max, 16);
+});
+
 test('kill and flee pin a leftover fight log (not log: [])', () => {
   const s = createState({ rngSeed: 4 });
   s.combat.autoContinue = false;
