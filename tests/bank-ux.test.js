@@ -17,7 +17,7 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
 const { createState, STARTER_BANK } = await import('../src/game/state.js');
 const { DEFAULT_BANK_TAB, ITEMS, ITEMS_BY_ID } = await import('../src/game/data/items.js');
 const { filterItems, sellItems, bankCount, bankSellValue, uniqueStackCount, lanternRoom,
-  toggleLock, isLocked, sellQtyForMode, tryBankAdd } = await import('../src/game/systems/bank.js');
+  toggleLock, isLocked, sellQtyForMode, tryBankAdd, resolveBankTab, isCatalogueTab } = await import('../src/game/systems/bank.js');
 const { itemGlyph } = await import('../src/game/data/item-glyphs.js');
 const { ICONS, FILLED_ICONS, filledIcon } = await import('../src/ui/icons.js');
 const tabs = await import('../src/ui/screens/tabs.js');
@@ -48,6 +48,12 @@ function makeCtx(state, overrides = {}) {
 
 test('DEFAULT_BANK_TAB is owned', () => {
   assert.equal(DEFAULT_BANK_TAB, 'owned');
+  assert.equal(resolveBankTab('all'), 'all');
+  assert.equal(resolveBankTab('catalogue'), 'all');
+  assert.equal(resolveBankTab('owned'), 'owned');
+  assert.equal(resolveBankTab('pinned'), 'pinned');
+  assert.equal(resolveBankTab('food'), 'owned');
+  assert.equal(isCatalogueTab(resolveBankTab('catalogue')), true);
 });
 
 test('owned-default screen has no unowned tiles until Catalogue is opened', () => {
@@ -707,9 +713,35 @@ test('Food tab stays on the starter row after dump; HUD chips and tab chips wrap
   assert.match(css, /\.pill\.known[\s\S]{0,220}white-space:\s*nowrap/);
   assert.match(css, /\.pill\.hollow[\s\S]{0,220}white-space:\s*nowrap/);
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
-  assert.match(html, /id="hud-known"/);
-  assert.match(html, /id="hud-hollow"/);
+  assert.match(html, /<button[^>]*id="hud-known"/);
+  assert.match(html, /<button[^>]*id="hud-hollow"/);
   assert.match(html, /Known 0\/137/);
+  assert.match(html, /Hollow 0\/12/);
+});
+
+test('bankTab all opens Catalogue with named found and unowned tiles, not Camp', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s, { bankTab: 'all' }));
+  assert.ok(scr.node.classList.contains('bank-screen'));
+  const cat = scr.node.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
+  assert.equal(cat?.getAttribute('aria-selected'), 'true');
+  const tiles = scr.node.querySelectorAll('.bank-tile');
+  assert.ok(tiles.length >= 100, 'catalogue lists the registry');
+  assert.ok(tiles.some((t) => t.classList.contains('unowned')));
+  assert.ok(tileByName(scr.node, 'Lantern-loaf'), 'found starter is named');
+  assert.ok(tileByName(scr.node, 'Pale-cap'), 'not-yet-held is still a named tile');
+  assert.equal(scr.node.querySelector('.camp'), null);
+});
+
+test('bankTab owned is the working pack (Hollow door)', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s, { bankTab: 'owned' }));
+  const owned = scr.node.querySelectorAll('.bank-tab').find((t) => t.textContent === 'Owned');
+  assert.equal(owned?.getAttribute('aria-selected'), 'true');
+  const tiles = scr.node.querySelectorAll('.bank-tile');
+  assert.ok(tiles.length > 0);
+  assert.ok(tiles.every((t) => t.classList.contains('owned')));
+  assert.equal(scr.node.querySelectorAll('.bank-tile.unowned').length, 0);
 });
 
 

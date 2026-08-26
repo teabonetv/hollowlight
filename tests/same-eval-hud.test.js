@@ -18,8 +18,8 @@ const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
-  'hud-known': new FakeNode('span'),
-  'hud-hollow': new FakeNode('span'),
+  'hud-known': new FakeNode('button'),
+  'hud-hollow': new FakeNode('button'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
   toasts: new FakeNode('div'),
@@ -265,4 +265,92 @@ test('Sell 1 from the Owned grid: HUD lumen == save.lumen same-eval', () => {
   } else {
     assert.equal(state.lumen, lumenBefore + catalogDrop);
   }
+});
+
+function activeBankTab() {
+  return elements.screen.querySelectorAll('.bank-tab').find((t) => t.classList.contains('active'));
+}
+
+test('tapping Known chip leaves Camp for Bank Catalogue (item log)', () => {
+  const campTab = tabButtons.find((b) => b.dataset.tab === 'camp');
+  campTab.click();
+  assert.ok(elements.screen.querySelector('.camp'), 'start on Camp');
+  assert.match(elements['hud-known'].textContent ?? '', /^Known \d+\/\d+$/);
+  assert.equal(elements['hud-known'].tagName, 'BUTTON');
+
+  elements['hud-known'].click();
+
+  assert.equal(elements.screen.querySelector('.camp'), null, 'Known is a door — leave Camp');
+  assert.ok(elements.screen.querySelector('.bank-screen'), 'land on Bank');
+  const cat = activeBankTab();
+  assert.ok(cat, 'a bank tab is selected');
+  assert.match(cat.textContent ?? '', /Catalogue/);
+  assert.equal(cat.getAttribute('aria-selected'), 'true');
+  const tiles = elements.screen.querySelectorAll('.bank-tile');
+  assert.ok(tiles.length >= 100, 'catalogue is a list of items, not a postcard');
+  assert.ok(tiles.some((t) => t.classList.contains('unowned')), 'unfound rows are in the log');
+  assert.ok(tiles.some((t) => /Lantern-loaf/.test(t.textContent ?? '')), 'found names are on the list');
+  assertHudEqualsSave('after Known chip → Catalogue');
+});
+
+test('tapping Hollow chip opens the owned Bank grid', () => {
+  const campTab = tabButtons.find((b) => b.dataset.tab === 'camp');
+  campTab.click();
+  assert.ok(elements.screen.querySelector('.camp'), 'start on Camp');
+  assert.match(elements['hud-hollow'].textContent ?? '', /^Hollow \d+\/\d+$/);
+  assert.equal(elements['hud-hollow'].tagName, 'BUTTON');
+
+  elements['hud-hollow'].click();
+
+  assert.equal(elements.screen.querySelector('.camp'), null, 'Hollow is a door — leave Camp');
+  assert.ok(elements.screen.querySelector('.bank-screen'), 'land on Bank');
+  const owned = activeBankTab();
+  assert.match(owned?.textContent ?? '', /^Owned$/);
+  const tiles = elements.screen.querySelectorAll('.bank-tile');
+  assert.ok(tiles.length > 0);
+  assert.ok(tiles.every((t) => t.classList.contains('owned')));
+  assert.equal(elements.screen.querySelectorAll('.bank-tile.unowned').length, 0);
+  assertHudEqualsSave('after Hollow chip → Owned');
+});
+
+test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () => {
+  const campTab = tabButtons.find((b) => b.dataset.tab === 'camp');
+  campTab.click();
+  elements['hud-hollow'].click();
+
+  const sellToggle = findButton(elements.screen, /Sell Mode|^Selling$/);
+  if (!/Selling/.test(sellToggle?.textContent ?? '')) sellToggle.click();
+  const dump = elements.screen.querySelectorAll('.bank-sell-qty-btn')
+    .find((b) => /Dump/.test(b.textContent ?? ''));
+  assert.ok(dump, 'Dump qty on the owned grid');
+  dump.click();
+
+  let loaf;
+  elements.screen._walk?.((n) => {
+    if (loaf || n === elements.screen) return;
+    if (n.classList?.contains('bank-tile') && /Lantern-loaf/.test(n.textContent ?? '')) loaf = n;
+  });
+  assert.ok(loaf, 'Lantern-loaf still on the owned grid');
+  loaf.click();
+
+  assert.equal(elements['hud-known'].textContent, 'Known 6/137');
+  assert.equal(elements['hud-hollow'].textContent, 'Hollow 5/12');
+  assertHudEqualsSave('after dump loaf');
+
+  campTab.click();
+  assert.ok(elements.screen.querySelector('.camp'), 'back on Camp');
+  assert.equal(elements['hud-known'].textContent, 'Known 6/137');
+  assert.equal(elements['hud-hollow'].textContent, 'Hollow 5/12');
+
+  elements['hud-known'].click();
+  assert.ok(elements.screen.querySelector('.bank-screen'));
+  assert.match(activeBankTab()?.textContent ?? '', /Catalogue/);
+  let catLoaf;
+  elements.screen._walk?.((n) => {
+    if (catLoaf || n === elements.screen) return;
+    if (n.classList?.contains('bank-tile') && /Lantern-loaf/.test(n.textContent ?? '')) catLoaf = n;
+  });
+  assert.ok(catLoaf, 'dumped loaf still named in Catalogue');
+  assert.ok(catLoaf.classList.contains('known-empty'));
+  assert.equal(catLoaf.querySelector('.bank-qty')?.textContent, '0');
 });

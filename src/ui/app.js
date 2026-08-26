@@ -31,14 +31,14 @@ import {
 } from '../core/offline.js';
 import { createState, pushLog } from '../game/state.js';
 import { ACTIONS_BY_ID } from '../game/data/actions.js';
-import { ITEMS_BY_ID } from '../game/data/items.js';
+import { ITEMS_BY_ID, DEFAULT_BANK_TAB } from '../game/data/items.js';
 import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
 import * as combat from '../game/systems/combat.js';
 import { sellItems, togglePin as pinItem, toggleLock as lockItem, savePreset as writePreset, applyPreset as usePreset,
-  deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot } from '../game/systems/bank.js';
+  deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot, resolveBankTab } from '../game/systems/bank.js';
 import * as storeSys from '../game/systems/store.js';
 import { offerItems } from '../game/systems/offerings.js';
 import { repairLantern as doRepair } from '../game/systems/repairs.js';
@@ -84,7 +84,10 @@ function boot() {
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
 
-  const ui = { tab: 'camp', skillId: null, almanac: 'overview', campView: null, sellMode: false, sellQtyMode: '1' };
+  const ui = {
+    tab: 'camp', skillId: null, almanac: 'overview', campView: null,
+    bankTab: DEFAULT_BANK_TAB, sellMode: false, sellQtyMode: '1',
+  };
   let liveUpdate = () => {};
   let sheetRepaint = null;
   let rng = createRng(1);
@@ -317,6 +320,7 @@ function boot() {
         skillId: ui.skillId,
         almanac: ui.almanac,
         campView: ui.campView,
+        bankTab: resolveBankTab(ui.bankTab),
         sellMode: !!ui.sellMode,
         sellQtyMode: SELL_QTY_MODES.has(ui.sellQtyMode) ? ui.sellQtyMode : '1',
         bankLocks: [...(game?.bankLocks ?? [])],
@@ -345,6 +349,7 @@ function boot() {
       : null;
     ui.almanac = typeof saved.almanac === 'string' ? saved.almanac : 'overview';
     ui.campView = saved.tab === 'camp' && saved.campView === 'store' ? 'store' : null;
+    ui.bankTab = resolveBankTab(saved.bankTab);
     ui.sellMode = !!saved.sellMode;
     ui.sellQtyMode = SELL_QTY_MODES.has(saved.sellQtyMode) ? saved.sellQtyMode : '1';
     if (Array.isArray(saved.bankLocks) && game) {
@@ -367,11 +372,23 @@ function boot() {
     ui.tab = tab;
     ui.skillId = null;
     ui.campView = null;
+    if (tab === 'bank') ui.bankTab = DEFAULT_BANK_TAB;
     if (tab === 'journal') {
       ui.almanac = ui.almanac && ui.almanac !== 'overview' ? ui.almanac : 'overview';
       game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
     }
     if (tab === 'map') game.stats.mapOpens = (game.stats.mapOpens ?? 0) + 1;
+    showRoute();
+    afterMutation({ stamp: false });
+  }
+
+  /** Known chip → Catalogue; Hollow chip → owned grid. Melvor's Bank / Log are doors. */
+  function openBank(tab = DEFAULT_BANK_TAB) {
+    if (recapOpen) return;
+    ui.tab = 'bank';
+    ui.skillId = null;
+    ui.campView = null;
+    ui.bankTab = resolveBankTab(tab);
     showRoute();
     afterMutation({ stamp: false });
   }
@@ -399,6 +416,9 @@ function boot() {
       else res.feats = [];
       return res;
     },
+    get bankTab() { return ui.bankTab; },
+    setBankTab(tab) { ui.bankTab = resolveBankTab(tab); writeUiRoute(); },
+    openBank,
     get sellMode() { return ui.sellMode; },
     setSellMode(on) { ui.sellMode = !!on; writeUiRoute(); },
     get sellQtyMode() { return ui.sellQtyMode; },
@@ -628,6 +648,7 @@ function boot() {
       ui.tab = 'camp';
       ui.skillId = null;
       ui.campView = null;
+      ui.bankTab = DEFAULT_BANK_TAB;
       ui.sellMode = false;
       ui.sellQtyMode = '1';
       adopt(freshGame());
@@ -716,6 +737,8 @@ function boot() {
     showSettingsModal(modalRoot, ctx);
     afterMutation({ stamp: false });
   });
+  hudKnown?.addEventListener('click', () => openBank('all'));
+  hudHollow?.addEventListener('click', () => openBank('owned'));
 
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) {
