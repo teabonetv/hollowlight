@@ -494,7 +494,7 @@ export function guardianStirred(state, zoneId) {
   return kills >= (boss.stirKills ?? 5);
 }
 
-export function startFight(state, enemyId, { encounterSeed } = {}) {
+export function startFight(state, enemyId, { encounterSeed, keepLog = false } = {}) {
   ensureCombat(state);
   const enemy = ENEMIES_BY_ID[enemyId];
   if (!enemy) return { ok: false, error: 'Unknown foe.' };
@@ -505,8 +505,10 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
   }
   if (state.combat.fighting) return { ok: false, error: 'Already in a fight.' };
 
-  // Fight-scoped log: a new Hunt must not paint eat/kill/flee from the last encounter.
-  state.combat.log = [];
+  // Fight-scoped log: a tapped Hunt must not paint eat/kill/flee from the last
+  // leftover. Keep hunting chains on the same tick as the kill, so retain the
+  // loot/XP (and Vigil) lines — those never reach leftover hub or the kill toast.
+  if (!keepLog) state.combat.log = [];
 
   const seed = encounterSeed ?? hashSeed(
     `${state.stats.playtimeMs}|${enemyId}|${state.combat.kills[enemyId] ?? 0}|${state.rngState}`,
@@ -659,7 +661,7 @@ function onKill(state, rng) {
   ];
 
   if (auto) {
-    const next = startFight(state, repeatId);
+    const next = startFight(state, repeatId, { keepLog: true });
     if (next.ok) out.push({ type: 'combat-start', enemyId: repeatId });
     else pushCombatLog(state, 'The stretch goes still.', 'info');
   } else if (enemy.boss) {

@@ -410,6 +410,25 @@ test('new Hunt log does not carry eat/kill/flee from the last encounter', () => 
   assert.match(log, /You meet Pale Moth/);
 });
 
+test('Keep hunting paints the kill loot line into the next fight log', () => {
+  const state = createState({ rngSeed: 3 });
+  state.combat.autoContinue = true;
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (state.combat.foe) state.combat.foe.hp = 1;
+    state.combat.player.nextActMs = 0;
+    const events = combat.tickCombat(state, 100);
+    kill = events.find((e) => e.type === 'combat-kill') ?? kill;
+  }
+  assert.ok(kill);
+  assert.equal(state.combat.fighting, true);
+  const log = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.combat-log')?.textContent ?? '';
+  assert.match(log, /Pale Moth falls/);
+  assert.match(log, /Loot:/);
+  assert.match(log, /You meet Pale Moth/);
+});
+
 test('leftover Acc moves when Knife is unequipped or style shifts to Rite', () => {
   const state = createState({ rngSeed: 4 });
   killMoth(state);
