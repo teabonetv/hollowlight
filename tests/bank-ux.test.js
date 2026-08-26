@@ -149,6 +149,9 @@ test('Catalogue Herbs do not share one leaf — each has a unique filled mark', 
   assert.equal(itemTileGlyph(ITEMS_BY_ID.fogwort), 'leaf');
   assert.notEqual(itemTileGlyph(ITEMS_BY_ID['bitter-sage']), 'leaf');
   assert.notEqual(itemTileGlyph(ITEMS_BY_ID['veil-clover']), 'leaf');
+  assert.notEqual(FILLED_ICONS.parsley, FILLED_ICONS.clover);
+  assert.notEqual(FILLED_ICONS.mint, FILLED_ICONS.clover);
+  assert.notEqual(FILLED_ICONS.sage, FILLED_ICONS.leaf);
   const s = createState({ rngSeed: 1 });
   s.bank['bitter-sage'] = 1;
   s.bank['veil-clover'] = 1;
