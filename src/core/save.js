@@ -142,6 +142,20 @@ export function deserializeSave(json, { currentVersion = SAVE_VERSION, migration
   return { state, savedAt: Number.isFinite(parsed.savedAt) ? parsed.savedAt : 0 };
 }
 
+/**
+ * Offline windows key off savedAt. Critics (and the HANDOFF method) rewind
+ * the envelope, the inner state, or both after navigating away to items.js.
+ * Boot must honour the earlier stamp so a 3h rewind still offers the recap.
+ */
+export function adoptedSavedAt(envelopeSavedAt, stateSavedAt) {
+  const times = [envelopeSavedAt, stateSavedAt]
+    .map(Number)
+    .filter((n) => Number.isFinite(n) && n > 0);
+  if (times.length) return Math.min(...times);
+  const fallback = Number(stateSavedAt);
+  return Number.isFinite(fallback) ? fallback : 0;
+}
+
 // Storage is injected (localStorage-shaped: getItem/setItem/removeItem) so
 // tests run against a plain object and the app passes window.localStorage.
 

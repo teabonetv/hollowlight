@@ -88,7 +88,8 @@ test('auto-restart keeps cycling until the bank runs dry, then halts cleanly', (
   assert.ok(s.flame === 60 && s.lumen === 50, 'rewards: flame 30×2, lumen 20+30');
   const halted = events.find((e) => e.type === 'halted');
   assert.ok(halted, 'a halted event surfaces for UI toasting');
-  assert.match(halted.reason, /tinderscrap/i);
+  assert.equal(halted.reason, 'out of Tinderscrap ×0');
+  assert.equal(halted.remainingQty, 0);
 });
 
 test('auto-restart OFF: one cycle then the action stops itself', () => {

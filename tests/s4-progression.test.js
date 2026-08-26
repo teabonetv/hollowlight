@@ -24,7 +24,7 @@ import { statsRows, totalCycles, recordCycle } from '../src/game/systems/stats.j
 import { completeCycle, startAction, tickActions, actionStatus } from '../src/game/systems/action-runner.js';
 import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { computeOfflineProgress } from '../src/core/offline.js';
-import { nextWants, totalCompletion, logCategoryStats } from '../src/game/systems/completion.js';
+import { nextWants, totalCompletion, logCategoryStats, formatCompletionPct } from '../src/game/systems/completion.js';
 import { TAB_OPEN_FEAT_IDS } from '../src/game/data/achievements.js';
 import { serializeSave, deserializeSave, SAVE_VERSION } from '../src/core/save.js';
 import { markDiscovered } from '../src/game/systems/discovered.js';
@@ -383,6 +383,25 @@ test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats do not pad 
   assert.equal(tot.pct, before.pct);
   assert.ok(feats.pct < 0.12, `tab-open feats must not pad Feats, got ${feats.pct}`);
   assert.ok(tot.pct < 0.08, `headline must stay a small early %, got ${tot.pct}`);
+});
+
+test('practiced mastery 7/1089 prints 0.6%, not 0%, next to Feats', () => {
+  const s = createState({ nowMs: 0, rngSeed: 9 });
+  const tracks = logCategoryStats(s).find((r) => r.id === 'mastery');
+  assert.equal(tracks.done, 0);
+  assert.equal(formatCompletionPct(tracks.pct), '0%');
+
+  s.skills.emberkeeping.mastery['tend-flame'] = { xp: 100, level: 3 };
+  s.actions.completed['tend-flame'] = 12;
+  s.skills.foraging.mastery['gather-herbs'] = { xp: 140, level: 4 };
+  s.actions.completed['gather-herbs'] = 20;
+  const mastery = logCategoryStats(s).find((r) => r.id === 'mastery');
+  assert.equal(mastery.done, 7);
+  assert.equal(mastery.total, 1089);
+  assert.equal(formatCompletionPct(mastery.pct), '0.6%');
+  assert.notEqual(formatCompletionPct(mastery.pct), '0%');
+  assert.equal(formatCompletionPct(0.01), '1%');
+  assert.equal(formatCompletionPct(0), '0%');
 });
 
 test('discovered items never decrease when the last stack is spent', () => {

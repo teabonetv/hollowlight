@@ -17,7 +17,7 @@ import {
   totalCompletion, achievementCompletion,
   closestAchievement, logCategoryStats,
   skillLogDetails, masteryLogDetails, itemsLogDetails,
-  logFeatAchievements,
+  logFeatAchievements, formatCompletionPct,
 } from '../../game/systems/completion.js';
 import { statsRows } from '../../game/systems/stats.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
@@ -88,7 +88,7 @@ function renderOverview(ctx) {
       el('div', { class: 'complete-bar bar bar-lg' },
         el('span', { class: 'bar-fill', style: `width:${(tot.pct * 100).toFixed(1)}%` })),
       el('p', { class: 'muted small' },
-        logCats.map((c) => `${c.name} ${Math.floor(c.pct * 100)}%`).join(' · '))),
+        logCats.map((c) => `${c.name} ${formatCompletionPct(c.pct)}`).join(' · '))),
     el('div', { class: 'want-list' },
       perk ? wantRow('Next star', perk.name, `${perk.cost} Radiance`, () => ctx.openAlmanac('stars')) : null,
       next ? wantRow('Next feat', next.name, next.desc, () => ctx.openAlmanac('achievements')) : null,
@@ -102,7 +102,7 @@ function renderOverview(ctx) {
         onclick: () => ctx.openAlmanac(`log-${c.id}`),
       },
         el('span', { class: 'cat-name' }, c.name),
-        el('span', { class: 'cat-pct' }, `${Math.floor(c.pct * 100)}% · ${c.done}/${c.total}`),
+        el('span', { class: 'cat-pct' }, `${formatCompletionPct(c.pct)} · ${c.done}/${c.total}`),
         el('span', { class: 'bar bar-mini cat-bar' },
           el('span', { class: 'bar-fill', style: `width:${(c.pct * 100).toFixed(1)}%` }))))),
     el('h2', { class: 'section-title' }, 'Journal'),
@@ -388,12 +388,12 @@ function dailyCard(ctx, taskId) {
 
 function logHero(ctx, bucketId, title, blurb) {
   const row = logCategoryStats(ctx.state).find((c) => c.id === bucketId);
-  const pct = row ? Math.floor(row.pct * 100) : 0;
+  const pctLabel = row ? formatCompletionPct(row.pct) : '0%';
   return [
     el('header', { class: 'screen-head' },
       el('h1', { class: 'screen-title' }, title),
       el('p', { class: 'screen-sub' },
-        row ? `${pct}% · ${row.done}/${row.total} — ${blurb}` : blurb)),
+        row ? `${pctLabel} · ${row.done}/${row.total} — ${blurb}` : blurb)),
     subnav(ctx, navCurrent(`log-${bucketId}`)),
     el('button', {
       class: 'btn btn-ghost btn-wide log-back',

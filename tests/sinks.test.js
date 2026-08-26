@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { createState } from '../src/game/state.js';
 import { offerItems, sparksFor } from '../src/game/systems/offerings.js';
 import { ITEMS_BY_ID } from '../src/game/data/items.js';
-import { repairLantern, lanternIntegrity, applyEmberkeepingWear } from '../src/game/systems/repairs.js';
+import { repairLantern, lanternIntegrity, applyEmberkeepingWear, repairNeedLabel } from '../src/game/systems/repairs.js';
+import { REPAIR_KITS_BY_ID } from '../src/game/data/repairs.js';
 import { buyTheme } from '../src/game/systems/store.js';
 import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { completeCycle } from '../src/game/systems/action-runner.js';
@@ -44,6 +45,20 @@ test('emberkeeping wear never halts; repairs restore integrity for Lumen+goods',
   assert.equal(res.ok, true);
   assert.equal(s.lanternIntegrity, 100);
   assert.equal(s.lumen, 0);
+});
+
+test('Wick patch names Tinderscrap when the bank is short', () => {
+  const s = createState({ rngSeed: 4 });
+  s.lanternIntegrity = 70;
+  s.lumen = 145;
+  s.bank.tinderscrap = 2;
+  const kit = REPAIR_KITS_BY_ID['wick-patch'];
+  assert.equal(repairNeedLabel(s, kit), 'Need Tinderscrap ×8');
+  const res = repairLantern(s, 'wick-patch');
+  assert.equal(res.ok, false);
+  assert.equal(res.error, 'Need Tinderscrap ×8');
+  assert.equal(s.lanternIntegrity, 70);
+  assert.equal(s.lumen, 145);
 });
 
 test('tab dyes spend Lumen and never grant bank slots or power', () => {

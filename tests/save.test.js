@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SAVE_VERSION, serializeSave, deserializeSave, SaveError,
+  SAVE_VERSION, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
   storageGet, storageSet,
 } from '../src/core/save.js';
 import { createState } from '../src/game/state.js';
@@ -112,4 +112,13 @@ test('storage set/get round-trip through a working backend', () => {
   const store = fakeStorage();
   storageSet(store, 'hello');
   assert.equal(storageGet(store), 'hello');
+});
+
+test('adoptedSavedAt honours the earlier of envelope and state stamps', () => {
+  const now = 1_700_000_000_000;
+  const threeHours = 3 * 3_600_000;
+  assert.equal(adoptedSavedAt(now - threeHours, now), now - threeHours);
+  assert.equal(adoptedSavedAt(now, now - threeHours), now - threeHours);
+  assert.equal(adoptedSavedAt(0, now), now, 'missing envelope stamp does not rewind to epoch');
+  assert.equal(adoptedSavedAt(now - threeHours, undefined), now - threeHours);
 });

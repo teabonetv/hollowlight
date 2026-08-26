@@ -8,7 +8,7 @@ import { TRACKS } from '../../game/data/upgrades.js';
 import { REPAIR_KITS } from '../../game/data/repairs.js';
 import { KINDLING_BUNDLE } from '../../game/data/store.js';
 import { bankCount } from '../../game/systems/bank.js';
-import { lanternIntegrity } from '../../game/systems/repairs.js';
+import { lanternIntegrity, canAffordRepair, repairNeedLabel, repairCostChips } from '../../game/systems/repairs.js';
 import * as camp from '../../game/systems/upgrades.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
 import { nextWants, totalCompletion } from '../../game/systems/completion.js';
@@ -54,12 +54,13 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'camp-flavor' },
       'The last ember of the Hollow sleeps in your lantern. Feed it, and carry its light down the pilgrim road.'),
     el('div', { class: 'stat-grid' },
+      el('div', { class: 'stat-cell stat-complete' }, completeVal, el('span', { class: 'stat-label' }, 'Completion')),
       el('div', { class: 'stat-cell' }, lumenVal, el('span', { class: 'stat-label' }, 'Lumen')),
       el('div', { class: 'stat-cell' }, radianceVal, el('span', { class: 'stat-label' }, 'Radiance')),
       el('div', { class: 'stat-cell' }, flameVal, el('span', { class: 'stat-label' }, 'Flame units')),
       el('div', { class: 'stat-cell' }, timeVal, el('span', { class: 'stat-label' }, 'Time by the flame')),
       el('div', { class: 'stat-cell' }, cyclesVal, el('span', { class: 'stat-label' }, 'Cycles worked')),
-      el('div', { class: 'stat-cell' }, completeVal, el('span', { class: 'stat-label' }, 'Completion'))),
+    ),
     el('h2', { class: 'section-title' }, 'Waiting for you'),
     el('p', { class: 'section-sub muted' }, 'Three things to want next — always.'),
     el('div', { class: 'want-list camp-wants' },
@@ -245,20 +246,49 @@ function buildTrackCard(ctx, track) {
 
 function buildRepairCard(ctx) {
   const integrityLine = el('span', { class: 'track-effect' });
-  const kitsHost = el('div', { class: 'repair-kits' });
+  const rows = REPAIR_KITS.map((kit) => {
+    const costChips = el('span', { class: 'chips' });
+    const btn = el('button', {
+      class: 'btn btn-wide',
+      type: 'button',
+      dataset: { repairId: kit.id },
+      onclick: () => {
+        if (btn.getAttribute('aria-disabled') === 'true') return;
+        ctx.repairLantern?.(kit.id);
+      },
+    }, `${kit.name} · +${kit.restore} · ✦${kit.lumen}`);
+    return {
+      kit,
+      btn,
+      costChips,
+      node: el('div', { class: 'repair-row' },
+        el('p', { class: 'track-flavor muted' }, kit.flavor),
+        el('div', { class: 'action-chips' }, costChips),
+        btn),
+    };
+  });
 
   function paint() {
     const i = lanternIntegrity(ctx.state);
     integrityLine.textContent = `Integrity ${i}/100`;
-    clear(kitsHost);
-    for (const kit of REPAIR_KITS) {
-      const btn = el('button', {
-        class: 'btn btn-ghost btn-wide',
-        onclick: () => ctx.repairLantern?.(kit.id),
-      }, `${kit.name} · +${kit.restore} · ✦${kit.lumen}`);
-      kitsHost.append(el('div', { class: 'repair-row' },
-        el('p', { class: 'track-flavor muted' }, kit.flavor),
-        btn));
+    for (const row of rows) {
+      const { kit, btn, costChips } = row;
+      clear(costChips);
+      for (const c of repairCostChips(kit)) {
+        const have = c.id === 'lumen' ? ctx.state.lumen : bankCount(ctx.state.bank, c.id);
+        costChips.append(el('span', {
+          class: `chip ${have >= c.qty ? 'chip-cost' : 'chip-cost chip-short'}`,
+          title: c.name,
+        },
+        c.id === 'lumen' ? `✦${formatNumber(c.qty)}` : `${c.name} ×${formatNumber(c.qty)}`));
+      }
+      const whole = i >= 100;
+      const affordable = !whole && canAffordRepair(ctx.state, kit.id);
+      btn.textContent = affordable
+        ? `${kit.name} · +${kit.restore} · ✦${kit.lumen}`
+        : repairNeedLabel(ctx.state, kit);
+      btn.className = `btn btn-wide ${affordable ? 'btn-primary' : 'btn-ghost btn-disabled'}`;
+      btn.setAttribute('aria-disabled', affordable ? 'false' : 'true');
     }
   }
   paint();
@@ -269,7 +299,7 @@ function buildRepairCard(ctx) {
         el('span', { class: 'track-title' },
           el('h3', { class: 'track-name' }, 'Lantern glass'),
           integrityLine)),
-      kitsHost),
+      el('div', { class: 'repair-kits' }, rows.map((r) => r.node))),
     update: paint,
   };
 }

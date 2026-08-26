@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatNumber, formatDuration, formatSeconds, formatNoun } from '../src/core/format.js';
+import { formatNumber, formatDuration, formatSeconds, formatNoun, formatMissingChip } from '../src/core/format.js';
 
 test('formatNumber: plain integers below 100k', () => {
   assert.equal(formatNumber(0), '0');
@@ -51,4 +51,10 @@ test('formatNoun never pluralises a count of 1', () => {
   assert.equal(formatNoun(4, 'soul'), '4 souls');
   assert.equal(formatNoun(1, 'lantern sip'), '1 lantern sip');
   assert.equal(formatNoun(2, 'lantern sip'), '2 lantern sips');
+});
+
+test('formatMissingChip always includes leftover ×N', () => {
+  assert.equal(formatMissingChip('Tinderscrap', 0), 'out of Tinderscrap ×0');
+  assert.equal(formatMissingChip('Tinderscrap', 1), 'out of Tinderscrap ×1');
+  assert.equal(formatMissingChip('Fogwort', 7.9), 'out of Fogwort ×7');
 });

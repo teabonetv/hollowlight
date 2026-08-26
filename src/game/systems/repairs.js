@@ -7,7 +7,7 @@ import { ITEMS_BY_ID } from '../data/items.js';
 import {
   LANTERN_MAX, WEAR_PER_EMBERKEEPING_CYCLE, INTEGRITY_FLAME_FLOOR, REPAIR_KITS_BY_ID,
 } from '../data/repairs.js';
-import { bankPay, canAfford } from './bank.js';
+import { bankPay, canAfford, bankCount } from './bank.js';
 
 export function lanternIntegrity(state) {
   const v = state.lanternIntegrity;
@@ -41,7 +41,7 @@ export function repairLantern(state, kitId) {
   }
   if ((state.lumen ?? 0) < kit.lumen) return { ok: false, error: 'Not enough Lumen.' };
   const costs = Object.entries(kit.items ?? {}).map(([id, qty]) => ({ id, qty }));
-  if (!canAfford(state.bank, costs)) return { ok: false, error: 'Need materials.' };
+  if (!canAfford(state.bank, costs)) return { ok: false, error: repairNeedLabel(state, kit) };
   state.lumen -= kit.lumen;
   bankPay(state.bank, costs);
   const before = lanternIntegrity(state);
@@ -55,4 +55,17 @@ export function repairCostChips(kit) {
     chips.push({ id, name: ITEMS_BY_ID[id]?.name ?? id, qty });
   }
   return chips;
+}
+
+/** Button copy when a kit cannot apply — names the missing Lumen or good. */
+export function repairNeedLabel(state, kit) {
+  if (!kit) return 'Need materials';
+  if (lanternIntegrity(state) >= LANTERN_MAX) return 'Already whole';
+  for (const c of repairCostChips(kit)) {
+    const have = c.id === 'lumen' ? (state.lumen ?? 0) : bankCount(state.bank, c.id);
+    if (have < c.qty) {
+      return c.id === 'lumen' ? `Need ✦${c.qty}` : `Need ${c.name} ×${c.qty}`;
+    }
+  }
+  return 'Need materials';
 }

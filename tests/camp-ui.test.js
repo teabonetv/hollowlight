@@ -18,6 +18,7 @@ const { createState } = await import('../src/game/state.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const modals = await import('../src/ui/modals.js');
 import { sellItems } from '../src/game/systems/bank.js';
+import { repairLantern } from '../src/game/systems/repairs.js';
 
 function makeCtx(state, overrides = {}) {
   return {
@@ -231,4 +232,50 @@ test('selling the last unit closes the sheet instead of showing an empty one', (
   overlay.remove();
   assert.equal(mount.querySelectorAll('.modal-panel').length, 0,
     'no lingering sheet after the stack empties');
+});
+
+test('360 CAMP puts Completion in the first stat cell, not below the fold', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderCampScreen(makeCtx(s));
+  const grid = scr.node.querySelector('.stat-grid');
+  const first = grid.children[0];
+  assert.ok(first.classList.contains('stat-complete'));
+  assert.match(first.textContent ?? '', /Completion/);
+});
+
+test('Wick patch applies when paid, or names the missing cost on the button', () => {
+  const poor = createState({ rngSeed: 2 });
+  poor.lanternIntegrity = 70;
+  poor.lumen = 145;
+  poor.bank.tinderscrap = 2;
+  const shortScr = tabs.renderCampScreen(makeCtx(poor, {
+    repairLantern: (id) => repairLantern(poor, id),
+  }));
+  const shortBtn = shortScr.node.querySelector('[data-repair-id="wick-patch"]');
+  assert.match(shortBtn.textContent ?? '', /Need Tinderscrap ×8/);
+  assert.equal(shortBtn.getAttribute('aria-disabled'), 'true');
+  shortBtn.click();
+  assert.equal(poor.lanternIntegrity, 70, 'disabled tap must not spend');
+
+  const rich = createState({ rngSeed: 3 });
+  rich.lanternIntegrity = 70;
+  rich.lumen = 145;
+  rich.bank.tinderscrap = 20;
+  const ctx = {
+    ...makeCtx(rich),
+    repairLantern(id) {
+      const res = repairLantern(rich, id);
+      if (res.ok) scr.update();
+      return res;
+    },
+  };
+  const scr = tabs.renderCampScreen(ctx);
+  const btn = scr.node.querySelector('[data-repair-id="wick-patch"]');
+  assert.match(btn.textContent ?? '', /Wick patch · \+25 · ✦10/);
+  assert.equal(btn.getAttribute('aria-disabled'), 'false');
+  btn.click();
+  assert.equal(rich.lanternIntegrity, 95);
+  assert.equal(rich.lumen, 135);
+  assert.equal(rich.bank.tinderscrap, 12);
+  assert.match(scr.node.textContent ?? '', /Integrity 95\/100/);
 });

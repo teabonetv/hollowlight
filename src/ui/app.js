@@ -18,7 +18,7 @@ import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
 import { formatDuration, formatNoun } from '../core/format.js';
 import {
-  SAVE_KEY, serializeSave, deserializeSave, SaveError,
+  SAVE_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
   storageGet, storageSet,
 } from '../core/save.js';
 import { computeOfflineProgress, OFFLINE_MIN_AWAY_MS } from '../core/offline.js';
@@ -115,7 +115,8 @@ function boot() {
     const raw = storageGet(window.localStorage);
     if (!raw) { adopt(freshGame(), { paint: false }); return true; }
     try {
-      const { state } = deserializeSave(raw);
+      const { state, savedAt } = deserializeSave(raw);
+      state.savedAt = adoptedSavedAt(savedAt, state.savedAt);
       adopt(state, { paint: false });
       return false;
     } catch (e) {
@@ -700,20 +701,31 @@ function boot() {
   // Fight HUD mounts paused (Resume is explicit). Persist boot feats so
   // HUD==save without restamping the offline window.
   afterMutation({ stamp: false });
-  // Boot guard for index.html's fallback screen (F1d Fix 3): the inline boot
-  // watchdog reveals a retry screen if this flag isn't set within 8s.
+  // Boot guard: index.html reveals #boot-fallback only on a real module
+  // failure (or a 45s hang). A late boot still hides it if it ever flashed.
   window.__HOLLOWLIGHT_BOOTED = true;
   const staleFallback = typeof document !== 'undefined'
     ? document.getElementById('boot-fallback') : null;
-  staleFallback?.setAttribute('hidden', '');
+  if (staleFallback) {
+    staleFallback.hidden = true;
+    staleFallback.setAttribute('hidden', '');
+  }
   if (Date.now() - game.savedAt >= OFFLINE_MIN_AWAY_MS) offerOffline();
   if (!recapOpen) loop.start();
 }
 
 if (typeof document !== 'undefined') {
+  const start = () => {
+    try {
+      boot();
+    } catch (err) {
+      try { window.__HOLLOWLIGHT_BOOT_FAIL?.(); } catch { /* overlay is best-effort */ }
+      throw err;
+    }
+  };
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', start);
   } else {
-    boot();
+    start();
   }
 }
