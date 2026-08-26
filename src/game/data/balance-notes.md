@@ -252,14 +252,16 @@ True completion must not move when you open the Almanac. Visit and tab-open feat
 | Mastery | 0 until a cycle or hunt is practiced. Live tracks = emberkeeping + foraging actions + combat hunts on kindled stretches. No invented Mining/Fishing/Smithing rows. Locked-zone hunts stay off the board. |
 | Items | Found names stay named. Unfound rows are `?` / mystery marks. Starter pack still does not count. |
 | Skills | Wave-0 crafts (Emberkeeping, Foraging, Combat) as a 1/99 tile grid. The Almanac tab is not a craft inside this book. Later-wave crafts show as Locked, not fake 1/99. |
-| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). While the recap modal is open, the live runner is frozen. |
+| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). While the recap modal is open, the live runner is frozen. Recap owns `savedAt` until Claim — autosave / hide / pagehide must not restamp to now. Persistent recap has no ×. |
 
 ## Offline playtime (S4 honesty)
 
 `playtimeMs` (“Time by the Flame”) adds **credited** away-time on Claim
 (capped at 12 h, same cap as production). The tick loop is frozen while the
 recap modal is open so Tend cannot keep counting down on an empty tinder stack;
-any live playtime that did accrue is still merged on Claim.
+any live playtime that did accrue is still merged on Claim. Until Claim,
+autosave / hide / pagehide keep the rewound `savedAt` so a reload still
+offers the same recap (wallet stays pre-Claim; HUD==save).
 
 Lumen and mastery XP use the **live per-cycle round**, then × completions
 (`Math.round(qty × multiplier)`), not a floored batch. Skill XP already

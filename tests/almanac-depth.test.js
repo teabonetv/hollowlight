@@ -7,6 +7,8 @@ import { FakeNode, FakeText } from './helpers/fake-node.mjs';
 globalThis.document = {
   createElement: (t) => new FakeNode(t),
   createTextNode: (s) => new FakeText(s),
+  addEventListener() {},
+  removeEventListener() {},
 };
 globalThis.requestAnimationFrame = (fn) => 0;
 try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
@@ -18,7 +20,7 @@ const { unlockPerk } = await import('../src/game/systems/radiance.js');
 const { ensureDailies, claimDaily } = await import('../src/game/systems/dailies.js');
 const { renderSkillDetail } = await import('../src/ui/screens/skills.js');
 const { renderAlmanacScreen } = await import('../src/ui/screens/meta.js');
-const { showOfflineModal } = await import('../src/ui/modals.js');
+const { showOfflineModal, openModal } = await import('../src/ui/modals.js');
 const { computeOfflineProgress, formatRecapLine } = await import('../src/core/offline.js');
 const { ACTIONS_BY_ID } = await import('../src/game/data/actions.js');
 const { logCategoryStats, totalCompletion, COMPLETION_HONESTY_RULE, liveMasteryTracks } = await import('../src/game/systems/completion.js');
@@ -282,6 +284,13 @@ test('offline recap modal names leftover Tinderscrap ×0 and ×1', () => {
     onClaim() {},
   });
   assert.match(mount.textContent ?? '', /Tend the Flame ×0 — out of Tinderscrap ×0/);
+  const recapClose = mount.querySelectorAll('button')
+    .filter((b) => b.getAttribute('aria-label') === 'Close');
+  assert.equal(recapClose.length, 0, 'persistent recap has no dismiss ×');
+  assert.ok(mount.querySelectorAll('button').some((b) => b.textContent === 'Claim'));
+  mount.querySelector('.modal-overlay')?.click();
+  assert.equal(mount.querySelector('.modal-title')?.textContent, 'While You Were Away…',
+    'overlay tap must not dismiss an unclaimed recap');
 
   const one = createState({ nowMs: 0, rngSeed: 1 });
   one.bank.tinderscrap = 1;
@@ -304,6 +313,24 @@ test('recap modal freezes the live runner until Claim', () => {
   assert.match(src, /recapOpen = true;\s*loop\.stop\(\)/);
   assert.match(src, /if \(recapOpen\) return;/);
   assert.match(src, /if \(!recapOpen\) loop\.start\(\)/);
+  assert.match(src, /if \(stamp && !recapOpen\)/,
+    'persist must not restamp savedAt while recap is unclaimed');
+});
+
+test('persistent modal has no Close; dismissible modal keeps it', () => {
+  const locked = new FakeNode('div');
+  openModal(locked, { title: 'Stay', body: 'must act', persistent: true });
+  assert.equal(
+    locked.querySelectorAll('button').filter((b) => b.getAttribute('aria-label') === 'Close').length,
+    0,
+  );
+
+  const free = new FakeNode('div');
+  openModal(free, { title: 'Go', body: 'may leave' });
+  assert.equal(
+    free.querySelectorAll('button').filter((b) => b.getAttribute('aria-label') === 'Close').length,
+    1,
+  );
 });
 
 test('journal halt uses the same leftover chip as recap', () => {

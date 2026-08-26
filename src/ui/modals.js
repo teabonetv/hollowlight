@@ -15,7 +15,8 @@ export { sellConfirmPending, clearSellConfirm, SELL_CONFIRM_WINDOW_MS };
 
 /**
  * Opens a modal. Returns { close, panel, overlay }. Only one at a time; Escape
- * and backdrop tap close it unless persistent=true.
+ * and backdrop tap close it unless persistent=true. Persistent dialogs have
+ * no × — the action button is the only way out.
  * `variant: 'sheet'` docks a bottom sheet that leaves the pack grid visible.
  */
 export function openModal(mount, {
@@ -32,7 +33,7 @@ export function openModal(mount, {
     isSheet ? el('div', { class: 'sheet-handle', 'aria-hidden': 'true' }) : null,
     el('div', { class: 'modal-head' },
       el('h2', { class: 'modal-title' }, title),
-      el('button', {
+      persistent ? null : el('button', {
         class: 'icon-btn', 'aria-label': 'Close',
         onclick: () => close(),
         html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -116,15 +117,29 @@ export function showOfflineModal(mount, summary, { onClaim }) {
       : el('p', { class: 'muted' }, 'Your actions rested with you. Nothing was gathered.'),
   );
 
+  let claimed = false;
+  const claim = () => {
+    if (claimed) return;
+    claimed = true;
+    onClaim?.();
+  };
+
   const m = openModal(mount, {
     title: 'While You Were Away…',
     body,
     persistent: true,
     actions: [el('button', {
       class: 'btn btn-primary btn-wide',
-      onclick: () => { m.close(); onClaim(); },
+      onclick: () => m.close(),
     }, 'Claim')],
   });
+  // Persistent means persistent: any close path (Claim, a future ×, etc.)
+  // applies the away window. Overlay / Escape are already ignored.
+  const origClose = m.close;
+  m.close = () => {
+    origClose();
+    claim();
+  };
 }
 
 /** Settings: reduced motion, export/import, reset. */

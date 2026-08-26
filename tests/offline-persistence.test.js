@@ -213,10 +213,14 @@ test('visibilitychange: hidden persists live runner state; return computes befor
       'While You Were Away…');
 
     const afterReturn = rawSave();
-    assert.ok(Math.abs(afterReturn.savedAt - shiftedBase) < 5_000,
-      'return path restamped savedAt only AFTER computing offline credit');
+    assert.equal(afterReturn.savedAt, envelope.savedAt,
+      'return path must not restamp savedAt while recap is unclaimed');
+    assert.ok(afterReturn.savedAt < shiftedBase - 60_000,
+      'hide-time stamp still yields an away window on reload');
+    assert.equal(afterReturn.state.lumen, envelope.state.lumen,
+      'wallet stays pre-Claim until the recap is claimed');
     assert.ok(afterReturn.state.actions.active['tend-flame'],
-      'restamped save still carries the running action');
+      'save still carries the running action');
   } finally {
     Date.now = realNow;
   }
