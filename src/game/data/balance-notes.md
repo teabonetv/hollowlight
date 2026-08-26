@@ -252,7 +252,7 @@ True completion must not move when you open the Almanac. Visit and tab-open feat
 | Mastery | 0 until a cycle or hunt is practiced. Live tracks = emberkeeping + foraging actions + combat hunts on kindled stretches. No invented Mining/Fishing/Smithing rows. Locked-zone hunts stay off the board. |
 | Items | Known names stay named (`itemFound > 0` or discovered). Unfound rows are `?` / mystery marks. Dumping a stack never turns it back into a mystery. |
 | Skills | Wave-0 crafts (Emberkeeping, Foraging, Combat) as a 1/99 tile grid. The Almanac tab is not a craft inside this book. Later-wave crafts show as Locked, not fake 1/99. |
-| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). While the recap modal is open, the live runner is frozen. Recap owns `savedAt` until Claim — autosave / hide / pagehide must not restamp to now. Persistent recap has no ×. Idle ≥60s still opens the recap (`Nothing ran.`). Every Claim feat is named in a scrollable list. |
+| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). While the recap modal is open, the live runner is frozen (no Lumen/Radiance/item ticks). Recap owns `savedAt` until Claim — autosave / hide / pagehide must not restamp to now. Persistent recap has no ×. Idle ≥60s still opens the recap (`Nothing ran.` plus the stillness line). Feat names collapse to `N feats` (tap to expand) so Claim stays pinned. After Claim the runner stays frozen one beat so HUD matches the recap. |
 
 ## Offline playtime (S4 honesty)
 
@@ -260,16 +260,16 @@ True completion must not move when you open the Almanac. Visit and tab-open feat
 **only when cycles actually ran** (capped at 12 h, same cap as production).
 A feats-only or fuel-halt rewind does not stuff wall-clock into playtime
 and does not increment `offlineClaims` / light “The Work Went On”.
-The tick loop is frozen (and its accumulator reset) while the recap modal is open so Tend cannot keep counting down on an empty tinder stack and Gather cannot add Fogwort on top of the preview before Claim; any live playtime that did accrue is still merged on Claim. Until Claim, autosave / hide / pagehide keep the rewound `savedAt` so a reload still offers the same recap (wallet stays pre-Claim; HUD==save).
+The tick loop is frozen (and its accumulator reset) while the recap modal is open so Tend cannot keep counting down on an empty tinder stack and Gather cannot add Fogwort on top of the preview before Claim. Recap-open wall time is not play — Claim does not merge leaked ticks into Time by the Flame. After Claim the runner stays frozen one beat (`RECAP_THAW_MS`) so HUD stays on the recap numbers. Until Claim, autosave / hide / pagehide keep the rewound `savedAt` so a reload still offers the same recap (wallet stays pre-Claim; HUD==save).
 
-**Always recap** when away ≥ 60s, including idle `active {}` and feats-only. Copy names the time away, Cap 12h, and a “Nothing ran.” / “Nothing ran — feats only.” line. Claim is still required (Melvor still shows Welcome Back on empty-away). Idle Claim does not stuff playtime or light “The Work Went On”. Persist must not restamp `savedAt` while that recap is open.
+**Always recap** when away ≥ 60s, including idle `active {}` and feats-only. Copy names the time away, Cap 12h, and `Nothing ran.` plus `No queued action. Time by the Flame not stuffed. Dailies frozen.` Claim is still required (Melvor still shows Welcome Back on empty-away). Idle Claim does not stuff playtime or light “The Work Went On”. Persist must not restamp `savedAt` while that recap is open.
 
 Recap preview == Claim: XP→Radiance sparks are a dedicated Radiance line,
 not hidden behind Feats. Level-ups and mastery print `Foraging 1 → 21` /
-`Mastery 1 → 18`. Every recap prints the 12h cap. Every feat Claim will
-light is named in a scrollable list — never truncated to four names behind
-`+98 Lumen · +11 Radiance`. Item / lumen / flame / radiance lines include
-an honest `/h` EV from the credited window.
+`Mastery 1 → 18`. Every recap prints the 12h cap. Feat names start collapsed
+as `N feats` (tap to expand) so Claim stays pinned on 360 — never truncated
+to four names behind `+98 Lumen · +11 Radiance`. Item / lumen / flame /
+radiance lines include an honest `/h` EV from the credited window.
 
 Lumen and mastery XP use the **live per-cycle round**, then × completions
 (`Math.round(qty × multiplier)`), not a floored batch. Skill XP already

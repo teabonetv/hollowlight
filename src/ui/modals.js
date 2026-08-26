@@ -5,7 +5,8 @@ import { el, clear } from './dom.js';
 import { formatDuration, formatNumber } from '../core/format.js';
 import {
   OFFLINE_CAP_HOURS, formatRecapLine, formatLevelUpLine, formatMasteryUpLine,
-  formatOfflineCapNote, formatIdleRecapLine, formatOfflineHourRate,
+  formatOfflineCapNote, formatIdleRecapLine, formatIdleRecapStillness,
+  formatOfflineHourRate,
 } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
@@ -83,6 +84,10 @@ export function showOfflineModal(mount, summary, { onClaim }) {
   if (idleLine) {
     rows.push(el('p', { class: 'offline-idle' }, idleLine));
   }
+  const idleStill = formatIdleRecapStillness({ hasGains, idleNotes });
+  if (idleStill) {
+    rows.push(el('p', { class: 'offline-idle-still muted small' }, idleStill));
+  }
   const actionRecap = recapLines ?? [
     ...gains.actions,
     ...idleNotes,
@@ -134,8 +139,28 @@ export function showOfflineModal(mount, summary, { onClaim }) {
         bits.length ? bits.join(' · ') : `${feats.length} titles`),
     ));
     if (feats.length) {
-      rows.push(el('div', { class: 'offline-feat-list' },
-        ...feats.map((a) => el('div', { class: 'offline-feat' }, a.name))));
+      const n = feats.length;
+      const collapsedLabel = n === 1 ? '1 feat' : `${n} feats`;
+      const list = el('div', { class: 'offline-feat-list is-collapsed' },
+        ...feats.map((a) => el('div', { class: 'offline-feat' }, a.name)));
+      const toggle = el('button', {
+        class: 'btn btn-small btn-wide offline-feat-toggle',
+        type: 'button',
+        'aria-expanded': 'false',
+      }, collapsedLabel);
+      toggle.addEventListener('click', () => {
+        const collapsed = list.classList.contains('is-collapsed');
+        if (collapsed) {
+          list.classList.remove('is-collapsed');
+          toggle.setAttribute('aria-expanded', 'true');
+          toggle.textContent = 'Hide feats';
+        } else {
+          list.classList.add('is-collapsed');
+          toggle.setAttribute('aria-expanded', 'false');
+          toggle.textContent = collapsedLabel;
+        }
+      });
+      rows.push(toggle, list);
     }
   }
 
