@@ -503,6 +503,111 @@ test('S4o: Claim after fuel-halt kills Tend; coda still on recap; idle stays idl
     '×0 fuel-halt Claim also kills the dead workstation');
 });
 
+test('S4p: fuel-halt Claim stamps tinderHalts and lights Out of Tinder; idle and ample-fuel do not', () => {
+  const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
+  const play = (2 * H) - 90_000;
+
+  const halt = createState({ nowMs: 0, rngSeed: 51 });
+  halt.stats.playtimeMs = play;
+  halt.stats.tinderHalts = 0;
+  halt.bank.tinderscrap = 28;
+  halt.actions.active['tend-flame'] = { progressMs: 0 };
+  const haltRes = computeOfflineProgress({
+    state: halt, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const haltRecap = formatRecapLine(haltRes.recapLines[0], names);
+  assert.match(haltRecap, /Tend the Flame ×28/);
+  assert.match(haltRecap, /900\/h for 1m 52s/);
+  assert.match(haltRecap, /out of Tinderscrap ×0/);
+  assert.equal(haltRes.nextState.stats.tinderHalts, 1,
+    'offline starve stamps the same counter live halt uses');
+  const haltPreview = previewOfflineClaim(haltRes);
+  assert.ok((haltRes.nextState.stats.tinderHalts ?? 0) >= 1);
+  assert.equal(isUnlocked(haltPreview.state, 's-empty'), true,
+    'Out of Tinder queued on the fuel-halt Claim feat cascade');
+  assert.ok((haltPreview.feats ?? []).some((a) => a.id === 's-empty'));
+  assert.equal(isUnlocked(haltPreview.state, 't-off-1'), false,
+    'Work Went On stays dark on a fuel-halt sliver');
+  const haltClaimed = applyClaim(haltRes);
+  assert.ok((haltClaimed.stats.tinderHalts ?? 0) >= 1);
+  assert.equal(isUnlocked(haltClaimed, 's-empty'), true);
+  assert.equal(haltClaimed.actions.active['tend-flame'], undefined);
+  assert.equal(haltClaimed.stats.playtimeMs, play + 28 * ACTIONS_BY_ID['tend-flame'].durationMs);
+
+  const dry = createState({ nowMs: 0, rngSeed: 52 });
+  dry.stats.tinderHalts = 0;
+  dry.bank.tinderscrap = 0;
+  dry.actions.active['tend-flame'] = { progressMs: 0 };
+  const dryRes = computeOfflineProgress({
+    state: dry, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.match(formatRecapLine(dryRes.recapLines[0], names), /out of Tinderscrap ×0/);
+  const dryClaimed = applyClaim(dryRes);
+  assert.ok((dryClaimed.stats.tinderHalts ?? 0) >= 1);
+  assert.equal(isUnlocked(dryClaimed, 's-empty'), true,
+    '×0 starve that printed out of Tinderscrap still lights Out of Tinder');
+
+  const idle = createState({ nowMs: 0, rngSeed: 53 });
+  idle.stats.playtimeMs = 90_000;
+  idle.stats.tinderHalts = 0;
+  idle.actions.active = {};
+  const idleRes = computeOfflineProgress({
+    state: idle, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(idleRes.hasGains, false);
+  assert.equal(formatHaltCoda(idleRes), null);
+  const idleClaimed = applyClaim(idleRes);
+  assert.equal(idleClaimed.stats.tinderHalts ?? 0, 0);
+  assert.equal(isUnlocked(idleClaimed, 's-empty'), false,
+    'idle 3h empty queue must not stamp a tinder halt');
+  assert.equal(idleClaimed.stats.playtimeMs, 90_000);
+
+  const capIdle = createState({ nowMs: 0, rngSeed: 54 });
+  capIdle.stats.tinderHalts = 0;
+  capIdle.actions.active = {};
+  const capRes = computeOfflineProgress({
+    state: capIdle, nowMs: 13 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(capRes.capped, true);
+  const capClaimed = applyClaim(capRes);
+  assert.equal(capClaimed.stats.tinderHalts ?? 0, 0);
+  assert.equal(isUnlocked(capClaimed, 's-empty'), false,
+    '13h cap-idle must not stamp a tinder halt');
+  const capMount = new FakeNode('div');
+  showOfflineModal(capMount, { ...capRes, featPreview: previewOfflineClaim(capRes) }, { onClaim() {} });
+  assert.doesNotMatch(capMount.textContent ?? '', /hours of work/);
+  assert.doesNotMatch(capMount.textContent ?? '', /Out of Tinder/);
+
+  const full = createState({ nowMs: 0, rngSeed: 55 });
+  full.stats.playtimeMs = 19 * 60_000 + 18_000;
+  full.stats.tinderHalts = 0;
+  full.bank.tinderscrap = 10_000;
+  full.actions.active['tend-flame'] = { progressMs: 0 };
+  const fullRes = computeOfflineProgress({
+    state: full, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(haltedEarly(fullRes), false);
+  assert.equal(fullRes.nextState.stats.tinderHalts ?? 0, 0);
+  const fullClaimed = applyClaim(fullRes);
+  assert.equal(fullClaimed.stats.tinderHalts ?? 0, 0);
+  assert.equal(isUnlocked(fullClaimed, 's-empty'), false,
+    'ample-fuel full window must not stamp a tinder halt');
+  assert.ok(fullClaimed.actions.active['tend-flame'], 'Tend still running after ample-fuel Claim');
+
+  const resinDry = createState({ nowMs: 0, rngSeed: 56 });
+  resinDry.stats.tinderHalts = 0;
+  resinDry.bank.tinderscrap = 100;
+  resinDry.bank.graveresin = 0;
+  resinDry.actions.active['fan-the-coals'] = { progressMs: 0 };
+  const resinRes = computeOfflineProgress({
+    state: resinDry, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const resinClaimed = applyClaim(resinRes);
+  assert.equal(resinClaimed.stats.tinderHalts ?? 0, 0);
+  assert.equal(isUnlocked(resinClaimed, 's-empty'), false,
+    'a non-tinder material halt must not stamp Out of Tinder');
+});
+
 test('idle rewind does not inflate playtime or grant Work Went On with zero cycles', () => {
   const play = 90_000;
   const s = createState({ nowMs: 0, rngSeed: 2 });

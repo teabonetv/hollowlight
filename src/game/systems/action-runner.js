@@ -20,7 +20,7 @@ import { levelFromXp } from '../../core/xp.js';
 import * as bank from './bank.js';
 import * as mods from './modifiers.js';
 import { grantRadianceFromXp } from './radiance.js';
-import { recordCycle } from './stats.js';
+import { recordCycle, recordTinderHalt } from './stats.js';
 import { applyEmberkeepingWear } from './repairs.js';
 
 /** +1% XP per mastery level of the running action (see balance-notes.md). */
@@ -175,9 +175,7 @@ export function tickActions(state, dtMs, rng) {
       const result = completeCycle(state, action, rng);
       if (result.halted) {
         delete state.actions.active[actionId];
-        if (/tinderscrap/i.test(result.reason ?? '')) {
-          state.stats.tinderHalts = (state.stats.tinderHalts ?? 0) + 1;
-        }
+        recordTinderHalt(state, result);
         events.push({
           type: 'halted',
           actionId,

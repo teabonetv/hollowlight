@@ -41,6 +41,8 @@ test('analytic match: 1h away tending the flame with ample tinder', () => {
   assert.equal(res.gains.lumen, 900, 'lumen drip: 1 × 900');
   assert.equal(res.nextState.lumen, 900 + 20, 'starter lumen preserved plus drip');
   assert.equal(res.nextState.bank.tinderscrap, 10_000 - 900);
+  assert.equal(res.nextState.stats.tinderHalts ?? 0, 0,
+    'ample fuel must not stamp a tinder halt');
   // Per-cycle rounding identical to live play: mastery starts at level 1 → ×1.01
   assert.equal(res.gains.xp.emberkeeping, Math.round(14 * 1.01) * 900);
 });
@@ -64,6 +66,8 @@ test('fuel-halt bills playtime until halt, not the credited away tail', () => {
     'halt tail must not push Time by the Flame over 2h');
   assert.notEqual(res.nextState.stats.playtimeMs, startPlay + threeH,
     'must not stuff the dry 3h into playtime');
+  assert.equal(res.nextState.stats.tinderHalts, 1,
+    'fuel-halt nextState stamps tinderHalts before Claim');
 });
 
 test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', () => {
@@ -75,6 +79,7 @@ test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', 
   assert.equal(none.hasReport, true);
   assert.equal(none.idleNotes[0].missingId, 'tinderscrap');
   assert.equal(none.idleNotes[0].completions, 0);
+  assert.equal(none.nextState.stats.tinderHalts, 1);
 
   const one = stateTending(1);
   const res = computeOfflineProgress({
@@ -83,6 +88,7 @@ test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', 
   assert.equal(res.gains.actions[0].completions, 1);
   assert.equal(res.idleNotes[0].missingId, 'tinderscrap');
   assert.equal(res.idleNotes[0].completions, 1);
+  assert.equal(res.nextState.stats.tinderHalts, 1);
   const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
   assert.equal(
     formatRecapLine(none.recapLines[0], names),
@@ -114,6 +120,8 @@ test('actions with auto-restart disabled do not idle', () => {
     state: s, nowMs: 5 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
   });
   assert.equal(res.hasGains, false);
+  assert.equal(res.nextState.stats.tinderHalts ?? 0, 0,
+    'skipped one-shot must not stamp a tinder halt');
 });
 
 test('multiple concurrent actions each contribute', () => {

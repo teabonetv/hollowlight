@@ -90,6 +90,7 @@ test('auto-restart keeps cycling until the bank runs dry, then halts cleanly', (
   assert.ok(halted, 'a halted event surfaces for UI toasting');
   assert.equal(halted.reason, 'out of Tinderscrap ×0');
   assert.equal(halted.remainingQty, 0);
+  assert.equal(s.stats.tinderHalts, 1, 'live dry-halt stamps Out of Tinder’s counter');
 });
 
 test('auto-restart OFF: one cycle then the action stops itself', () => {
