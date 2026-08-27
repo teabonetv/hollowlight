@@ -47,6 +47,10 @@ function almanacCtx(state, view = 'dailies') {
     ensureDailies: () => ensureDailies(state, Date.UTC(2026, 7, 25)),
     rerollDailies() {},
     claimDaily: (id) => claimDaily(state, id),
+    equipTitle(t) {
+      state.cosmetics ??= { titles: [], frames: ['plain'], lanternFrame: 'plain', activeTitle: null };
+      state.cosmetics.activeTitle = t;
+    },
   };
   return ctx;
 }
@@ -367,3 +371,62 @@ test('journal halt uses the same leftover chip as recap', () => {
   const last = runner.completeCycle(one, ACTIONS_BY_ID['fan-the-coals'], createRng(1));
   assert.equal(last.reason, 'out of Tinderscrap ×1');
 });
+
+const EARNED_TITLES = [
+  'Last Ember', 'Unscathed', 'Long-Sitter', 'Star-Pinned', 'Vigilant',
+  'Forgot the Fuel', 'Returned', 'Pockets Out', 'Fog-Walker',
+];
+
+function fireChange(node) {
+  for (const fn of node._listeners.change ?? []) fn({ target: node });
+}
+
+test('Stats titles is one native dropdown of earned names, not a button stack', () => {
+  const state = createState({ nowMs: 0, rngSeed: 1 });
+  state.cosmetics.titles = [...EARNED_TITLES];
+  state.cosmetics.activeTitle = 'Last Ember';
+  const equipped = [];
+  const ctx = almanacCtx(state, 'stats');
+  ctx.equipTitle = (t) => {
+    equipped.push(t);
+    state.cosmetics.activeTitle = t;
+  };
+
+  const scr = renderAlmanacScreen(ctx);
+  const pickers = scr.node.querySelectorAll('select[aria-label=Titles]');
+  assert.equal(pickers.length, 1, 'exactly one Titles picker');
+  const wrap = scr.node.querySelector('.title-pick');
+  assert.ok(wrap, 'titles section present');
+  assert.match(wrap.querySelector('.section-title')?.textContent ?? '', /^Titles$/);
+  assert.equal(wrap.querySelectorAll('button').length, 0, 'no stacked title buttons');
+  assert.equal(wrap.querySelectorAll('.btn').length, 0);
+
+  const picker = pickers[0];
+  const opts = picker.querySelectorAll('option').map((o) => o.getAttribute('value'));
+  assert.deepEqual(opts, EARNED_TITLES);
+  assert.ok(!opts.includes('Cataloguer'), 'unearned titles stay out');
+  assert.equal(picker.value, 'Last Ember');
+  assert.match(scr.node.querySelector('.screen-sub')?.textContent ?? '', /As Last Ember/);
+
+  picker.value = 'Unscathed';
+  fireChange(picker);
+  assert.deepEqual(equipped, ['Unscathed']);
+  assert.equal(state.cosmetics.activeTitle, 'Unscathed');
+});
+
+test('Stats with no titles shows the earn-feats footnote and no picker', () => {
+  const state = createState({ nowMs: 0, rngSeed: 1 });
+  assert.deepEqual(state.cosmetics.titles, []);
+  const scr = renderAlmanacScreen(almanacCtx(state, 'stats'));
+  assert.equal(scr.node.querySelectorAll('select').length, 0, 'no empty select');
+  assert.equal(scr.node.querySelector('.title-pick'), null);
+  assert.match(scr.node.textContent ?? '', /Earn feats to wear a title/);
+  assert.equal(scr.node.querySelector('.screen-sub')?.textContent, 'Honest counts. Nothing hidden.');
+});
+
+test('title select chrome is a 44px lantern-gold control', () => {
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.title-select\s*\{[^}]*min-height:\s*44px/s);
+  assert.doesNotMatch(css, /\.title-pick\s+button/);
+});
+
