@@ -22,12 +22,13 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 */ }
 const { createState } = await import('../src/game/state.js');
 const { serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { renderSkillDetail, renderSkillsScreen } = await import('../src/ui/screens/skills.js');
-const { cockpitLogVsTab, leftoverLogVsTab, lobbyFirstHuntBottom, COMBAT_360 } = await import('../src/ui/screens/combat.js');
+const { cockpitLogVsTab, leftoverLogVsTab, fightLogVsTab, leftoverHuntRowVs360, lobbyFirstHuntBottom, COMBAT_360 } = await import('../src/ui/screens/combat.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const combat = await import('../src/game/systems/combat.js');
 const { buyFromStore } = await import('../src/game/systems/store.js');
 const { ITEMS } = await import('../src/game/data/items.js');
 const { uniqueStackCount, lanternRoom, canAcceptStack } = await import('../src/game/systems/bank.js');
+const { paintHud } = await import('../src/ui/hud.js');
 
 function makeCtx(state) {
   return {
@@ -830,6 +831,8 @@ test('Eat, Fall back, and Hunt another stay 44px taps and do not shrink under th
   assert.match(css, /\.leftover-oil-buy\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.eat-slot\s*\{[^}]*flex-wrap:\s*nowrap/);
   assert.match(css, /\.eat-row\s*\{[^}]*flex-shrink:\s*0/);
+  assert.match(css, /\.leftover-actions\s*\{[^}]*flex-wrap:\s*nowrap/);
+  assert.match(css, /\.leftover-actions\s*\{[^}]*max-width:\s*100%/);
 });
 
 test('leftover loot tray keeps prior chips after Hunt this foe and Take all pays once', () => {
@@ -1036,4 +1039,172 @@ test('dry leftover tray + oil buy still pins the log above tab 577', () => {
   assert.equal(box.wrapH, 100);
   const fed = leftoverLogVsTab({ loot: true, oilBuy: false });
   assert.equal(fed.logBottom, box.logBottom, 'oil buy must not move logWrap.bottom');
+  assert.ok(box.eatBottom < 577, `leftover Eat ${box.eatBottom} vs tab 577`);
+  assert.ok(box.anotherBottom < 577, `Hunt another ${box.anotherBottom} vs tab 577`);
+});
+
+test('first live fight has no Take all until ungranted chips exist', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.ok(fight);
+  assert.equal(fight.classList.contains('leftover-station'), false);
+  assert.equal(scr.node.querySelector('.leftover-take'), null);
+  assert.equal(/Take all/.test(fight.textContent ?? ''), false);
+  const empty = leftoverLogVsTab({ loot: false });
+  assert.ok(empty.fits);
+});
+
+test('ungranted leftover chips paint on the next live fight; kill still does not pay', () => {
+  const state = createState({ rngSeed: 4 });
+  const lumen0 = state.lumen;
+  const souls0 = state.souls;
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const first = renderSkillDetail(makeCtx(state), 'combat');
+  assert.equal(first.node.querySelector('.leftover-take'), null);
+
+  assert.ok(killMoth(state));
+  const pile = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  assert.ok(pile.length >= 1);
+  assert.ok(pile.every((e) => e.granted === false));
+  assert.equal(state.lumen, lumen0);
+  assert.equal(state.souls, souls0);
+
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover.querySelector('.leftover-loot'));
+  assert.ok(leftover.querySelector('.leftover-take'));
+  leftover.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+  assert.equal(state.lumen, lumen0);
+  assert.equal(state.souls, souls0);
+
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.ok(fight);
+  assert.equal(fight.classList.contains('leftover-station'), false);
+  const tray = fight.querySelector('.leftover-loot') ?? fight.querySelector('.fight-loot');
+  assert.ok(tray, 'unpaid tray stays on the live pull');
+  assert.equal(tray.classList.contains('is-empty'), false);
+  const pileText = tray.textContent ?? '';
+  assert.match(pileText, /soul/);
+  assert.match(pileText, /✦/);
+  assert.ok(fight.querySelector('.leftover-take'));
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Eat/);
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
+  assert.equal(fight.querySelector('.eat-row')?.querySelector('.leftover-another'), null);
+});
+
+test('Take all from the live-fight tray pays once and the HUD lumen jumps', () => {
+  const state = createState({ rngSeed: 4 });
+  const lumen0 = state.lumen;
+  const souls0 = state.souls;
+  const bank0 = { ...state.bank };
+  assert.ok(killMoth(state));
+  const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  scr.node.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+  assert.equal(state.lumen, lumen0, 'wallet still unpaid on the live pull');
+
+  const hud = { textContent: '' };
+  paintHud(hud, null, state);
+  assert.match(hud.textContent ?? '', new RegExp(`✦\\s*${lumen0}`));
+
+  const take = scr.node.querySelector('.leftover-take');
+  assert.ok(take);
+  take.click();
+  assert.deepEqual(state.combat.lootTray, []);
+  assert.equal(state.lumen, lumen0 + traySum(held, 'lumen'));
+  assert.equal(state.souls, souls0 + traySum(held, 'soul'));
+  for (const row of held) {
+    if (row.kind === 'item' && row.id) {
+      assert.equal(state.bank[row.id] ?? 0, (bank0[row.id] ?? 0) + row.qty);
+    }
+  }
+  paintHud(hud, null, state);
+  assert.match(hud.textContent ?? '', new RegExp(`✦\\s*${state.lumen}`));
+  assert.ok(state.lumen > lumen0, 'HUD lumen jumps on Take all');
+  assert.equal(scr.node.querySelector('.leftover-take'), null);
+  assert.ok(scr.node.querySelector('.eat-btn'), 'Eat stays after collect');
+  assert.ok(scr.node.querySelector('.flee-btn'), 'Fall back stays after collect');
+
+  const paid = { lumen: state.lumen, souls: state.souls };
+  combat.takeAllLootTray(state);
+  assert.equal(state.lumen, paid.lumen);
+  assert.equal(state.souls, paid.souls);
+});
+
+test('Eat and Fall back survive ticks while the unpaid live-fight tray is mounted', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  assert.ok((state.combat.lootTray ?? []).some((e) => e.granted === false));
+  const max = combat.playerMaxHp(state);
+  state.combat.player.hp = Math.max(8, max - 20);
+  const loafBefore = state.bank['lantern-loaf'] ?? 0;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  scr.node.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+  combat.resumeCombat(state);
+  const eatBtn = scr.node.querySelector('.eat-btn');
+  const fleeBtn = scr.node.querySelector('.flee-btn');
+  const strike = scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Strike');
+  const tray = scr.node.querySelector('.leftover-loot') ?? scr.node.querySelector('.fight-loot');
+  assert.ok(eatBtn && fleeBtn && strike && tray);
+  assert.ok(tray.querySelector('.leftover-take'));
+  for (let i = 0; i < 10; i++) {
+    if (state.combat.foe) state.combat.foe.hp = Math.max(4, state.combat.foe.hp);
+    combat.tickCombat(state, 100);
+    assert.equal(state.combat.fighting, true);
+    scr.update();
+    assert.equal(scr.node.querySelector('.eat-btn'), eatBtn, 'Eat node must survive ticks with tray mounted');
+    assert.equal(scr.node.querySelector('.flee-btn'), fleeBtn, 'Fall back node must survive ticks with tray mounted');
+    assert.equal(scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Strike'), strike);
+    const liveTray = scr.node.querySelector('.leftover-loot') ?? scr.node.querySelector('.fight-loot');
+    assert.equal(liveTray, tray);
+    assert.ok(liveTray.querySelector('.leftover-take'));
+  }
+  const hpBefore = state.combat.player.hp;
+  eatBtn.click();
+  assert.ok(state.combat.player.hp > hpBefore, 'eatFood must run after live updates with tray');
+  assert.ok((state.bank['lantern-loaf'] ?? 0) < loafBefore);
+  assert.ok((state.combat.lootTray ?? []).some((e) => e.granted === false), 'Eat does not collect');
+});
+
+test('leftover Hunt another sits on leftover-actions, not the eat-slot, and fits 360', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
+  assert.ok(leftover);
+  const eat = leftover.querySelector('.eat-row');
+  assert.ok(eat);
+  assert.equal(eat.querySelector('.leftover-another'), null, 'Hunt another is not packed onto Eat');
+  assert.ok(eat.querySelector('.leftover-hunt'));
+  const actions = leftover.querySelector('.leftover-actions');
+  assert.ok(actions);
+  assert.ok(actions.querySelector('.leftover-another'));
+  assert.match(actions.querySelector('.leftover-another')?.textContent ?? '', /Hunt another/);
+  assert.ok(actions.querySelector('.leftover-loot'));
+  const row = leftoverHuntRowVs360();
+  assert.equal(row.viewportW, 360);
+  assert.ok(row.fits, `eat ${row.eatUsed} actions ${row.actionsUsed} vs ${row.contentW}; anotherRight ${row.anotherRight}`);
+  assert.ok(row.anotherRight <= 360);
+  const box = leftoverLogVsTab({ loot: true });
+  assert.ok(box.eatBottom < 577);
+  assert.ok(box.anotherBottom < 577);
+  assert.equal(box.tabTop, 577);
+});
+
+test('live-fight tray + Eat + Fall back sit above tab 577', () => {
+  const empty = fightLogVsTab({ loot: false });
+  const piled = fightLogVsTab({ loot: true });
+  assert.equal(empty.tabTop, 577);
+  assert.equal(piled.tabTop, 577);
+  assert.ok(empty.fits, `empty fill ${empty.fillH}`);
+  assert.ok(piled.fits, `tray fill ${piled.fillH} eat ${piled.eatBottom} tray ${piled.trayBottom}`);
+  assert.ok(piled.eatBottom < 577);
+  assert.ok(piled.fleeBottom < 577);
+  assert.ok(piled.trayBottom < 577);
+  assert.equal(piled.logBottom, empty.logBottom, 'live tray must not move logWrap.bottom');
+  assert.ok(piled.fillH >= 0);
 });

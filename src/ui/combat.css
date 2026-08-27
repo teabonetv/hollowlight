@@ -243,6 +243,9 @@
   font-size: 12.5px;
   padding: 8px 8px;
 }
+.leftover-station .eat-slot {
+  max-width: 100%;
+}
 .cockpit-fill {
   flex: 1 1 0;
   min-height: 0;
@@ -299,6 +302,35 @@
   gap: 6px;
   min-height: 44px;
   max-height: 44px;
+  overflow: hidden;
+}
+.leftover-actions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  max-height: 44px;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  flex: 0 0 auto;
+}
+.leftover-actions .leftover-loot {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.fight-loot {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+.fight-loot.is-empty,
+.fight-loot[hidden] {
+  display: none;
+  min-height: 0;
+  max-height: 0;
+  margin: 0;
   overflow: hidden;
 }
 .leftover-loot-chips {

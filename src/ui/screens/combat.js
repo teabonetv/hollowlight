@@ -21,6 +21,8 @@ import * as combat from '../../game/systems/combat.js';
  */
 export const COMBAT_360 = {
   viewportH: 640,
+  viewportW: 360,
+  screenPadX: 16,
   topbarH: 52,
     tabbarH: 63, // --tab-h 62 + 1px border → tab top 577 at vh=640
   screenPadTop: 8,
@@ -101,19 +103,36 @@ export function cockpitLogVsTab(kind = 'leftover') {
  * leftover-station is height-capped to the hub; .cockpit-fill eats the
  * chrome remainder so the tray / oil buy cannot shove logWrap.bottom into the tab.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
+ * leftover-actions (Hunt another, plus chips when loot) is always 44px so
+ * Hunt another is not packed onto the eat-slot past 360px.
  */
 export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const C = COMBAT_360;
   const box = cockpitLogVsTab('leftover');
   const stationTop = C.leftoverStationTop;
+  const actionsH = C.loot;
   const lootH = loot ? C.loot : 0;
   const oilH = oilBuy ? (C.oilBuy ?? 44) : C.oil;
   const fighterH = C.leftoverFighter ?? C.fighter;
   const accH = C.leftoverAcc ?? C.acc;
-  const chromeBlocks = 8 + (loot ? 1 : 0);
-  const chrome = C.kicker + 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + lootH;
-  const chromeGaps = (C.leftoverGap ?? C.gap) * (chromeBlocks - 1);
+  const gap = C.leftoverGap ?? C.gap;
+  const chromeBlocks = 9;
+  const chrome = C.kicker + 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + actionsH;
+  const chromeGaps = gap * (chromeBlocks - 1);
   const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
+  let y = stationTop;
+  y += C.kicker + gap;
+  y += fighterH + gap;
+  y += fighterH + gap;
+  y += accH + gap;
+  y += oilH + gap;
+  const eatTop = y;
+  const eatBottom = y + C.eat;
+  y = eatBottom + gap;
+  y += C.hand + gap;
+  y += C.styles + gap;
+  const anotherTop = y;
+  const anotherBottom = y + actionsH;
   return {
     ...box,
     loot,
@@ -123,7 +142,78 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     fillH,
     stationTop,
     stationBottom: box.logBottom,
-    fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop,
+    eatTop,
+    eatBottom,
+    anotherTop,
+    anotherBottom,
+    fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop
+      && eatBottom < box.tabTop && anotherBottom < box.tabTop,
+  };
+}
+
+/**
+ * Live 360 fight geometry. Ungranted tray chips share leftover-loot chrome
+ * (44px) above the log; Eat / Fall back sit on the eat row, still above tab 577.
+ */
+export function fightLogVsTab({ loot = false } = {}) {
+  const C = COMBAT_360;
+  const box = cockpitLogVsTab('fight');
+  const stationTop = C.leftoverStationTop;
+  const lootH = loot ? C.loot : 0;
+  const chromeBlocks = 8 + (loot ? 1 : 0);
+  const chrome = 2 * C.fighter + C.acc + C.oil + C.eat + C.hand + C.styles + C.keep + lootH;
+  const chromeGaps = C.gap * (chromeBlocks - 1);
+  const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
+  let y = stationTop;
+  y += C.fighter + C.gap;
+  y += C.fighter + C.gap;
+  y += C.acc + C.gap;
+  y += C.oil + C.gap;
+  const eatTop = y;
+  const eatBottom = y + C.eat;
+  y = eatBottom + C.gap;
+  y += C.hand + C.gap;
+  y += C.styles + C.gap;
+  y += C.keep + C.gap;
+  const trayTop = loot ? y : null;
+  const trayBottom = loot ? y + lootH : null;
+  return {
+    ...box,
+    loot,
+    lootH,
+    fillH,
+    stationTop,
+    stationBottom: box.logBottom,
+    eatTop,
+    eatBottom,
+    fleeBottom: eatBottom,
+    trayTop,
+    trayBottom,
+    fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop
+      && eatBottom < box.tabTop
+      && (trayBottom == null || trayBottom < box.tabTop),
+  };
+}
+
+/** Eat + Hunt-this-foe on one 360 row; Take all + Hunt another on leftover-actions. */
+export function leftoverHuntRowVs360() {
+  const C = COMBAT_360;
+  const viewportW = C.viewportW ?? 360;
+  const padX = C.screenPadX ?? 16;
+  const contentW = viewportW - padX * 2;
+  const gap = 6;
+  const eatUsed = C.eat + C.hunt + gap * 2;
+  const actionsUsed = C.loot + C.hunt + gap * 2;
+  const anotherRight = padX + contentW;
+  return {
+    viewportW,
+    contentW,
+    eatUsed,
+    actionsUsed,
+    anotherRight,
+    eatFits: eatUsed < contentW,
+    actionsFits: actionsUsed < contentW,
+    fits: eatUsed < contentW && actionsUsed < contentW && anotherRight <= viewportW,
   };
 }
 
@@ -657,6 +747,7 @@ function mountFight(ctx, st, paint) {
   const acc = wrap.querySelector('.acc-station');
   const oil = wrap.querySelector('.oil-line');
   const eat = wrap.querySelector('.eat-row');
+  const tray = wrap.querySelector('.fight-loot');
   const logBox = wrap.querySelector('.combat-log');
 
   return {
@@ -675,6 +766,7 @@ function mountFight(ctx, st, paint) {
         oil.className = `oil-line ${next.lanternFed ? 'muted' : 'danger'}`;
       }
       syncEatRow(eat, ctx, next);
+      if (tray) fillFightLoot(tray, ctx, next, paint);
       fillLogBox(logBox, next.log, 12);
     },
   };
@@ -738,6 +830,7 @@ function buildFight(ctx, st, paint) {
   });
   wrap.append(keep);
 
+  wrap.append(mountFightLoot(ctx, st, paint));
   wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(st.log));
   return wrap;
@@ -760,10 +853,7 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
     row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
     const tools = el('div', { class: 'eat-slot' });
     if (flee) tools.append(fleeButton(ctx, paint));
-    if (hunt) {
-      tools.append(leftoverHunt(ctx, hunt, dry, paint));
-      tools.append(leftoverAnother(ctx, paint));
-    }
+    if (hunt) tools.append(leftoverHunt(ctx, hunt, dry, paint));
     if (tools.children.length) row.append(tools);
     return row;
   }
@@ -805,10 +895,7 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
     },
   }, 'Eat'));
   if (flee) slot.append(fleeButton(ctx, paint));
-  if (hunt) {
-    slot.append(leftoverHunt(ctx, hunt, dry, paint));
-    slot.append(leftoverAnother(ctx, paint));
-  }
+  if (hunt) slot.append(leftoverHunt(ctx, hunt, dry, paint));
   row.append(slot);
   return row;
 }
@@ -847,8 +934,7 @@ function leftoverStation(ctx, st, paint) {
   wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
   wrap.append(handChip(ctx, st, paint));
   wrap.append(styleRow(ctx, st, paint));
-  const loot = leftoverLootRow(ctx, st, paint);
-  if (loot) wrap.append(loot);
+  wrap.append(leftoverActionsRow(ctx, st, paint));
   wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
   return wrap;
@@ -876,11 +962,17 @@ function leftoverOilRow(ctx, st, paint, { sips, dry }) {
   return row;
 }
 
-function leftoverLootRow(ctx, st, paint) {
-  const tray = st.lootTray ?? ctx.state.combat?.lootTray ?? [];
-  if (!tray.length) return null;
+function trayEntries(tray) {
+  return (tray ?? []).filter((e) => e && e.qty > 0);
+}
+
+function ungrantedTrayEntries(tray) {
+  return trayEntries(tray).filter((e) => e.granted === false);
+}
+
+function lootChipsFor(tray) {
   const chips = [];
-  for (const d of tray) {
+  for (const d of trayEntries(tray)) {
     if (d.kind === 'soul') {
       chips.push(el('span', { class: 'chip chip-gold' }, formatNoun(d.qty, 'soul')));
     } else if (d.kind === 'lumen') {
@@ -889,9 +981,11 @@ function leftoverLootRow(ctx, st, paint) {
       chips.push(el('span', { class: 'chip' }, `${d.name ?? d.id} ×${d.qty}`));
     }
   }
-  const row = el('div', { class: 'leftover-loot leftover-tray' });
-  row.append(chipRow('leftover-loot-chips chips', chips));
-  row.append(el('button', {
+  return chips;
+}
+
+function takeAllBtn(ctx, paint) {
+  return el('button', {
     class: 'btn btn-ghost leftover-take',
     type: 'button',
     onclick: () => {
@@ -901,8 +995,47 @@ function leftoverLootRow(ctx, st, paint) {
       if (res?.blocked) ctx.toast?.(res.error, 'warn');
       paint();
     },
-  }, 'Take all'));
+  }, 'Take all');
+}
+
+function leftoverLootRow(ctx, st, paint) {
+  const tray = st.lootTray ?? ctx.state.combat?.lootTray ?? [];
+  const chips = lootChipsFor(tray);
+  if (!chips.length) return null;
+  const row = el('div', { class: 'leftover-loot leftover-tray' });
+  row.append(chipRow('leftover-loot-chips chips', chips));
+  row.append(takeAllBtn(ctx, paint));
   return row;
+}
+
+function leftoverActionsRow(ctx, st, paint) {
+  const row = el('div', { class: 'leftover-actions' });
+  const loot = leftoverLootRow(ctx, st, paint);
+  if (loot) row.append(loot);
+  row.append(leftoverAnother(ctx, paint));
+  return row;
+}
+
+function mountFightLoot(ctx, st, paint) {
+  const row = el('div', { class: 'fight-loot leftover-tray' });
+  fillFightLoot(row, ctx, st, paint);
+  return row;
+}
+
+function fillFightLoot(row, ctx, st, paint) {
+  const pending = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
+  clear(row);
+  row.classList.toggle('is-empty', pending.length === 0);
+  row.classList.toggle('leftover-loot', pending.length > 0);
+  if (!pending.length) {
+    row.setAttribute('hidden', '');
+    row.setAttribute('aria-hidden', 'true');
+    return;
+  }
+  row.removeAttribute('hidden');
+  row.removeAttribute('aria-hidden');
+  row.append(chipRow('leftover-loot-chips chips', lootChipsFor(pending)));
+  row.append(takeAllBtn(ctx, paint));
 }
 
 function leftoverLog(st) {
