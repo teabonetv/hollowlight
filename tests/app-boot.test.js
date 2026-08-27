@@ -14,6 +14,7 @@ const elements = {
   'hud-lumen': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
   'hud-known': new FakeNode('button'),
+  'hud-complete': new FakeNode('span'),
   'hud-hollow': new FakeNode('button'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
@@ -58,6 +59,7 @@ test('boot() renders the camp screen into #screen and lights the HUD', () => {
   assert.ok(camp, 'camp screen rendered on first boot');
   assert.match(elements['hud-lumen'].textContent ?? '', /^✦ /);
   assert.match(elements['hud-known'].textContent ?? '', /^Known \d+\/\d+$/);
+  assert.match(elements['hud-complete'].textContent ?? '', /^\d+(?:\.\d+)?%$/);
   assert.match(elements['hud-hollow'].textContent ?? '', /^Hollow \d+\/\d+$/);
   assert.match(camp.textContent ?? '', /Hearthway Hollow/);
 });

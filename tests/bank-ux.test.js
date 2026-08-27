@@ -623,11 +623,14 @@ test('dump a unique starter stack decrements Hollow occupancy, not known', () =>
     'Almanac items found stays known after a dump');
 
   const hudKnown = new FakeNode('span');
+  const hudComplete = new FakeNode('span');
   const hudHollow = new FakeNode('span');
-  paintHud(new FakeNode('span'), new FakeNode('span'), s, new FakeNode('span'), { hudKnown, hudHollow });
+  paintHud(new FakeNode('span'), new FakeNode('span'), s, new FakeNode('span'), { hudKnown, hudComplete, hudHollow });
   assert.equal(hudKnown.textContent, 'Known 6/137');
+  assert.match(hudComplete.textContent ?? '', /^\d+(?:\.\d+)?%$/);
   assert.equal(hudHollow.textContent, 'Hollow 5/12');
   assert.equal(hudKnown.getAttribute('aria-label'), 'Known 6/137');
+  assert.match(hudComplete.getAttribute('aria-label') ?? '', /True completion/);
   assert.equal(hudHollow.getAttribute('aria-label'), 'Hollow 5/12');
 
   const opened = [];
@@ -739,6 +742,7 @@ test('Food tab stays on the starter row after dump; HUD chips and tab chips wrap
   assert.match(css, /\.pill\.hollow[\s\S]{0,220}white-space:\s*nowrap/);
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /<button[^>]*id="hud-known"/);
+  assert.match(html, /id="hud-complete"/);
   assert.match(html, /<button[^>]*id="hud-hollow"/);
   assert.match(html, /Known 0\/137/);
   assert.match(html, /Hollow 0\/12/);

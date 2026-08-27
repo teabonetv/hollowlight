@@ -14,7 +14,7 @@ import { canUnlock, respecCostLumen, cheapestAvailable } from '../../game/system
 import { isUnlocked } from '../../game/systems/achievements.js';
 import { canReroll, taskProgress } from '../../game/systems/dailies.js';
 import {
-  totalCompletion, achievementCompletion,
+  totalCompletion, trueCompletion, achievementCompletion,
   closestAchievement, logCategoryStats,
   skillLogDetails, masteryLogDetails, itemsLogDetails,
   logFeatAchievements, formatCompletionPct,
@@ -528,8 +528,7 @@ function renderLogMastery(ctx) {
 
 function renderLogItems(ctx) {
   const { found, missing } = itemsLogDetails(ctx.state);
-  const row = logCategoryStats(ctx.state).find((c) => c.id === 'items');
-  const pctLabel = row ? formatCompletionPct(row.pct) : '0%';
+  const tot = trueCompletion(ctx.state);
   const foundBlock = found.length
     ? el('div', { class: 'log-tile-grid', 'data-log-drill': 'items-found' },
       found.map((r) => logTile({
@@ -566,7 +565,8 @@ function renderLogItems(ctx) {
         }, '←'),
         el('h1', { class: 'screen-title' }, 'Items'),
         el('p', { class: 'screen-sub' },
-          row ? `${pctLabel} · ${row.done}/${row.total}` : 'known by Times Found')),
+          el('span', { class: 'true-complete-pct', 'data-true-complete': 'items' }, tot.label),
+          ` · ${tot.done}/${tot.total}`)),
       subnav(ctx, navCurrent('log-items')),
       el('h2', { class: 'section-title' }, `Found · ${found.length}`),
       foundBlock,

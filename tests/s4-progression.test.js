@@ -24,7 +24,7 @@ import { statsRows, totalCycles, recordCycle } from '../src/game/systems/stats.j
 import { completeCycle, startAction, tickActions, actionStatus } from '../src/game/systems/action-runner.js';
 import { ACTIONS_BY_ID } from '../src/game/data/actions.js';
 import { computeOfflineProgress } from '../src/core/offline.js';
-import { nextWants, totalCompletion, logCategoryStats, formatCompletionPct } from '../src/game/systems/completion.js';
+import { nextWants, totalCompletion, trueCompletion, logCategoryStats, formatCompletionPct } from '../src/game/systems/completion.js';
 import { TAB_OPEN_FEAT_IDS } from '../src/game/data/achievements.js';
 import { serializeSave, deserializeSave, SAVE_VERSION } from '../src/core/save.js';
 import { markDiscovered } from '../src/game/systems/discovered.js';
@@ -215,6 +215,7 @@ test('nextWants always offers three concrete pulls; camp completion is defined',
   const wants = nextWants(s);
   assert.equal(wants.length, 3);
   assert.ok(totalCompletion(s).pct >= 0);
+  assert.equal(trueCompletion(s).label, formatCompletionPct(trueCompletion(s).pct));
 });
 
 test('old saves migrate v1→v4 and hydrate S2+S1+S4 fields', () => {

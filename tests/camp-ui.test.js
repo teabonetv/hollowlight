@@ -15,6 +15,7 @@ globalThis.requestAnimationFrame = (fn) => 0;
 try { globalThis.navigator = {}; } catch { /* node ≥21 read-only */ }
 
 const { createState } = await import('../src/game/state.js');
+const { trueCompletion } = await import('../src/game/systems/completion.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const modals = await import('../src/ui/modals.js');
 import { sellItems } from '../src/game/systems/bank.js';
@@ -244,6 +245,8 @@ test('360 CAMP puts Completion in the first stat cell, not below the fold', () =
   const first = grid.children[0];
   assert.ok(first.classList.contains('stat-complete'));
   assert.match(first.textContent ?? '', /Completion/);
+  assert.equal(first.querySelector('.stat-value')?.textContent, trueCompletion(s).label);
+  assert.equal(first.querySelector('[data-true-complete="camp"]')?.textContent, trueCompletion(s).label);
 });
 
 test('Wick patch applies when paid, or names the missing cost on the button', () => {

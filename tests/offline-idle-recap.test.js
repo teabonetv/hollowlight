@@ -23,6 +23,7 @@ const elements = {
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
   'hud-known': new FakeNode('button'),
+  'hud-complete': new FakeNode('span'),
   'hud-hollow': new FakeNode('button'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
@@ -32,6 +33,7 @@ const elements = {
 };
 elements['hud-lumen'].textContent = '✦ 20';
 elements['hud-known'].textContent = 'Known 0/137';
+elements['hud-complete'].textContent = '0%';
 elements['hud-hollow'].textContent = 'Hollow 0/12';
 
 const docEl = new FakeNode('html');

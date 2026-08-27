@@ -9,7 +9,7 @@
 import { formatNumber } from '../core/format.js';
 import { uniqueStackCount, lanternRoom } from '../game/systems/bank.js';
 import { ITEMS } from '../game/data/items.js';
-import { knownItemCount } from '../game/systems/completion.js';
+import { knownItemCount, trueCompletion } from '../game/systems/completion.js';
 
 /**
  * Persistent HUD chip — Melvor pins `Bank N/MAX` on every screen.
@@ -30,11 +30,27 @@ export function formatKnownChip(state) {
   return `Known ${knownItemCount(state)}/${ITEMS.length}`;
 }
 
+/**
+ * Persistent HUD % — Melvor pins True Completion in the nav beside Bank.
+ * Known stays the N/MAX count door; this is the catalogue fraction.
+ */
+export function formatTrueCompletionChip(state) {
+  return trueCompletion(state).label;
+}
+
 function paintChip(node, chip) {
   if (!node) return;
   node.textContent = chip;
   node.setAttribute?.('title', chip);
   node.setAttribute?.('aria-label', chip);
+}
+
+function paintTrueCompletion(node, state) {
+  if (!node) return;
+  const label = formatTrueCompletionChip(state);
+  node.textContent = label;
+  node.setAttribute?.('title', `True completion ${label}`);
+  node.setAttribute?.('aria-label', `True completion ${label}`);
 }
 
 export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
@@ -45,5 +61,6 @@ export function paintHud(hudLumen, hudFlame, state, hudRadiance, extras = {}) {
   const unspent = extras.unspentRadiance;
   if (unspent) unspent.textContent = `${radiance} Radiance unspent`;
   paintChip(extras.hudKnown, formatKnownChip(state));
+  paintTrueCompletion(extras.hudComplete, state);
   paintChip(extras.hudHollow, formatHollowChip(state));
 }

@@ -80,6 +80,7 @@ function boot() {
   const hudFlame = document.getElementById('hud-flame');
   const hudRadiance = document.getElementById('hud-radiance');
   const hudKnown = document.getElementById('hud-known');
+  const hudComplete = document.getElementById('hud-complete');
   const hudHollow = document.getElementById('hud-hollow');
   const screenRoot = document.getElementById('screen');
   const modalRoot = document.getElementById('modal-root');
@@ -262,6 +263,7 @@ function boot() {
     paintHud(hudLumen, hudFlame, game, hudRadiance, {
       unspentRadiance: unspent,
       hudKnown,
+      hudComplete,
       hudHollow,
     });
   }

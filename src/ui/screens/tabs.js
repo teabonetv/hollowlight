@@ -11,7 +11,7 @@ import { bankCount } from '../../game/systems/bank.js';
 import { lanternIntegrity, canAffordRepair, repairNeedLabel, repairCostChips } from '../../game/systems/repairs.js';
 import * as camp from '../../game/systems/upgrades.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
-import { nextWants, totalCompletion } from '../../game/systems/completion.js';
+import { nextWants, trueCompletion } from '../../game/systems/completion.js';
 import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
 import { taskProgress } from '../../game/systems/dailies.js';
 import { ZONES } from '../../game/data/combat/zones.js';
@@ -36,7 +36,7 @@ export function renderCampScreen(ctx) {
   const flameVal = el('span', { class: 'stat-value' });
   const timeVal = el('span', { class: 'stat-value' });
   const cyclesVal = el('span', { class: 'stat-value' });
-  const completeVal = el('span', { class: 'stat-value' });
+  const completeVal = el('span', { class: 'stat-value', 'data-true-complete': 'camp' });
 
 
   const trackRefs = TRACKS.map((t) => buildTrackCard(ctx, t));
@@ -109,7 +109,7 @@ export function renderCampScreen(ctx) {
     flameVal.textContent = formatNumber(s.flame);
     cyclesVal.textContent = formatNumber(campCycles(s));
     timeVal.textContent = formatDuration(s.stats.playtimeMs);
-    completeVal.textContent = totalCompletion(s).label;
+    completeVal.textContent = trueCompletion(s).label;
 
     const tinder = bankCount(s.bank, 'tinderscrap');
     if (tinder <= 0) {
