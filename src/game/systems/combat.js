@@ -62,7 +62,7 @@ export function createCombatState() {
     dryAnnounced: false,
     foodId: null, // selected eat slot; null = first owned in FOOD_ORDER
     lastStation: null, // leftover cockpit after a hunt (HP/acc snapshot)
-    lootTray: [], // visible collect pile; ungranted until Take all / Hunt another
+    lootTray: [], // visible collect pile; ungranted until Take all / Hunt another. Painted on leftover and the next live fight.
   };
 }
 
