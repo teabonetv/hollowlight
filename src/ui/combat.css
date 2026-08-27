@@ -128,7 +128,11 @@
   flex: 1 1 auto;
 }
 .combat-fight:not(.leftover-station) {
-  min-height: calc(100cqh - 52px);
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  gap: 2px;
 }
 .leftover-hub {
   display: flex;
@@ -264,6 +268,7 @@
   overflow: hidden;
 }
 .combat-fight:not(.leftover-station) .log-wrap {
+  margin-top: auto;
   min-height: 64px;
   max-height: 64px;
 }
@@ -324,6 +329,26 @@
   flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
+}
+.combat-fight:not(.leftover-station) .fight-loot.leftover-loot {
+  min-height: 32px;
+  max-height: 32px;
+  gap: 4px;
+  position: relative;
+  z-index: 1;
+}
+.combat-fight:not(.leftover-station) .fight-loot .leftover-loot-chips {
+  min-height: 24px;
+}
+.combat-fight:not(.leftover-station) .fight-loot .chip {
+  font-size: 10.5px;
+  padding: 0 6px;
+}
+.combat-fight:not(.leftover-station) .fight-loot .leftover-take {
+  min-height: 32px;
+  min-width: 44px;
+  padding: 4px 8px;
+  font-size: 12px;
 }
 .fight-loot.is-empty,
 .fight-loot[hidden] {

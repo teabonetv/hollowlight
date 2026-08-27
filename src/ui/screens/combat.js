@@ -48,6 +48,12 @@ export const COMBAT_360 = {
   keep: 44,
   hunt: 44,
   loot: 44,
+  /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49, 10px under tab 577). */
+  fightLoot: 32,
+  fightGap: 2,
+  fightFighter: 34, // head + bar-lg 12, not leftover's 22
+  fightAcc: 32, // cockpit pad + 28px Acc chip
+  fightOil: 16,
   souls: 32,
   zoneChips: 44,
   huntCardAboveBtn: 140,
@@ -152,29 +158,34 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
 }
 
 /**
- * Live 360 fight geometry. Ungranted tray chips share leftover-loot chrome
- * (44px) above the log; Eat / Fall back sit on the eat row, still above tab 577.
+ * Live 360 fight geometry. Compact unpaid tray (not leftover 44px) sits above
+ * the log; Eat / Fall back stay on the eat row, all above tab 577.
+ * v49 critic: leftover-loot 44px on the live pull measured top 543 / bottom 587.
  */
 export function fightLogVsTab({ loot = false } = {}) {
   const C = COMBAT_360;
   const box = cockpitLogVsTab('fight');
   const stationTop = C.leftoverStationTop;
-  const lootH = loot ? C.loot : 0;
+  const gap = C.fightGap ?? C.gap;
+  const fighterH = C.fightFighter ?? C.fighter;
+  const accH = C.fightAcc ?? C.acc;
+  const oilH = C.fightOil ?? C.oil;
+  const lootH = loot ? (C.fightLoot ?? C.loot) : 0;
   const chromeBlocks = 8 + (loot ? 1 : 0);
-  const chrome = 2 * C.fighter + C.acc + C.oil + C.eat + C.hand + C.styles + C.keep + lootH;
-  const chromeGaps = C.gap * (chromeBlocks - 1);
+  const chrome = 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + C.keep + lootH;
+  const chromeGaps = gap * (chromeBlocks - 1);
   const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
   let y = stationTop;
-  y += C.fighter + C.gap;
-  y += C.fighter + C.gap;
-  y += C.acc + C.gap;
-  y += C.oil + C.gap;
+  y += fighterH + gap;
+  y += fighterH + gap;
+  y += accH + gap;
+  y += oilH + gap;
   const eatTop = y;
   const eatBottom = y + C.eat;
-  y = eatBottom + C.gap;
-  y += C.hand + C.gap;
-  y += C.styles + C.gap;
-  y += C.keep + C.gap;
+  y = eatBottom + gap;
+  y += C.hand + gap;
+  y += C.styles + gap;
+  y += C.keep + gap;
   const trayTop = loot ? y : null;
   const trayBottom = loot ? y + lootH : null;
   return {
