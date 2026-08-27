@@ -1254,4 +1254,9 @@ test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay abo
   assert.match(css, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*max-height:\s*100%/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.log-wrap\s*\{[^}]*margin-top:\s*auto/);
+  const landscape = css.match(/@media\s*\(max-height:\s*500px\)\s*\{([\s\S]+)\}\s*$/);
+  assert.ok(landscape, 'short-viewport fight rule');
+  assert.match(landscape[1], /#screen:has\(\.fight-live\)[\s\S]*overflow-y:\s*auto/);
+  assert.match(landscape[1], /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*overflow:\s*visible/);
+  assert.match(landscape[1], /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*max-height:\s*none/);
 });

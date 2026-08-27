@@ -511,7 +511,7 @@
 .log-line.log-telegraph { color: var(--gold); font-style: italic; }
 .log-line.log-eat, .log-line.log-oil { color: #c5d4e8; }
 
-/* Short landscape: do not clip Eat / Fall back under the log or tab bar. */
+/* Short landscape: do not clip Eat / Fall back / Hand / tray under the log or tab bar. */
 @media (max-height: 500px) {
   #screen:has(.fight-live) {
     overflow-x: hidden;
@@ -521,5 +521,11 @@
     overflow: visible;
     height: auto;
     max-height: none;
+  }
+  .screen.fight-live .combat-root,
+  .combat-fight:not(.leftover-station) {
+    overflow: visible;
+    max-height: none;
+    flex: 1 1 auto;
   }
 }
