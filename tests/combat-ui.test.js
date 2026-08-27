@@ -1208,3 +1208,50 @@ test('live-fight tray + Eat + Fall back sit above tab 577', () => {
   assert.equal(piled.logBottom, empty.logBottom, 'live tray must not move logWrap.bottom');
   assert.ok(piled.fillH >= 0);
 });
+
+test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay above', () => {
+  const criticTrayTop = 543;
+  const criticTrayBottom = 587;
+  const tabTop = 577;
+  assert.equal(criticTrayBottom - criticTrayTop, 44, 'v49 measured leftover-loot 44px');
+  assert.ok(criticTrayBottom > tabTop, 'v49 letter 5: live tray 10px under the tab');
+
+  const fatLoot = COMBAT_360.loot;
+  assert.equal(fatLoot, 44);
+  assert.ok(criticTrayTop + fatLoot > tabTop, 'uncapped 44px live tray cannot clear 577');
+
+  assert.equal(COMBAT_360.fightLoot, 32);
+  assert.ok(COMBAT_360.fightLoot < fatLoot, 'live tray is compact vs leftover 44');
+  assert.ok(criticTrayTop + COMBAT_360.fightLoot < tabTop,
+    `compact ${COMBAT_360.fightLoot}px from critic top ${criticTrayTop} vs tab ${tabTop}`);
+
+  const empty = fightLogVsTab({ loot: false });
+  const piled = fightLogVsTab({ loot: true });
+  assert.equal(piled.tabTop, tabTop);
+  assert.equal(piled.lootH, 32);
+  assert.ok(piled.trayBottom < tabTop,
+    `360 live unpaid tray bottom ${piled.trayBottom} vs tab ${tabTop}`);
+  assert.ok(piled.trayBottom < criticTrayBottom, 'compact must beat the v49 587px bottom');
+  assert.ok(piled.eatBottom < tabTop, `Eat ${piled.eatBottom} vs tab ${tabTop}`);
+  assert.ok(piled.fleeBottom < tabTop, `Fall back ${piled.fleeBottom} vs tab ${tabTop}`);
+  assert.ok(piled.fits, `fill ${piled.fillH} tray ${piled.trayTop}–${piled.trayBottom}`);
+  assert.ok(piled.fillH >= 0);
+  assert.ok(piled.fillH - (fatLoot - COMBAT_360.fightLoot) < 0,
+    '44px leftover-loot on the live pull would go negative fill (v49 under the tab)');
+  assert.equal(piled.logBottom, empty.logBottom);
+
+  const leftover = leftoverLogVsTab({ loot: true });
+  assert.equal(leftover.tabTop, tabTop);
+  assert.ok(leftover.anotherBottom < tabTop, `Hunt another ${leftover.anotherBottom} vs tab ${tabTop}`);
+  assert.equal(leftover.lootH, 44, 'leftover Hunt another row stays 44px');
+
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  const liveLoot = [...css.matchAll(/\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{([^}]+)\}/g)];
+  assert.ok(liveLoot.length >= 1, 'live fight-loot compact rule');
+  const maxH = liveLoot.flatMap((m) => [...m[1].matchAll(/max-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(maxH.some((h) => h <= 32), `live fight-loot max-height ${maxH.join(',')} must be ≤32px`);
+  assert.match(css, /\.leftover-loot\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*max-height:\s*100%/);
+  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.log-wrap\s*\{[^}]*margin-top:\s*auto/);
+});
