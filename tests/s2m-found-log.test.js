@@ -145,5 +145,6 @@ test('360 Known-door geometry: two Still-in-the-dark rows sit above tab 577', ()
   assert.match(css, /\.screen\.log-items \.log-items-head\s*\{[^}]*min-height:\s*44px/s);
   assert.match(css, /\.screen\.log-items \[data-log-drill="items-found"\]\s*\{[^}]*grid-template-columns:\s*repeat\(6,/s);
   assert.match(css, /\.screen\.log-items \.section-title\s*\{[^}]*font-size:\s*12px/s);
+  assert.match(css, /\.screen\.log-items \[data-log-drill="items-missing"\] \.log-tile\s*\{[^}]*min-height:\s*44px/s);
   assert.doesNotMatch(css, /\.screen\.log-items \[data-log-drill="items-found"\]\s*\{[^}]*repeat\(3,/s);
 });

@@ -1345,6 +1345,22 @@ html.reduced-motion *::after {
   color: var(--gold-hi);
   font-variant-numeric: tabular-nums;
 }
+.screen.log-items [data-log-drill="items-missing"] .log-tile {
+  min-height: 44px;
+  padding: 4px 2px 3px;
+  gap: 1px;
+}
+.screen.log-items [data-log-drill="items-missing"] .log-tile-icon {
+  width: 22px;
+  height: 22px;
+}
+.screen.log-items [data-log-drill="items-missing"] .log-tile-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.screen.log-items [data-log-drill="items-missing"] .log-tile-frac {
+  display: none;
+}
 .log-detail-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .log-detail-row {
   display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;

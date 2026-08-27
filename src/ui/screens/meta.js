@@ -41,7 +41,7 @@ export const LOG_ITEMS_360 = {
   foundGap: 4,
   missingHeadH: 16,
   missingCols: 4,
-  missingTileH: 44,
+  missingTileH: 50, // measured ~49px after compact mystery chrome
   missingGap: 6,
 };
 
