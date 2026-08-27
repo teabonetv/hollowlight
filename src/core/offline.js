@@ -270,6 +270,27 @@ export function haltedEarly(res) {
 }
 
 /**
+ * OfflineClaims / "The Work Went On" only fire for full-span labour.
+ * A fuel-halt sliver (40s of a 3h away) is not hours of work.
+ */
+export function creditsOfflineLabour(res) {
+  return Boolean(res?.hasGains && !haltedEarly(res));
+}
+
+/** Remaining away after the halt clock. 3h − 40s → 2h 59m. */
+export function haltStillMs(res) {
+  if (!haltedEarly(res)) return 0;
+  return Math.max(0, (res.awayMs ?? 0) - (res.workedMs ?? 0));
+}
+
+/** Player-voice halt coda. Null when idle, ×0, or ample-fuel full span. */
+export function formatHaltCoda(res) {
+  const stillMs = haltStillMs(res);
+  if (stillMs <= 0) return null;
+  return `Then the flame sat still for ${formatDuration(stillMs)}.`;
+}
+
+/**
  * Away headline without the cap chip. Halt-early names workedMs so 80s is
  * not hidden in 900/h. Idle names that Time by the Flame did not move.
  * Full-window work headlines the credited span with no shorter worked clause.
@@ -298,6 +319,17 @@ export function formatOfflineHourRate(qty, creditedMs) {
   return `${formatNumber(Math.round(perHour))}/h`;
 }
 
+/**
+ * Halt recaps pair the honest /h with the halt clock (`900/h for 40s`)
+ * so 3h away cannot be read as a successful shift rate.
+ */
+export function formatOfflineHourRateChip(qty, rateMs, { forMs = 0 } = {}) {
+  const rate = formatOfflineHourRate(qty, rateMs);
+  if (!rate) return '';
+  if (forMs > 0) return `${rate} for ${formatDuration(forMs)}`;
+  return rate;
+}
+
 function mergeRecapLines(actionLines, idleNotes) {
   /** @type {Map<string, object>} */
   const byId = new Map();
@@ -322,6 +354,7 @@ function mergeRecapLines(actionLines, idleNotes) {
  * One recap sentence. Halted actions always include ×N (including 0 and 1)
  * and name the leftover stack (`out of Tinderscrap ×0` when empty).
  * Completions > 0 print an honest /h from run-until-halt, not the away tail.
+ * Halt-early pairs that /h with the halt clock (`900/h for 40s`).
  * @param {{name:string, completions?:number, missingId?:string, xp?:number, remainingQty?:number, runMs?:number, creditedMs?:number}} line
  * @param {(id:string)=>string} [resolveItem]
  */
@@ -329,7 +362,8 @@ export function formatRecapLine(line, resolveItem = (id) => id) {
   const n = line.completions ?? 0;
   let text = `${line.name} ×${n}`;
   const rateMs = line.runMs ?? line.creditedMs;
-  const rate = n > 0 ? formatOfflineHourRate(n, rateMs) : '';
+  const forMs = line.missingId && n > 0 ? rateMs : 0;
+  const rate = n > 0 ? formatOfflineHourRateChip(n, rateMs, { forMs }) : '';
   if (line.missingId) {
     const left = Number.isFinite(line.remainingQty) ? line.remainingQty : 0;
     if (rate) text += ` · ${rate}`;
@@ -379,12 +413,13 @@ export function formatOfflineCreditedNote(res) {
 
 /**
  * Wallet + feats Claim will apply on top of `res.nextState`.
- * OfflineClaims (and "The Work Went On") only fire when cycles actually ran.
+ * OfflineClaims (and "The Work Went On") only fire for full-span labour —
+ * not idle, feats-only, ×0 halt, or a fuel-halt sliver of the away window.
  */
 export function previewOfflineClaim(res) {
   const preview = structuredClone(res.nextState);
   preview.stats ??= {};
-  if (res.hasGains) {
+  if (creditsOfflineLabour(res)) {
     preview.stats.offlineClaims = (preview.stats.offlineClaims ?? 0) + 1;
   }
   const beforeL = preview.lumen;

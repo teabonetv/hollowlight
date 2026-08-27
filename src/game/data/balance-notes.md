@@ -254,7 +254,7 @@ True completion must not move when you open the Almanac. Visit and tab-open feat
 | Mastery | 0 until a cycle or hunt is practiced. Live tracks = emberkeeping + foraging actions + combat hunts on kindled stretches. No invented Mining/Fishing/Smithing rows. Locked-zone hunts stay off the board. |
 | Items | Known names stay named (`itemFound > 0` or discovered). Unfound rows are `?` / mystery marks. Dumping a stack never turns it back into a mystery. |
 | Skills | Wave-0 crafts (Emberkeeping, Foraging, Combat) as a 1/99 tile grid. The Almanac tab is not a craft inside this book. Later-wave crafts show as Locked, not fake 1/99. |
-| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). Halt-early away line prints `worked 1m 20s` so the halt clock is not a `/h` puzzle. Idle nothing-queued keeps stillness and names `Time by the Flame unchanged`. While the recap modal is open, the live runner is frozen (no Lumen/Radiance/item ticks). Recap owns `savedAt` until Claim — autosave / hide / pagehide must not restamp to now. Persistent recap has no ×. Idle ≥60s still opens the recap (`Nothing ran.` plus the stillness line). Feat names collapse to `N feats` (tap to expand) so Claim stays pinned. After Claim the runner stays frozen one beat so HUD matches the recap. |
+| Recap halt | Always names leftover stack (`out of Tinderscrap ×0` / `×1`). Halt-early away line prints `worked 40s` / `worked 1m 20s` so the halt clock is not a `/h` puzzle. After the clock, a player-voice coda names the stillness (`Then the flame sat still for 2h 59m.`) above the list — visible on 360 without expanding feats. Halt `/h` is paired with that clock (`900/h for 40s`), not a 3h-looking rate. Fuel-halt slivers do not increment `offlineClaims` / light “The Work Went On”. Idle nothing-queued keeps stillness and names `Time by the Flame unchanged`. While the recap modal is open, the live runner is frozen (no Lumen/Radiance/item ticks). Recap owns `savedAt` until Claim — autosave / hide / pagehide must not restamp to now. Persistent recap has no ×. Idle ≥60s still opens the recap (`Nothing ran.` plus the stillness line). Feat names collapse to `N feats` (tap to expand) so Claim stays pinned. After Claim the runner stays frozen one beat so HUD matches the recap. |
 
 ## Offline playtime (S4 honesty)
 
@@ -263,12 +263,15 @@ when cycles actually ran (capped at 12 h, same cap as production). A fuel
 halt stops the clock when the action would have stopped — Tend ×20 then
 dry over 3 h away is ~80 s of 4 s cycles, not 3 h, and must not light
 “The Long Sit” from the stuffed tail. Recap `/h` uses that same halt
-window (×20 · 900/h, not 7/h over 3 h). A feats-only, idle, or fuel-halt
-at ×0 rewind does not stuff wall-clock into playtime and does not
-increment `offlineClaims` / light “The Work Went On”.
+window (×20 · 900/h, not 7/h over 3 h). Halt recaps pair that /h with the
+halt clock (`900/h for 40s`) and print `Then the flame sat still for 2h 59m.`
+so a dry tail is not read as a successful shift. A feats-only, idle, or
+fuel-halt (×0 or a sliver of the away window) rewind does not stuff
+wall-clock into playtime and does not increment `offlineClaims` / light
+“The Work Went On”. Ample-fuel full-span still lights it.
 The tick loop is frozen (and its accumulator reset) while the recap modal is open so Tend cannot keep counting down on an empty tinder stack and Gather cannot add Fogwort on top of the preview before Claim. Recap-open wall time is not play — Claim does not merge leaked ticks into Time by the Flame. After Claim the runner stays frozen one beat (`RECAP_THAW_MS`) so HUD stays on the recap numbers. Until Claim, autosave / hide / pagehide keep the rewound `savedAt` so a reload still offers the same recap (wallet stays pre-Claim; HUD==save).
 
-**Always recap** when away ≥ 60s, including idle `active {}` and feats-only. Copy names the time away, Cap 12h, and `Nothing ran.` plus `With nothing queued, Time by the Flame and the dailies sat still.` Halt-early away lines print the halt clock (`3h 00m away · worked 1m 20s. Cap 12h.`) so 80s is not a `/h` puzzle. Idle nothing-queued keeps stillness and names `Time by the Flame unchanged` on the away line. Ample-fuel full-window still headlines the credited span with no shorter worked clause. Claim is still required (Melvor still shows Welcome Back on empty-away). Idle Claim does not stuff playtime or light “The Work Went On”. Persist must not restamp `savedAt` while that recap is open. Capped idle must not say “kept 12 hours of work” / “Credited 12h” when the body is stillness.
+**Always recap** when away ≥ 60s, including idle `active {}` and feats-only. Copy names the time away, Cap 12h, and `Nothing ran.` plus `With nothing queued, Time by the Flame and the dailies sat still.` Halt-early away lines print the halt clock (`3h 00m away · worked 40s. Cap 12h.`) so 40s is not a `/h` puzzle, then the coda `Then the flame sat still for 2h 59m.` Idle nothing-queued keeps stillness and names `Time by the Flame unchanged` on the away line. Ample-fuel full-window still headlines the credited span with no shorter worked clause and no sat-still coda. Claim is still required (Melvor still shows Welcome Back on empty-away). Idle Claim does not stuff playtime or light “The Work Went On”. A fuel-halt sliver does not light it either. Persist must not restamp `savedAt` while that recap is open. Capped idle must not say “kept 12 hours of work” / “Credited 12h” when the body is stillness.
 
 Recap preview == Claim: XP→Radiance sparks are a dedicated Radiance line,
 not hidden behind Feats. Level-ups and mastery print `Foraging 1 → 21` /
@@ -276,6 +279,7 @@ not hidden behind Feats. Level-ups and mastery print `Foraging 1 → 21` /
 as `N feats` (tap to expand; names open above Claim in the body scrollport) so Claim stays pinned on 360 — never truncated
 to four names behind `+98 Lumen · +11 Radiance`. Item / lumen / flame /
 radiance lines include an honest `/h` EV from the run-until-halt window.
+Halt-early pairs that `/h` with the halt clock (`900/h for 40s`).
 
 Lumen and mastery XP use the **live per-cycle round**, then × completions
 (`Math.round(qty × multiplier)`), not a floored batch. Skill XP already

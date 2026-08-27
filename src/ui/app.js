@@ -27,7 +27,7 @@ import {
 } from '../core/save.js';
 import {
   computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim,
-  shouldOfferOfflineRecap,
+  shouldOfferOfflineRecap, creditsOfflineLabour,
 } from '../core/offline.js';
 import { createState, pushLog } from '../game/state.js';
 import { ACTIONS_BY_ID } from '../game/data/actions.js';
@@ -706,10 +706,10 @@ function boot() {
         rng = createRng(game.rngState ?? 1);
         ensureDailies(game, Date.now());
         applyMotionClass();
-        // Work Went On tracks real idle labour, not a feats-only / fuel-halt pop.
-        // Recap-open wall time is not play — do not merge leaked ticks into
-        // Time by the Flame. Claim is the only apply.
-        if (res.hasGains) {
+        // Work Went On tracks full-span idle labour, not a feats-only /
+        // fuel-halt sliver. Recap-open wall time is not play — do not merge
+        // leaked ticks into Time by the Flame. Claim is the only apply.
+        if (creditsOfflineLabour(res)) {
           game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
           pushLog(game,
             `Returned after ${formatDuration(res.awayMs)} — the work went on without you.`,
