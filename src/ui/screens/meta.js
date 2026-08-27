@@ -22,6 +22,65 @@ import {
 import { statsRows } from '../../game/systems/stats.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
 
+/**
+ * 360×640 Almanac Items (Known door). Chrome must leave two full
+ * Still-in-the-dark rows above --tab-h (tab top 577).
+ * Lockstep with styles.css `.screen.log-items` rules.
+ */
+export const LOG_ITEMS_360 = {
+  viewportH: 640,
+  tabbarH: 63, // --tab-h 62 + 1px border → tab top 577
+  topbarH: 105, // 360 wrapped Known/Hollow HUD
+  screenPadTop: 18,
+  screenGap: 4,
+  headH: 44, // back + title + 6/137 on one row
+  navH: 44,
+  foundHeadH: 16,
+  foundCols: 6,
+  foundTileH: 56,
+  foundGap: 4,
+  missingHeadH: 16,
+  missingCols: 4,
+  missingTileH: 44,
+  missingGap: 6,
+};
+
+/** Times Found on an Almanac Items tile — ×N, never a binary Found sticker. */
+export function formatLogTimesFound(timesFound) {
+  return `×${formatNumber(timesFound ?? 0)}`;
+}
+
+/** First `rows` of Still-in-the-dark `?` tiles vs the 360 tab bar. */
+export function logItemsMissingRowsVsTab({ foundCount = 6, rows = 2 } = {}) {
+  const C = LOG_ITEMS_360;
+  const tabTop = C.viewportH - C.tabbarH;
+  const foundRows = Math.max(0, Math.ceil(foundCount / C.foundCols));
+  const foundGridH = foundRows === 0
+    ? 0
+    : foundRows * C.foundTileH + Math.max(0, foundRows - 1) * C.foundGap;
+  let y = C.topbarH + C.screenPadTop;
+  y += C.headH + C.screenGap;
+  y += C.navH + C.screenGap;
+  y += C.foundHeadH + C.screenGap;
+  y += foundGridH + C.screenGap;
+  y += C.missingHeadH + C.screenGap;
+  const missingTop = y;
+  const line = [];
+  for (let i = 0; i < rows; i++) {
+    const top = missingTop + i * (C.missingTileH + C.missingGap);
+    const bottom = top + C.missingTileH;
+    line.push({ top, bottom, index: i + 1 });
+  }
+  const row2 = line[1] ?? line[0];
+  return {
+    tabTop,
+    missingTop,
+    rows: line,
+    row2Bottom: row2?.bottom ?? missingTop,
+    fits: line.length > 0 && line.every((r) => r.bottom < tabTop),
+  };
+}
+
 export function renderAlmanacScreen(ctx) {
   const view = ctx.almanacView?.() ?? 'overview';
   if (view === 'stars') return renderStars(ctx);
@@ -408,20 +467,27 @@ function mysteryMark() {
 
 function logTile({
   id, name, glyph, done = 0, total = 99, frac, mystery = false, locked = false,
+  timesFound,
 }) {
   const pct = total > 0 ? Math.min(1, done / total) : 0;
-  const fracText = mystery ? '?' : locked ? 'Locked' : (frac ?? `${done}/${total}`);
+  const timesLabel = timesFound != null ? formatLogTimesFound(timesFound) : null;
+  const fracText = mystery ? '?' : locked ? 'Locked' : (timesLabel ?? frac ?? `${done}/${total}`);
   const label = mystery ? '?' : name;
+  const aria = mystery ? 'Unknown item'
+    : timesFound != null ? `${name}, found ${timesLabel}`
+    : `${name}, ${fracText}`;
+  const known = timesFound != null;
   return el('div', {
-    class: `log-tile${mystery ? ' log-tile-mystery' : ''}${locked ? ' log-tile-locked' : ''}`,
-    dataset: { logRow: id },
+    class: `log-tile${mystery ? ' log-tile-mystery' : ''}${locked ? ' log-tile-locked' : ''}${known ? ' log-tile-known' : ''}`,
+    dataset: { logRow: id, ...(known ? { timesFound: String(timesFound) } : {}) },
     'data-log-row': id,
-    'aria-label': mystery ? 'Unknown item' : `${name}, ${fracText}`,
+    ...(known ? { 'data-times-found': String(timesFound) } : {}),
+    'aria-label': aria,
   },
     el('span', { class: 'log-tile-icon', html: mystery ? mysteryMark() : icon(glyph ?? 'star') }),
     el('span', { class: 'log-tile-name' }, label),
-    el('span', { class: 'log-tile-frac' }, fracText),
-    mystery || locked ? null : el('span', { class: 'bar bar-mini cat-bar' },
+    el('span', { class: `log-tile-frac${known ? ' log-tile-times' : ''}` }, fracText),
+    mystery || locked || known ? null : el('span', { class: 'bar bar-mini cat-bar' },
       el('span', { class: 'bar-fill', style: `width:${(pct * 100).toFixed(1)}%` })));
 }
 
@@ -462,6 +528,8 @@ function renderLogMastery(ctx) {
 
 function renderLogItems(ctx) {
   const { found, missing } = itemsLogDetails(ctx.state);
+  const row = logCategoryStats(ctx.state).find((c) => c.id === 'items');
+  const pctLabel = row ? formatCompletionPct(row.pct) : '0%';
   const foundBlock = found.length
     ? el('div', { class: 'log-tile-grid', 'data-log-drill': 'items-found' },
       found.map((r) => logTile({
@@ -470,7 +538,7 @@ function renderLogItems(ctx) {
         glyph: itemGlyph(ITEMS_BY_ID[r.id]),
         done: 1,
         total: 1,
-        frac: 'Found',
+        timesFound: r.timesFound,
       })))
     : el('div', { class: 'empty-state log-items-empty' },
       el('span', { class: 'empty-icon', html: icon('book') }),
@@ -490,7 +558,16 @@ function renderLogItems(ctx) {
 
   return {
     node: el('section', { class: 'screen almanac log-items' },
-      ...logHero(ctx, 'items', 'Items', 'known by Times Found, never un-completed'),
+      el('header', { class: 'screen-head log-items-head' },
+        el('button', {
+          class: 'btn btn-ghost log-back',
+          onclick: () => ctx.openAlmanac('overview'),
+          'aria-label': 'Back to completion log',
+        }, '←'),
+        el('h1', { class: 'screen-title' }, 'Items'),
+        el('p', { class: 'screen-sub' },
+          row ? `${pctLabel} · ${row.done}/${row.total}` : 'known by Times Found')),
+      subnav(ctx, navCurrent('log-items')),
       el('h2', { class: 'section-title' }, `Found · ${found.length}`),
       foundBlock,
       el('h2', { class: 'section-title' }, `Still in the dark · ${missing.length}`),
