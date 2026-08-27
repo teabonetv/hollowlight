@@ -10,7 +10,7 @@ import { taskProgress } from './dailies.js';
 import { ACTIONS, ACTIONS_BY_ID } from '../data/actions.js';
 import { SKILLS, SKILL_BY_ID } from '../data/skills.js';
 import { ITEMS } from '../data/items.js';
-import { isItemKnown } from './stats.js';
+import { isItemKnown, itemTimesFound } from './stats.js';
 import { MILESTONE_LEVEL } from '../../core/xp.js';
 import { ENEMIES } from '../data/enemies/index.js';
 import { ZONE_BY_ID } from '../data/combat/zones.js';
@@ -219,11 +219,13 @@ export function itemsLogDetails(state) {
   const missing = [];
   for (const item of ITEMS) {
     const known = isItemKnown(state, item.id);
+    const times = itemTimesFound(state, item.id);
     const row = {
       id: item.id,
       name: item.name,
       found: known,
       mystery: !known,
+      timesFound: times,
     };
     (row.found ? found : missing).push(row);
   }

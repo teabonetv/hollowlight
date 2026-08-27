@@ -300,6 +300,8 @@ test('tapping Known chip leaves Camp for Almanac Items (found-log)', () => {
   assert.ok(found, 'Found grid is on the page');
   assert.ok(missing, 'Still in the dark grid is on the page');
   assert.match(found.textContent ?? '', /Lantern-loaf/);
+  const loaf = found.querySelector('[data-log-row="lantern-loaf"]');
+  assert.equal(loaf.querySelector('.log-tile-times')?.textContent, `×${STARTER_BANK['lantern-loaf']}`);
   assert.match(missing.textContent ?? '', /\?/);
   assert.equal((missing.textContent ?? '').includes('Bog-moss'), false);
   const logTab = elements.screen.querySelectorAll('.almanac-tab').find((t) => t.classList.contains('active'));
@@ -367,7 +369,9 @@ test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () 
   assert.equal(elements.screen.querySelector('.bank-screen'), null);
   assert.equal(elements.screen.querySelector('.screen-title')?.textContent, 'Items');
   const found = elements.screen.querySelector('[data-log-drill="items-found"]');
+  const logLoaf = found.querySelector('[data-log-row="lantern-loaf"]');
   assert.match(found.textContent ?? '', /Lantern-loaf/);
+  assert.equal(logLoaf.querySelector('.log-tile-times')?.textContent, `×${STARTER_BANK['lantern-loaf']}`);
   const missing = elements.screen.querySelector('[data-log-drill="items-missing"]');
   assert.equal((missing?.textContent ?? '').includes('Lantern-loaf'), false);
 

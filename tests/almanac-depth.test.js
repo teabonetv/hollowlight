@@ -157,7 +157,7 @@ test('tap Skills / Mastery / Items / Feats opens drill-down tiles and keeps %', 
   const drills = {
     'log-skills': { name: 'Emberkeeping', frac: '1/99' },
     'log-mastery': { name: 'Tend the Flame', frac: '0/99' },
-    'log-items': { name: 'Fogwort', frac: 'Found' },
+    'log-items': { name: 'Fogwort', frac: '×4' },
     'log-feats': { name: 'First Kindling', frac: null },
   };
   for (const [view, expect] of Object.entries(drills)) {
@@ -189,7 +189,10 @@ test('tap Skills / Mastery / Items / Feats opens drill-down tiles and keeps %', 
 
   const items = renderAlmanacScreen(almanacCtx(state, 'log-items'));
   assert.match(items.node.textContent ?? '', /Fogwort/);
-  assert.match(items.node.textContent ?? '', /Found/);
+  assert.match(items.node.textContent ?? '', /Found · /);
+  const fogTile = items.node.querySelector('[data-log-row="fogwort"]');
+  assert.equal(fogTile?.querySelector('.log-tile-times')?.textContent, '×4');
+  assert.doesNotMatch(fogTile?.querySelector('.log-tile-frac')?.textContent ?? '', /^Found$/);
   const missing = items.node.querySelector('[data-log-drill="items-missing"]');
   assert.ok(missing);
   assert.equal((missing.textContent ?? '').includes('Tinderscrap'), false,

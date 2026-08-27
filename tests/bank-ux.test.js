@@ -694,7 +694,9 @@ test('dump a unique starter stack decrements Hollow occupancy, not known', () =>
   const found = almanac.node.querySelector('[data-log-drill="items-found"]');
   const missing = almanac.node.querySelector('[data-log-drill="items-missing"]');
   assert.match(found.textContent ?? '', /Lantern-loaf/);
-  assert.match(found.textContent ?? '', /Found/);
+  const loafTile = found.querySelector('[data-log-row="lantern-loaf"]');
+  assert.equal(loafTile.querySelector('.log-tile-times')?.textContent, '×8');
+  assert.doesNotMatch(loafTile.querySelector('.log-tile-frac')?.textContent ?? '', /^Found$/);
   assert.equal((missing?.textContent ?? '').includes('Lantern-loaf'), false);
   assert.equal((missing?.textContent ?? '').includes('?'), true);
 });
@@ -740,8 +742,8 @@ test('Food tab stays on the starter row after dump; HUD chips and tab chips wrap
   assert.match(html, /<button[^>]*id="hud-hollow"/);
   assert.match(html, /Known 0\/137/);
   assert.match(html, /Hollow 0\/12/);
-  assert.match(css, /\.screen\.log-items\s*\{[^}]*gap:\s*8px/s);
-  assert.match(css, /\.screen\.log-items \.section-title\s*\{[^}]*margin-top:\s*4px/s);
+  assert.match(css, /\.screen\.log-items\s*\{[^}]*gap:\s*4px/s);
+  assert.match(css, /\.screen\.log-items \.section-title\s*\{[^}]*margin-top:\s*0/s);
 });
 
 test('bankTab all opens Catalogue with named found and mystery unfound tiles, not Camp', () => {
