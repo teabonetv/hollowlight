@@ -38,7 +38,7 @@ export function hydrateState(state) {
   state.beacons ??= { kindled: ['hearthway'] };
   state.beacons.kindled ??= ['hearthway'];
   state.skills ??= {};
-  ensureCombat(state);
+  ensureCombat(state); // v5: leftover tray granted-flag / pending loot (no SAVE_VERSION bump)
   // Reload must not keep swinging on Camp: freeze until the fight HUD mounts.
   if (state.combat?.fighting && state.combat?.foe) {
     state.combat.paused = true;

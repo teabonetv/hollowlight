@@ -11,6 +11,10 @@ import * as runner from '../src/game/systems/action-runner.js';
 import { ALWAYS_STOCK } from '../src/game/data/store.js';
 import { isOnShelf, buyFromStore } from '../src/game/systems/store.js';
 import { serializeSave, deserializeSave } from '../src/core/save.js';
+import { ITEMS } from '../src/game/data/items.js';
+import {
+  uniqueStackCount, lanternRoom, canAcceptStack, PACK_FULL_MSG,
+} from '../src/game/systems/bank.js';
 
 test('roster meets charter scope: ≥40 regulars, 12 bosses, 12 zones', () => {
   assert.ok(REGULARS.length >= 40, `regulars ${REGULARS.length}`);
@@ -112,7 +116,8 @@ test('kills grant combat XP via the shared mastery × altar formula and drop loo
   assert.ok(kill, 'kill event');
   assert.equal(kill.enemyId, 'pale-moth');
   assert.ok(s.skills.combat.xp > 0);
-  assert.ok(s.souls >= 1);
+  assert.equal(s.souls, 0, 'souls wait on the leftover tray');
+  assert.ok(s.combat.lootTray.some((e) => e.kind === 'soul' && e.qty >= 1 && e.granted === false));
   assert.equal(s.stats.kills, 1);
 });
 
@@ -610,58 +615,136 @@ function killPaleMoth(s, encounterSeed = 1) {
   return kill;
 }
 
-test('loot tray holds prior kill chips across the next hunt until Take all', () => {
+function traySum(tray, kind, id) {
+  return (tray ?? [])
+    .filter((e) => e.kind === kind && (id == null || e.id === id))
+    .reduce((n, e) => n + e.qty, 0);
+}
+
+function walletSnap(s) {
+  return { lumen: s.lumen, souls: s.souls, bank: { ...s.bank } };
+}
+
+function fillHollowExcept(state, skipId, cap = lanternRoom(state)) {
+  delete state.bank[skipId];
+  for (const it of ITEMS) {
+    if (it.id === skipId) continue;
+    if (uniqueStackCount(state.bank) >= cap) break;
+    if ((state.bank[it.id] ?? 0) <= 0) state.bank[it.id] = 1;
+  }
+  return uniqueStackCount(state.bank);
+}
+
+function pinUnpaidLeftover(s, { lumen = 3, souls = 1, itemId = 'pall-fang' } = {}) {
+  fillHollowExcept(s, itemId);
+  assert.equal(canAcceptStack(s, itemId), false);
+  s.combat.fighting = false;
+  s.combat.foe = null;
+  s.combat.lastStation = {
+    enemyId: 'pale-moth',
+    enemyName: 'Pale Moth',
+    ended: 'kill',
+    foeHp: 0,
+    foeMaxHp: 16,
+    souls,
+    lootGranted: false,
+    loot: [{ kind: 'item', id: itemId, qty: 1, name: 'Pall-fang', granted: false }],
+  };
+  s.combat.lootTray = [
+    { kind: 'lumen', qty: lumen, name: 'Lumen', granted: false },
+    { kind: 'soul', qty: souls, granted: false },
+    { kind: 'item', id: itemId, qty: 1, name: 'Pall-fang', granted: false },
+  ];
+}
+
+function assertWalletUnchanged(s, snap) {
+  assert.equal(s.lumen, snap.lumen);
+  assert.equal(s.souls, snap.souls);
+  assert.deepEqual({ ...s.bank }, snap.bank);
+}
+
+function assertWalletMatchesPile(s, snap, pile) {
+  assert.equal(s.lumen, snap.lumen + traySum(pile, 'lumen'));
+  assert.equal(s.souls, snap.souls + traySum(pile, 'soul'));
+  const expected = { ...snap.bank };
+  for (const row of pile) {
+    if (row.kind === 'item' && row.id) expected[row.id] = (expected[row.id] ?? 0) + row.qty;
+  }
+  assert.deepEqual({ ...s.bank }, expected);
+}
+
+test('kill leaves bank and lumen unpaid until Take all; second Take all is a no-op', () => {
   const s = createState({ rngSeed: 4 });
+  const snap = walletSnap(s);
+  assert.ok(killPaleMoth(s, 1));
+  const pile = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
+  assert.ok(pile.length >= 1, 'kill fills the leftover pile');
+  assert.ok(pile.some((e) => e.kind === 'soul'));
+  assert.ok(pile.some((e) => e.kind === 'lumen'));
+  assert.ok(pile.every((e) => e.granted === false), 'tray is pending, not a receipt');
+  assert.ok(s.combat.log.some((l) => l.kind === 'kill' && /Loot:/.test(l.text)),
+    'kill log may name loot as flavour');
+  assertWalletUnchanged(s, snap);
+
+  const res = combat.takeAllLootTray(s);
+  assert.equal(res.ok, true);
+  assert.ok(res.granted.length >= 1);
+  assert.deepEqual(s.combat.lootTray, []);
+  assertWalletMatchesPile(s, snap, pile);
+
+  const paid = walletSnap(s);
+  const again = combat.takeAllLootTray(s);
+  assert.equal(again.ok, true);
+  assert.equal(again.granted.length, 0);
+  assert.deepEqual(s.combat.lootTray, []);
+  assertWalletUnchanged(s, paid);
+});
+
+test('two kills without Take all stack the tray; wallet stays unpaid until one collect', () => {
+  const s = createState({ rngSeed: 4 });
+  const snap = walletSnap(s);
   assert.ok(killPaleMoth(s, 1));
   const first = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
-  assert.ok(first.length >= 1, 'first kill fills the visible pile');
-  assert.ok(first.some((e) => e.kind === 'soul'));
-  assert.ok(first.some((e) => e.kind === 'lumen'));
-  const lumenAfterFirst = s.lumen;
-  const soulsAfterFirst = s.souls;
-  const bankAfterFirst = { ...s.bank };
+  assert.ok(first.length >= 1);
+  assertWalletUnchanged(s, snap);
 
   assert.ok(killPaleMoth(s, 2));
   const tray = s.combat.lootTray;
   assert.ok(tray.some((e) => e.kind === 'soul' && e.qty >= 2), 'souls stack across hunts');
+  assert.ok(tray.every((e) => e.granted === false));
   for (const row of first) {
     const hit = tray.find((t) => t.kind === row.kind && (row.kind !== 'item' || t.id === row.id));
     assert.ok(hit, `prior ${row.kind} ${row.name ?? row.id ?? ''} still in the pile`);
     assert.ok(hit.qty >= row.qty);
   }
+  assertWalletUnchanged(s, snap);
 
-  const lumen = s.lumen;
-  const souls = s.souls;
+  const piled = tray.map((e) => ({ ...e }));
   const res = combat.takeAllLootTray(s);
   assert.equal(res.ok, true);
-  assert.equal(res.granted.length, 0, 'kill loot was already banked');
+  assert.ok(res.granted.length >= 1);
   assert.deepEqual(s.combat.lootTray, []);
-  assert.equal(s.lumen, lumen);
-  assert.equal(s.souls, souls);
-  assert.ok(s.lumen >= lumenAfterFirst);
-  assert.ok(s.souls >= soulsAfterFirst);
-  for (const [id, n] of Object.entries(bankAfterFirst)) {
-    assert.ok((s.bank[id] ?? 0) >= n, `${id} stayed earned`);
-  }
+  assertWalletMatchesPile(s, snap, piled);
+
+  const paid = walletSnap(s);
+  assert.equal(combat.takeAllLootTray(s).granted.length, 0);
+  assertWalletUnchanged(s, paid);
 });
 
-test('Take all pays only pending tray rows, never a second grant', () => {
+test('Take all skips granted receipts and never double-pays', () => {
   const s = createState({ rngSeed: 4 });
-  assert.ok(killPaleMoth(s, 1));
-  s.combat.lootTray.push({ kind: 'lumen', qty: 3, name: 'Lumen', granted: false });
-  const lumen = s.lumen;
-  const souls = s.souls;
-  const fang = s.bank['pall-fang'] ?? 0;
+  s.combat.lootTray = [{ kind: 'lumen', qty: 9, name: 'Lumen', granted: true }];
+  const snap = walletSnap(s);
   const res = combat.takeAllLootTray(s);
   assert.equal(res.ok, true);
-  assert.equal(s.lumen, lumen + 3);
-  assert.equal(s.souls, souls);
-  assert.equal(s.bank['pall-fang'] ?? 0, fang);
+  assert.equal(res.granted.length, 0);
   assert.deepEqual(s.combat.lootTray, []);
+  assertWalletUnchanged(s, snap);
 });
 
-test('Fall back keeps the loot tray; Hunt another dismisses it', () => {
+test('Fall back keeps the unpaid tray; Hunt another auto-collects it', () => {
   const s = createState({ rngSeed: 4 });
+  const snap = walletSnap(s);
   assert.ok(killPaleMoth(s, 1));
   const before = s.combat.lootTray.map((e) => ({ ...e }));
   assert.ok(before.length >= 1);
@@ -673,10 +756,46 @@ test('Fall back keeps the loot tray; Hunt another dismisses it', () => {
     const hit = s.combat.lootTray.find((t) => t.kind === row.kind && t.id === row.id);
     assert.ok(hit);
     assert.equal(hit.qty, row.qty);
+    assert.equal(hit.granted, false);
   }
+  assertWalletUnchanged(s, snap);
   combat.dismissLastStation(s);
   assert.equal(s.combat.lastStation, null);
   assert.deepEqual(s.combat.lootTray, []);
+  assertWalletMatchesPile(s, snap, before);
+});
+
+test('pack-full Take all keeps unbanked chips; Hunt another does not wipe them', () => {
+  const s = createState({ rngSeed: 4 });
+  pinUnpaidLeftover(s, { lumen: 3, souls: 1, itemId: 'pall-fang' });
+  const snap = walletSnap(s);
+  const last = s.combat.lastStation;
+
+  const taken = combat.takeAllLootTray(s);
+  assert.equal(s.lumen, snap.lumen + 3);
+  assert.equal(s.souls, snap.souls + 1);
+  assert.equal(s.bank['pall-fang'], undefined);
+  assert.equal(taken.blocked, true);
+  assert.match(taken.error ?? '', /hollow is full/i);
+  assert.equal(s.combat.lootTray.length, 1);
+  assert.equal(s.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(s.combat.lootTray[0].granted, false);
+  assert.equal(s.combat.lastStation, last);
+
+  const again = combat.takeAllLootTray(s);
+  assert.equal(again.blocked, true);
+  assert.equal(s.bank['pall-fang'], undefined);
+  assert.equal(s.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(s.lumen, snap.lumen + 3);
+
+  const door = combat.dismissLastStation(s);
+  assert.equal(door.ok, false);
+  assert.match(door.error ?? PACK_FULL_MSG, /hollow is full/i);
+  assert.equal(s.combat.lastStation?.enemyId, 'pale-moth');
+  assert.equal(s.combat.lootTray.length, 1);
+  assert.equal(s.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(s.combat.lootTray[0].granted, false);
+  assert.equal(s.bank['pall-fang'], undefined);
 });
 
 test('v5 hydrate unions lootTray without a SAVE_VERSION bump', () => {
@@ -703,4 +822,63 @@ test('v5 hydrate unions lootTray without a SAVE_VERSION bump', () => {
   assert.ok(state.combat.lootTray.some((e) => e.kind === 'soul' && e.qty === 1));
   assert.ok(state.combat.lootTray.some((e) => e.kind === 'lumen' && e.qty === 2));
   assert.equal(state.combat.lastStation?.enemyId, 'pale-moth');
+});
+
+test('v5 hydrate keeps pending tray loot ungranted across reload', () => {
+  const s = createState({ rngSeed: 4 });
+  const snap = walletSnap(s);
+  assert.ok(killPaleMoth(s, 1));
+  const pile = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
+  assert.ok(pile.every((e) => e.granted === false));
+  assertWalletUnchanged(s, snap);
+
+  const json = serializeSave(s, 99);
+  assert.equal(JSON.parse(json).version, 5);
+  const { state } = deserializeSave(json);
+  assert.equal(JSON.parse(serializeSave(state, 1)).version, 5);
+  assert.ok(state.combat.lootTray.every((e) => e.granted === false));
+  assert.equal(traySum(state.combat.lootTray, 'lumen'), traySum(pile, 'lumen'));
+  assert.equal(traySum(state.combat.lootTray, 'soul'), traySum(pile, 'soul'));
+  assertWalletUnchanged(state, snap);
+
+  const res = combat.takeAllLootTray(state);
+  assert.ok(res.granted.length >= 1);
+  assert.deepEqual(state.combat.lootTray, []);
+  assertWalletMatchesPile(state, snap, pile);
+});
+
+test('v5 hydrate of an explicit pending tray does not bank until Take all', () => {
+  const json = JSON.stringify({
+    version: 5,
+    savedAt: 1,
+    state: {
+      lumen: 20,
+      souls: 0,
+      bank: { tinderscrap: 30 },
+      combat: {
+        fighting: false,
+        lootTray: [
+          { kind: 'soul', qty: 1, granted: false },
+          { kind: 'lumen', qty: 2, name: 'Lumen', granted: false },
+        ],
+        lastStation: {
+          enemyId: 'pale-moth',
+          enemyName: 'Pale Moth',
+          ended: 'kill',
+          souls: 1,
+          lootGranted: false,
+          loot: [{ kind: 'lumen', qty: 2, name: 'Lumen', granted: false }],
+        },
+      },
+    },
+  });
+  const { state } = deserializeSave(json);
+  assert.equal(JSON.parse(serializeSave(state, 1)).version, 5);
+  assert.equal(state.lumen, 20);
+  assert.equal(state.souls, 0);
+  assert.ok(state.combat.lootTray.every((e) => e.granted === false));
+  combat.takeAllLootTray(state);
+  assert.equal(state.lumen, 22);
+  assert.equal(state.souls, 1);
+  assert.deepEqual(state.combat.lootTray, []);
 });

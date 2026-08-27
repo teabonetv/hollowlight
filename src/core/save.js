@@ -12,6 +12,7 @@
 // v3 → v4  S4 meta (Radiance, perks, feats, dailies) + combat defaults so
 //          S4-only v3 PR saves also pick up the S1 blob
 // v4 → v5  Almanac LOG discovered map + S1e leftover station / selected eat slot
+//           (S1n unions tray granted-flag / pending loot in hydrate; no bump)
 
 import { hydrateState } from '../game/hydrate.js';
 import { createCombatState } from '../game/systems/combat.js';
