@@ -1,5 +1,7 @@
-// Camp, Bank, Map, Journal screens. Camp is a warm home hub; Bank is an
-// owned-first pack with an opt-in Catalogue; Map shows the twelve-beacon
+// Camp, Bank, Map, Journal screens. Camp is a 5-second hearth (wants, lantern,
+// Keeper's Camp) — crafts, the stall, and the constellation live on Skills /
+// Bank / Almanac tabs, not a sitemap stack. Bank is an owned-first pack with
+// an opt-in Catalogue and a Stall buy-tab; Map shows the twelve-beacon
 // pilgrim road with only Hearthway kindled; Journal is the log.
 
 import { el, clear } from '../dom.js';
@@ -76,17 +78,6 @@ export function renderCampScreen(ctx) {
           el('span', { class: 'want-detail muted' }, w.detail)))
         : el('p', { class: 'muted' }, 'The road is quiet. Tend the flame.')),
     dailyStrip(ctx),
-    el('div', { class: 'camp-actions' },
-      el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openSkill('emberkeeping') },
-        'Tend the Flame'),
-      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openSkill('foraging') },
-        'Walk the fog-line'),
-      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openStore?.() },
-        'The General Store'),
-      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openSkill('combat') },
-        'Face the pale-things'),
-      el('button', { class: 'btn btn-ghost btn-wide', onclick: () => ctx.openAlmanac?.('stars') },
-        'Open the constellation')),
 
     tinderBanner,
 
@@ -119,7 +110,7 @@ export function renderCampScreen(ctx) {
         el('p', { class: 'empty-text' },
           `Kindling is gone — the stall still sells Tinderscrap, and a ${KINDLING_BUNDLE.name} is ✦${KINDLING_BUNDLE.cost} for eight handfuls. Or walk the fog-line; herbs carry dry tinder home.`),
         el('button', { class: 'btn btn-primary btn-wide', onclick: () => ctx.openStore?.() },
-          'Buy kindling at the stall'));
+          'Buy kindling'));
     } else if (tinder < 8) {
       tinderBanner.style.display = '';
       clear(tinderBanner);

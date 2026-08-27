@@ -17,7 +17,14 @@ export {
   uniqueStackCount, lanternRoom, canAcceptStack,
 };
 
-const CORE_TAB_IDS = new Set(['owned', 'pinned', 'all', 'catalogue']);
+const CORE_TAB_IDS = new Set(['owned', 'pinned', 'all', 'catalogue', 'stall']);
+
+/** Buy-tab on Bank — the stall is not an item category. */
+export const STALL_TAB = 'stall';
+
+export function isStallTab(tab) {
+  return tab === STALL_TAB;
+}
 
 export function bankCount(bank, itemId) {
   return bank[itemId] ?? 0;
@@ -172,6 +179,7 @@ export function isCatalogueTab(tab) {
 export function resolveBankTab(tab) {
   if (isCatalogueTab(tab)) return 'all';
   if (tab === 'pinned') return 'pinned';
+  if (isStallTab(tab)) return STALL_TAB;
   return DEFAULT_BANK_TAB;
 }
 
@@ -183,10 +191,11 @@ export function stockedCategoryTabs(bank, state) {
   });
 }
 
-/** Owned / Pinned / Catalogue, plus categories with a known (or held) stack. */
+/** Owned / Pinned / Catalogue / Stall, plus categories with a known (or held) stack. */
 export function visibleBankTabs(bank, state) {
   const core = BANK_TABS.filter(([id]) => id === 'owned' || id === 'pinned' || id === 'all');
-  return [...core, ...stockedCategoryTabs(bank, state)];
+  const stall = [[STALL_TAB, 'Stall']];
+  return [...core, ...stall, ...stockedCategoryTabs(bank, state)];
 }
 
 export function filterItems({ items = ITEMS, bank = {}, tab = 'owned', query = '', pins = [], state } = {}) {

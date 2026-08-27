@@ -23,8 +23,8 @@ const { createState } = await import('../src/game/state.js');
 const { serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { renderSkillDetail, renderSkillsScreen } = await import('../src/ui/screens/skills.js');
 const { cockpitLogVsTab, leftoverLogVsTab, fightLogVsTab, leftoverHuntRowVs360, lobbyFirstHuntBottom, COMBAT_360 } = await import('../src/ui/screens/combat.js');
-const tabs = await import('../src/ui/screens/tabs.js');
 const combat = await import('../src/game/systems/combat.js');
+const runner = await import('../src/game/systems/action-runner.js');
 const { buyFromStore } = await import('../src/game/systems/store.js');
 const { ITEMS } = await import('../src/game/data/items.js');
 const { uniqueStackCount, lanternRoom, canAcceptStack } = await import('../src/game/systems/bank.js');
@@ -36,6 +36,7 @@ function makeCtx(state) {
     toast() {},
     openSkill() {},
     openSkillsList() {},
+    actionStatus: (id) => runner.actionStatus(state, id),
     startFight: (id) => combat.startFight(state, id),
     fleeFight: () => combat.fleeFight(state),
     eatFood: (id) => combat.eatFood(state, id),
@@ -69,9 +70,16 @@ test('combat skill detail shows Hearthway hunts, not a coming-soon panel', () =>
   assert.match(scr.node.textContent ?? '', /Hunt/);
 });
 
-test('camp offers a tap through to combat', () => {
-  const scr = tabs.renderCampScreen(makeCtx(createState({ rngSeed: 3 })));
-  assert.match(scr.node.textContent ?? '', /Face the pale-things/);
+test('skills craft subnav offers a tap through to combat', () => {
+  const opened = [];
+  const ctx = makeCtx(createState({ rngSeed: 3 }));
+  ctx.openSkill = (id) => opened.push(id);
+  const scr = renderSkillDetail(ctx, 'emberkeeping');
+  const combatTab = scr.node.querySelectorAll('.craft-tab')
+    .find((b) => b.getAttribute('data-skill') === 'combat');
+  assert.ok(combatTab, 'Combat is a craft tab');
+  combatTab.click();
+  assert.deepEqual(opened, ['combat']);
 });
 
 test('a live fight paints HP, styles, eat, flee, weapon, cockpit, and a log', () => {
@@ -747,9 +755,9 @@ test('live panel.update keeps Eat and Fall back nodes; eatFood and fleeFight sti
   const fleeBtn = scr.node.querySelector('.flee-btn');
   const strike = scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Strike');
   const keep = scr.node.querySelector('.combat-keep');
-  const back = scr.node.querySelector('.icon-btn');
+  const craftNav = scr.node.querySelector('.craft-nav');
   const hand = scr.node.querySelector('.hand-chip');
-  assert.ok(eatBtn && fleeBtn && strike && keep && back && hand);
+  assert.ok(eatBtn && fleeBtn && strike && keep && craftNav && hand);
   for (let i = 0; i < 10; i++) {
     if (state.combat.foe) state.combat.foe.hp = Math.max(4, state.combat.foe.hp);
     combat.tickCombat(state, 100);
@@ -759,7 +767,7 @@ test('live panel.update keeps Eat and Fall back nodes; eatFood and fleeFight sti
     assert.equal(scr.node.querySelector('.flee-btn'), fleeBtn, 'Fall back node must survive ticks');
     assert.equal(scr.node.querySelectorAll('button').find((b) => (b.textContent ?? '') === 'Strike'), strike);
     assert.equal(scr.node.querySelector('.combat-keep'), keep);
-    assert.equal(scr.node.querySelector('.icon-btn'), back);
+    assert.equal(scr.node.querySelector('.craft-nav'), craftNav);
     assert.equal(scr.node.querySelector('.hand-chip'), hand);
   }
   const hpBefore = state.combat.player.hp;

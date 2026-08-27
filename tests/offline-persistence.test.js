@@ -14,6 +14,21 @@ import assert from 'node:assert/strict';
 
 const { FakeNode } = await import('./helpers/fake-node.mjs');
 
+function tabButton(tab) {
+  const b = new FakeNode('button');
+  b.dataset.tab = tab;
+  b.setAttribute('data-tab', tab);
+  if (tab === 'camp') {
+    b.classList.add('active');
+    b.setAttribute('aria-selected', 'true');
+  } else {
+    b.setAttribute('aria-selected', 'false');
+  }
+  return b;
+}
+
+const tabButtons = ['camp', 'skills', 'bank', 'map', 'journal'].map(tabButton);
+
 // ── browser env stubs (installed BEFORE importing app.js) ──────────
 const elements = {
   'hud-lumen': new FakeNode('span'),
@@ -33,7 +48,10 @@ globalThis.document = {
   createElement: (t) => new FakeNode(t),
   createTextNode: (s) => ({ nodeType: 3, textContent: String(s) }),
   getElementById: (id) => elements[id] ?? null,
-  querySelectorAll: () => [],
+  querySelectorAll: (sel) => {
+    if (sel === '.tabbar button') return tabButtons;
+    return [];
+  },
   addEventListener(type, fn) { (docListeners[type] ??= []).push(fn); },
   removeEventListener() {},
 };
@@ -85,8 +103,8 @@ function rawSave() {
 }
 
 function openEmberkeepingAndStart() {
-  elements.screen.querySelectorAll('button')
-    .find((b) => b.textContent === 'Tend the Flame').click();
+  const skills = tabButtons.find((b) => b.dataset.tab === 'skills');
+  skills.click();
   const runBtn = elements.screen.querySelectorAll('.btn-run')[0];
   assert.equal(runBtn.textContent, 'Start');
   runBtn.click();

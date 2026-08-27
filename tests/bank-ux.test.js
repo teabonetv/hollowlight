@@ -52,7 +52,7 @@ test('DEFAULT_BANK_TAB is owned', () => {
   assert.equal(resolveBankTab('all'), 'all');
   assert.equal(resolveBankTab('catalogue'), 'all');
   assert.equal(resolveBankTab('owned'), 'owned');
-  assert.equal(resolveBankTab('pinned'), 'pinned');
+  assert.equal(resolveBankTab('stall'), 'stall');
   assert.equal(resolveBankTab('food'), 'owned');
   assert.equal(isCatalogueTab(resolveBankTab('catalogue')), true);
 });
@@ -127,13 +127,36 @@ test('owned tab chips are core tabs plus only categories that hold stock', () =>
   const s = createState({ rngSeed: 1 });
   const scr = tabs.renderBankScreen(makeCtx(s));
   const labels = scr.node.querySelectorAll('.bank-tab').map((t) => t.textContent);
-  assert.deepEqual(labels.slice(0, 3), ['Owned', 'Pinned', 'Catalogue']);
+  assert.deepEqual(labels.slice(0, 4), ['Owned', 'Pinned', 'Catalogue', 'Stall']);
   assert.ok(labels.includes('Fuel'));
   assert.ok(labels.includes('Herbs'));
   assert.equal(labels.includes('Fish'), false);
   assert.equal(labels.includes('Gems'), false);
   assert.equal(labels.includes('Ores'), false);
   assert.ok(labels.length < 12, 'empty categories are not a second inventory');
+});
+
+test('Stall tab opens the Hearthway buy-board without leaving Bank', () => {
+  const s = createState({ rngSeed: 1 });
+  const scr = tabs.renderBankScreen(makeCtx(s, {
+    bankTab: 'stall',
+    buyKindlingBundle() {},
+    storeBuy() {},
+    buyTheme() {},
+  }));
+  const active = scr.node.querySelectorAll('.bank-tab').find((t) => /\bactive\b/.test(t.className));
+  assert.equal(active?.textContent, 'Stall');
+  assert.equal(active?.getAttribute('aria-selected'), 'true');
+  assert.match(scr.node.textContent ?? '', /Hearthway Stall/);
+  assert.ok(scr.node.querySelector('.store-board') || scr.node.querySelector('.trade-card'));
+  assert.equal(scr.node.querySelector('.bank-pack')?.style.display, 'none');
+  assert.match(scr.node.textContent ?? '', /Tinderscrap/);
+
+  const owned = scr.node.querySelectorAll('.bank-tab').find((t) => t.textContent === 'Owned');
+  owned.click();
+  const after = scr.node.querySelectorAll('.bank-tab').find((t) => /\bactive\b/.test(t.className));
+  assert.equal(after?.textContent, 'Owned');
+  assert.ok(scr.node.querySelector('.bank-tile.owned'));
 });
 
 function tileByName(root, name) {

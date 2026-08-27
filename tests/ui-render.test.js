@@ -81,6 +81,25 @@ test('foraging detail includes both gathering actions and mastery badge', () => 
   assert.equal(scr.node.querySelectorAll('.mastery-badge').length, 2);
 });
 
+test('skill detail craft subnav switches Emberkeeping / Foraging / Combat', () => {
+  const state = createState({ nowMs: 0, rngSeed: 11 });
+  const opened = [];
+  const ctx = { ...makeCtx(state), openSkill(id) { opened.push(id); } };
+  const scr = renderSkillDetail(ctx, 'emberkeeping');
+  const nav = scr.node.querySelectorAll('.craft-tab');
+  assert.ok(nav.length >= 3, 'live crafts are tabs');
+  const names = nav.map((t) => t.textContent ?? '');
+  assert.ok(names.includes('Emberkeeping'));
+  assert.ok(names.includes('Foraging'));
+  assert.ok(names.includes('Combat'));
+  const foraging = nav.find((t) => t.getAttribute('data-skill') === 'foraging');
+  foraging.click();
+  assert.deepEqual(opened, ['foraging']);
+  const combat = nav.find((t) => t.getAttribute('data-skill') === 'combat');
+  combat.click();
+  assert.deepEqual(opened, ['foraging', 'combat']);
+});
+
 test('future skill detail renders a designed coming-soon empty state', () => {
   const state = createState({ nowMs: 0, rngSeed: 6 });
   const scr = renderSkillDetail(makeCtx(state), 'mining');
@@ -89,7 +108,7 @@ test('future skill detail renders a designed coming-soon empty state', () => {
   assert.match(empty.textContent ?? '', /Wave 1/i);
 });
 
-test('camp renders stats and quick actions', () => {
+test('camp renders stats and hearth, not a five-button sitemap', () => {
   const state = createState({ nowMs: 0, rngSeed: 7 });
   state.flame = 42;
   const scr = tabs.renderCampScreen(makeCtx(state));
@@ -97,9 +116,18 @@ test('camp renders stats and quick actions', () => {
   assert.equal(cells.length, 6);
   assert.match(scr.node.textContent ?? '', /42/);
   assert.match(scr.node.textContent ?? '', /Waiting for you/);
-  assert.match(scr.node.textContent ?? '', /The General Store/);
-  assert.match(scr.node.textContent ?? '', /Face the pale-things/);
-  assert.match(scr.node.textContent ?? '', /Open the constellation/);
+  assert.match(scr.node.textContent ?? '', /Keeper's Camp/);
+  assert.equal(scr.node.querySelector('.camp-actions'), null);
+  const labels = scr.node.querySelectorAll('button').map((b) => b.textContent ?? '');
+  for (const name of [
+    'Tend the Flame',
+    'Walk the fog-line',
+    'The General Store',
+    'Face the pale-things',
+    'Open the constellation',
+  ]) {
+    assert.equal(labels.includes(name), false, `Camp must not host “${name}”`);
+  }
 });
 
 test('bank defaults to Owned — only carried stacks fill the working grid', () => {

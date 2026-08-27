@@ -13,7 +13,30 @@ import { levelProgress } from '../../core/xp.js';
 import { formatNumber, formatSeconds } from '../../core/format.js';
 import { bankCount } from '../../game/systems/bank.js';
 
-/** Skills list (all eight). */
+/** Live crafts first (Emberkeeping, Foraging, Combat), then later waves. */
+export function craftNavSkills() {
+  return [
+    ...SKILLS.filter((s) => s.wave === 0),
+    ...SKILLS.filter((s) => s.wave !== 0),
+  ];
+}
+
+function craftSubnav(ctx, currentId) {
+  return el('div', { class: 'craft-nav almanac-nav', role: 'tablist', 'aria-label': 'Crafts' },
+    craftNavSkills().map((s) => el('button', {
+      class: `craft-tab almanac-tab ${s.id === currentId ? 'active' : ''}`,
+      role: 'tab',
+      type: 'button',
+      'data-skill': s.id,
+      'aria-selected': s.id === currentId ? 'true' : 'false',
+      onclick: () => {
+        if (s.id === currentId) return;
+        ctx.openSkill?.(s.id);
+      },
+    }, s.name)));
+}
+
+/** Skills list (all eight). The Skills tab lands on a craft with `craftSubnav`. */
 export function renderSkillsScreen(ctx) {
   const { state } = ctx;
   const root = el('section', { class: 'screen' },
@@ -70,14 +93,10 @@ export function renderSkillDetail(ctx, skillId) {
   });
 
   root.append(el('header', { class: 'detail-head' },
-    el('button', {
-      class: 'icon-btn', 'aria-label': 'Back to skills',
-      html: icon('back'), onclick: () => ctx.openSkillsList(),
-    }),
-    el('div', { class: 'detail-title' },
-      el('h1', { class: 'screen-title' }, skill.name),
-      el('p', { class: 'screen-sub' }, skill.tagline)),
-  ));
+    craftSubnav(ctx, skillId)));
+  root.append(el('div', { class: 'detail-title' },
+    el('h1', { class: 'screen-title' }, skill.name),
+    el('p', { class: 'screen-sub' }, skill.tagline)));
 
   const prog = progFor(sk);
   const xpWrap = el('div', { class: 'xp-block' },
