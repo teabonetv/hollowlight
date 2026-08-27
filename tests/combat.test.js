@@ -11,6 +11,10 @@ import * as runner from '../src/game/systems/action-runner.js';
 import { ALWAYS_STOCK } from '../src/game/data/store.js';
 import { isOnShelf, buyFromStore } from '../src/game/systems/store.js';
 import { serializeSave, deserializeSave } from '../src/core/save.js';
+import { ITEMS } from '../src/game/data/items.js';
+import {
+  uniqueStackCount, lanternRoom, canAcceptStack, PACK_FULL_MSG,
+} from '../src/game/systems/bank.js';
 
 test('roster meets charter scope: ≥40 regulars, 12 bosses, 12 zones', () => {
   assert.ok(REGULARS.length >= 40, `regulars ${REGULARS.length}`);
@@ -621,6 +625,38 @@ function walletSnap(s) {
   return { lumen: s.lumen, souls: s.souls, bank: { ...s.bank } };
 }
 
+function fillHollowExcept(state, skipId, cap = lanternRoom(state)) {
+  delete state.bank[skipId];
+  for (const it of ITEMS) {
+    if (it.id === skipId) continue;
+    if (uniqueStackCount(state.bank) >= cap) break;
+    if ((state.bank[it.id] ?? 0) <= 0) state.bank[it.id] = 1;
+  }
+  return uniqueStackCount(state.bank);
+}
+
+function pinUnpaidLeftover(s, { lumen = 3, souls = 1, itemId = 'pall-fang' } = {}) {
+  fillHollowExcept(s, itemId);
+  assert.equal(canAcceptStack(s, itemId), false);
+  s.combat.fighting = false;
+  s.combat.foe = null;
+  s.combat.lastStation = {
+    enemyId: 'pale-moth',
+    enemyName: 'Pale Moth',
+    ended: 'kill',
+    foeHp: 0,
+    foeMaxHp: 16,
+    souls,
+    lootGranted: false,
+    loot: [{ kind: 'item', id: itemId, qty: 1, name: 'Pall-fang', granted: false }],
+  };
+  s.combat.lootTray = [
+    { kind: 'lumen', qty: lumen, name: 'Lumen', granted: false },
+    { kind: 'soul', qty: souls, granted: false },
+    { kind: 'item', id: itemId, qty: 1, name: 'Pall-fang', granted: false },
+  ];
+}
+
 function assertWalletUnchanged(s, snap) {
   assert.equal(s.lumen, snap.lumen);
   assert.equal(s.souls, snap.souls);
@@ -727,6 +763,39 @@ test('Fall back keeps the unpaid tray; Hunt another auto-collects it', () => {
   assert.equal(s.combat.lastStation, null);
   assert.deepEqual(s.combat.lootTray, []);
   assertWalletMatchesPile(s, snap, before);
+});
+
+test('pack-full Take all keeps unbanked chips; Hunt another does not wipe them', () => {
+  const s = createState({ rngSeed: 4 });
+  pinUnpaidLeftover(s, { lumen: 3, souls: 1, itemId: 'pall-fang' });
+  const snap = walletSnap(s);
+  const last = s.combat.lastStation;
+
+  const taken = combat.takeAllLootTray(s);
+  assert.equal(s.lumen, snap.lumen + 3);
+  assert.equal(s.souls, snap.souls + 1);
+  assert.equal(s.bank['pall-fang'], undefined);
+  assert.equal(taken.blocked, true);
+  assert.match(taken.error ?? '', /hollow is full/i);
+  assert.equal(s.combat.lootTray.length, 1);
+  assert.equal(s.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(s.combat.lootTray[0].granted, false);
+  assert.equal(s.combat.lastStation, last);
+
+  const again = combat.takeAllLootTray(s);
+  assert.equal(again.blocked, true);
+  assert.equal(s.bank['pall-fang'], undefined);
+  assert.equal(s.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(s.lumen, snap.lumen + 3);
+
+  const door = combat.dismissLastStation(s);
+  assert.equal(door.ok, false);
+  assert.match(door.error ?? PACK_FULL_MSG, /hollow is full/i);
+  assert.equal(s.combat.lastStation?.enemyId, 'pale-moth');
+  assert.equal(s.combat.lootTray.length, 1);
+  assert.equal(s.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(s.combat.lootTray[0].granted, false);
+  assert.equal(s.bank['pall-fang'], undefined);
 });
 
 test('v5 hydrate unions lootTray without a SAVE_VERSION bump', () => {

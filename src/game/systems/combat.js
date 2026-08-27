@@ -395,8 +395,9 @@ export function pushLeftoverTray(state, entries) {
 }
 
 /**
- * Pay pending (granted: false) rows into bank/wallet once, then clear the pile.
- * Already-granted receipts are not paid again. Hunt another auto-collects here.
+ * Pay pending (granted: false) rows into bank/wallet. Already-granted receipts
+ * are not paid again. Items that cannot enter the hollow stay ungranted on the
+ * tray — Take all / Hunt another must not wipe chips the player already saw.
  */
 export function takeAllLootTray(state) {
   const c = ensureCombat(state);
@@ -418,7 +419,14 @@ export function takeAllLootTray(state) {
     }
   }
   c.lootTray = leftover;
-  return { ok: true, granted };
+  const blocked = leftover.length > 0;
+  return {
+    ok: !blocked,
+    granted,
+    leftover,
+    blocked,
+    error: blocked ? bank.PACK_FULL_MSG : undefined,
+  };
 }
 
 function snapshotLastStation(state, ended = 'kill', extra = {}) {
@@ -480,12 +488,20 @@ export function leftoverKicker(last) {
   return name ? `${name} fell` : 'After the hunt';
 }
 
-/** Drop leftover so the hunt list can offer a different foe. Auto-collects first. */
+/** Auto-collect, then drop leftover so the hunt list can offer a different foe.
+ *  Stays on leftover when the hollow cannot take pending chips. */
 export function dismissLastStation(state) {
   ensureCombat(state);
   const collected = takeAllLootTray(state);
+  if ((state.combat.lootTray ?? []).length) {
+    return {
+      ok: false,
+      granted: collected.granted,
+      leftover: state.combat.lootTray,
+      error: collected.error ?? bank.PACK_FULL_MSG,
+    };
+  }
   state.combat.lastStation = null;
-  state.combat.lootTray = [];
   return { ok: true, granted: collected.granted };
 }
 

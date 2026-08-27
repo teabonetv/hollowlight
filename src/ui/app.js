@@ -593,12 +593,14 @@ function boot() {
     },
     dismissLastStation() {
       const res = combat.dismissLastStation(game);
+      if (!res.ok) toaster.push(res.error ?? "The lantern's hollow is full. Sell a stack to make room.", 'warn');
       afterMutation();
       renderScreen();
       return res;
     },
     takeAllLootTray() {
       const res = combat.takeAllLootTray(game);
+      if (res.blocked) toaster.push(res.error ?? "The lantern's hollow is full. Sell a stack to make room.", 'warn');
       afterMutation();
       return res;
     },

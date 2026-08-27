@@ -895,8 +895,10 @@ function leftoverLootRow(ctx, st, paint) {
     class: 'btn btn-ghost leftover-take',
     type: 'button',
     onclick: () => {
-      if (ctx.takeAllLootTray) ctx.takeAllLootTray();
-      else combat.takeAllLootTray(ctx.state);
+      const res = ctx.takeAllLootTray
+        ? ctx.takeAllLootTray()
+        : combat.takeAllLootTray(ctx.state);
+      if (res?.blocked) ctx.toast?.(res.error, 'warn');
       paint();
     },
   }, 'Take all'));
@@ -935,8 +937,10 @@ function leftoverAnother(ctx, paint) {
     class: 'btn btn-ghost leftover-another',
     type: 'button',
     onclick: () => {
-      if (ctx.dismissLastStation) ctx.dismissLastStation();
-      else combat.dismissLastStation(ctx.state);
+      const res = ctx.dismissLastStation
+        ? ctx.dismissLastStation()
+        : combat.dismissLastStation(ctx.state);
+      if (!res?.ok) ctx.toast?.(res?.error, 'warn');
       paint();
     },
   }, 'Hunt another');

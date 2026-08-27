@@ -26,6 +26,8 @@ const { cockpitLogVsTab, leftoverLogVsTab, lobbyFirstHuntBottom, COMBAT_360 } = 
 const tabs = await import('../src/ui/screens/tabs.js');
 const combat = await import('../src/game/systems/combat.js');
 const { buyFromStore } = await import('../src/game/systems/store.js');
+const { ITEMS } = await import('../src/game/data/items.js');
+const { uniqueStackCount, lanternRoom, canAcceptStack } = await import('../src/game/systems/bank.js');
 
 function makeCtx(state) {
   return {
@@ -916,6 +918,59 @@ test('leftover after Fall back still shows the held loot pile', () => {
   assert.deepEqual(state.combat.lootTray, []);
   assert.equal(state.lumen, lumen0 + traySum(first, 'lumen'));
   assert.equal(state.souls, souls0 + traySum(first, 'soul'));
+});
+
+test('pack-full Hunt another keeps leftover chips; Take all does not hide them', () => {
+  const state = createState({ rngSeed: 4 });
+  delete state.bank['pall-fang'];
+  for (const it of ITEMS) {
+    if (it.id === 'pall-fang') continue;
+    if (uniqueStackCount(state.bank) >= lanternRoom(state)) break;
+    if ((state.bank[it.id] ?? 0) <= 0) state.bank[it.id] = 1;
+  }
+  assert.equal(canAcceptStack(state, 'pall-fang'), false);
+  state.combat.fighting = false;
+  state.combat.lastStation = {
+    enemyId: 'pale-moth',
+    enemyName: 'Pale Moth',
+    ended: 'kill',
+    foeHp: 0,
+    foeMaxHp: 16,
+    souls: 1,
+    lootGranted: false,
+    loot: [{ kind: 'item', id: 'pall-fang', qty: 1, name: 'Pall-fang', granted: false }],
+    log: [{ t: 0, text: 'Pale Moth falls. Loot: Pall-fang ×1.', kind: 'kill' }],
+  };
+  state.combat.lootTray = [
+    { kind: 'lumen', qty: 4, name: 'Lumen', granted: false },
+    { kind: 'soul', qty: 1, granted: false },
+    { kind: 'item', id: 'pall-fang', qty: 1, name: 'Pall-fang', granted: false },
+  ];
+  const lumen0 = state.lumen;
+  const souls0 = state.souls;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.match(leftover.querySelector('.leftover-loot')?.textContent ?? '', /Pall-fang/);
+  leftover.querySelector('.leftover-take').click();
+  assert.equal(state.lumen, lumen0 + 4);
+  assert.equal(state.souls, souls0 + 1);
+  assert.equal(state.bank['pall-fang'], undefined);
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  assert.equal(scr.node.querySelector('.hunt-list'), null);
+  assert.match(scr.node.querySelector('.leftover-loot')?.textContent ?? '', /Pall-fang/);
+  assert.ok(scr.node.querySelector('.leftover-take'));
+
+  scr.node.querySelector('.leftover-another').click();
+  assert.equal(state.combat.lastStation?.enemyId, 'pale-moth');
+  assert.equal(state.combat.lootTray.length, 1);
+  assert.equal(state.combat.lootTray[0].id, 'pall-fang');
+  assert.equal(state.combat.lootTray[0].granted, false);
+  assert.equal(state.bank['pall-fang'], undefined);
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  assert.ok(scr.node.querySelector('.leftover-station'));
+  assert.equal(scr.node.querySelector('.hunt-list'), null);
+  assert.match(scr.node.querySelector('.leftover-loot')?.textContent ?? '', /Pall-fang/);
 });
 
 test('leftover Eat heals in place without leaving leftover-live', () => {
