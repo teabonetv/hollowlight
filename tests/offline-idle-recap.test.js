@@ -115,6 +115,8 @@ test('idle 3h rewind with active {} still opens recap and keeps savedAt', async 
   assert.match(recap, /With nothing queued/);
   assert.match(recap, /Time by the Flame/);
   assert.match(recap, /dailies sat still/);
+  assert.match(recap, /Time by the Flame unchanged/);
+  assert.doesNotMatch(recap, / · worked/);
   assert.doesNotMatch(recap, /stuffed/i);
   const recapClose = elements['modal-root'].querySelectorAll('button')
     .filter((b) => b.getAttribute('aria-label') === 'Close');

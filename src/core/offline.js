@@ -252,9 +252,42 @@ export function formatIdleRecapLine(res, _featPreview) {
 export const IDLE_RECAP_STILLNESS =
   'With nothing queued, Time by the Flame and the dailies sat still.';
 
+/** Idle away-line clock. The halt clock is not a /h puzzle. */
+export const IDLE_RECAP_FLAME_UNCHANGED = 'Time by the Flame unchanged.';
+
 export function formatIdleRecapStillness(res) {
   if (!isIdleRecap(res)) return null;
   return IDLE_RECAP_STILLNESS;
+}
+
+/** Cycles ran, then fuel ran out before the credited window ended. */
+export function haltedEarly(res) {
+  return Boolean(
+    res?.hasGains
+    && (res.workedMs ?? 0) > 0
+    && res.workedMs < (res.creditedMs ?? 0),
+  );
+}
+
+/**
+ * Away headline without the cap chip. Halt-early names workedMs so 80s is
+ * not hidden in 900/h. Idle names that Time by the Flame did not move.
+ * Full-window work headlines the credited span with no shorter worked clause.
+ */
+export function formatOfflineAwayHead(res) {
+  const away = `${formatDuration(res?.awayMs ?? 0)} away`;
+  if (haltedEarly(res)) {
+    return `${away} · worked ${formatDuration(res.workedMs)}.`;
+  }
+  if (isIdleRecap(res)) {
+    return `${away}. ${IDLE_RECAP_FLAME_UNCHANGED}`;
+  }
+  return `${away}.`;
+}
+
+/** `3h 00m away · worked 1m 20s. Cap 12h.` */
+export function formatOfflineAwayLine(res, capHours = OFFLINE_CAP_HOURS) {
+  return `${formatOfflineAwayHead(res)} ${formatOfflineCapNote(capHours)}`;
 }
 
 /** `+3,240 · 1,080/h` — honest EV rate from the run-until-halt window. */
@@ -335,12 +368,12 @@ export function formatOfflineCapNote(capHours = OFFLINE_CAP_HOURS) {
  * or "Credited 12h" — the body already says Nothing ran.
  */
 export function formatOfflineCappedWorkNote(res) {
-  if (!res?.capped || !res.hasGains) return null;
+  if (!res?.capped || !res.hasGains || haltedEarly(res)) return null;
   return `The lantern kept ${OFFLINE_CAP_HOURS} hours of work.`;
 }
 
 export function formatOfflineCreditedNote(res) {
-  if (!res?.capped || !res.hasGains) return null;
+  if (!res?.capped || !res.hasGains || haltedEarly(res)) return null;
   return `Credited ${formatDuration(res.creditedMs)}.`;
 }
 

@@ -2,11 +2,12 @@
 // (export/import/reset), and confirmations.
 
 import { el, clear } from './dom.js';
-import { formatDuration, formatNumber } from '../core/format.js';
+import { formatNumber } from '../core/format.js';
 import {
   formatRecapLine, formatLevelUpLine, formatMasteryUpLine,
   formatOfflineCapNote, formatIdleRecapLine, formatIdleRecapStillness,
   formatOfflineHourRate, formatOfflineCappedWorkNote, formatOfflineCreditedNote,
+  formatOfflineAwayHead,
 } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
@@ -191,7 +192,7 @@ function qtyWithHourRate(qty, rateMs, { gold = false } = {}) {
 
 export function showOfflineModal(mount, summary, { onClaim }) {
   const {
-    awayMs, creditedMs, gains, idleNotes = [], recapLines, featPreview,
+    creditedMs, gains, idleNotes = [], recapLines, featPreview,
     levelUps = [], masteryUps = [], hasGains, workedMs,
   } = summary;
   const rateMs = workedMs > 0 ? workedMs : creditedMs;
@@ -293,7 +294,7 @@ export function showOfflineModal(mount, summary, { onClaim }) {
   const creditedNote = formatOfflineCreditedNote(summary);
   const body = el('div', {},
     el('p', { class: 'offline-away' },
-      formatDuration(awayMs), ' away. ',
+      formatOfflineAwayHead(summary), ' ',
       el('span', { class: 'muted' },
         workNote ?? formatOfflineCapNote()),
     ),
