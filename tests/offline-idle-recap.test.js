@@ -112,9 +112,10 @@ test('idle 3h rewind with active {} still opens recap and keeps savedAt', async 
   const recap = elements['modal-root'].textContent ?? '';
   assert.match(recap, /Cap 12h/);
   assert.match(recap, /Nothing ran/);
-  assert.match(recap, /No queued action/);
-  assert.match(recap, /Time by the Flame not stuffed/);
-  assert.match(recap, /Dailies frozen/);
+  assert.match(recap, /With nothing queued/);
+  assert.match(recap, /Time by the Flame/);
+  assert.match(recap, /dailies sat still/);
+  assert.doesNotMatch(recap, /stuffed/i);
   const recapClose = elements['modal-root'].querySelectorAll('button')
     .filter((b) => b.getAttribute('aria-label') === 'Close');
   assert.equal(recapClose.length, 0, 'recap has no dismiss ×');
@@ -148,7 +149,8 @@ test('idle 3h rewind with active {} still opens recap and keeps savedAt', async 
   assert.equal(elements['modal-root'].querySelector('.modal-title')?.textContent,
     'While You Were Away…', 'reload with the modal-era save still offers recap');
   assert.match(elements['modal-root'].textContent ?? '', /Nothing ran/);
-  assert.match(elements['modal-root'].textContent ?? '', /No queued action/);
+  assert.match(elements['modal-root'].textContent ?? '', /With nothing queued/);
+  assert.doesNotMatch(elements['modal-root'].textContent ?? '', /stuffed/i);
 
   const claim = elements['modal-root'].querySelectorAll('button')
     .find((b) => b.textContent === 'Claim');

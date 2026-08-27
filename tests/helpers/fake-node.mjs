@@ -63,7 +63,12 @@ export class FakeNode {
     return n;
   }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
-  contains(n) { return n !== null && this._walk((m) => m === n); }
+  contains(n) {
+    if (n == null) return false;
+    let found = false;
+    this._walk((m) => { if (m === n) found = true; });
+    return found;
+  }
   setAttribute(k, v) {
     this.attrs[k] = String(v);
     if (k === 'value') this.value = v;
@@ -82,6 +87,7 @@ export class FakeNode {
     if (this.disabled) return;
     for (const fn of this._listeners.click ?? []) fn({ target: this });
   }
+  scrollIntoView() {}
   _walk(fn) {
     fn(this);
     for (const c of this.children) if (c._walk) c._walk(fn);
