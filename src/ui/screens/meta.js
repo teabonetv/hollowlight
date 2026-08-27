@@ -301,12 +301,22 @@ function titleRow(ctx) {
   if (!titles.length) {
     return el('p', { class: 'footnote muted' }, 'Earn feats to wear a title.');
   }
+  const worn = ctx.state.cosmetics?.activeTitle;
+  const selected = titles.includes(worn) ? worn : titles[0];
+  const picker = el('select', {
+    id: 'title-select',
+    class: 'title-select',
+    'aria-label': 'Titles',
+    'aria-labelledby': 'title-pick-heading',
+    onchange: (e) => ctx.equipTitle(e.target.value),
+  }, titles.map((t) => el('option', {
+    value: t,
+    selected: t === selected,
+  }, t)));
+  picker.value = selected;
   return el('div', { class: 'title-pick' },
-    el('h2', { class: 'section-title' }, 'Titles'),
-    ...titles.map((t) => el('button', {
-      class: `btn btn-wide ${ctx.state.cosmetics.activeTitle === t ? 'btn-primary' : 'btn-ghost'}`,
-      onclick: () => ctx.equipTitle(t),
-    }, t)));
+    el('h2', { class: 'section-title', id: 'title-pick-heading' }, 'Titles'),
+    el('div', { class: 'title-pick-control' }, picker));
 }
 
 function formatStat(value, kind) {
