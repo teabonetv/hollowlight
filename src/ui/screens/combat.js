@@ -3,13 +3,14 @@
 // is a ≥44px tap. No hover-only info.
 
 import { el, clear } from '../dom.js';
-import { icon } from '../icons.js';
+import { filledIcon, icon } from '../icons.js';
 import { formatNumber, formatSeconds, formatNoun } from '../../core/format.js';
 import { ZONES, ZONE_BY_ID } from '../../game/data/combat/zones.js';
 import { STYLES, STYLE_BY_ID } from '../../game/data/combat/styles.js';
 import { FOOD } from '../../game/data/combat/consumables.js';
 import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vigils.js';
 import { ITEMS_BY_ID } from '../../game/data/items.js';
+import { itemGlyph } from '../../game/data/item-glyphs.js';
 import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemies/index.js';
 import { bankCount } from '../../game/systems/bank.js';
 import { buyFromStore, liveBuyUnit } from '../../game/systems/store.js';
@@ -981,18 +982,66 @@ function ungrantedTrayEntries(tray) {
   return trayEntries(tray).filter((e) => e.granted === false);
 }
 
-function lootChipsFor(tray) {
-  const chips = [];
-  for (const d of trayEntries(tray)) {
-    if (d.kind === 'soul') {
-      chips.push(el('span', { class: 'chip chip-gold' }, formatNoun(d.qty, 'soul')));
-    } else if (d.kind === 'lumen') {
-      chips.push(el('span', { class: 'chip chip-gold' }, `✦${formatNumber(d.qty)}`));
-    } else {
-      chips.push(el('span', { class: 'chip' }, `${d.name ?? d.id} ×${d.qty}`));
-    }
+function trayFingerprint(entries) {
+  return entries.map((e) => `${e.kind}:${e.id ?? ''}:${e.qty}`).join('|');
+}
+
+/** Noun + portrait for a tray row. Souls/Lumen are wallet drops, not bank items. */
+function trayTileSpec(entry) {
+  if (entry.kind === 'soul') {
+    return {
+      kind: 'soul',
+      id: 'soul',
+      glyph: 'spark',
+      name: formatNoun(entry.qty, 'soul'),
+      qtyLabel: `×${formatNumber(entry.qty)}`,
+      aria: formatNoun(entry.qty, 'soul'),
+    };
   }
-  return chips;
+  if (entry.kind === 'lumen') {
+    return {
+      kind: 'lumen',
+      id: 'lumen',
+      glyph: 'star',
+      name: 'Lumen',
+      qtyLabel: `✦${formatNumber(entry.qty)}`,
+      aria: `✦${formatNumber(entry.qty)} Lumen`,
+    };
+  }
+  const item = entry.id ? ITEMS_BY_ID[entry.id] : null;
+  const name = item?.name ?? entry.name ?? entry.id ?? 'Loot';
+  return {
+    kind: 'item',
+    id: entry.id ?? name,
+    glyph: itemGlyph(item),
+    name,
+    qtyLabel: `×${formatNumber(entry.qty)}`,
+    aria: `${name} ×${formatNumber(entry.qty)}`,
+  };
+}
+
+function lootTile(entry) {
+  const spec = trayTileSpec(entry);
+  return el('div', {
+    class: `loot-tile loot-${spec.kind} glyph-${spec.glyph}`,
+    'data-loot-kind': spec.kind,
+    'data-loot-id': spec.id ?? '',
+    'aria-label': spec.aria,
+  },
+    el('span', {
+      class: `loot-glyph bank-glyph bank-glyph-fill glyph-${spec.glyph}`,
+      html: filledIcon(spec.glyph),
+      'aria-hidden': 'true',
+    }),
+    el('span', { class: 'loot-copy' },
+      el('span', { class: 'loot-name' }, spec.name),
+      el('span', { class: 'loot-qty' }, spec.qtyLabel)));
+}
+
+function lootTileRow(entries) {
+  const grid = el('div', { class: 'leftover-loot-chips loot-tray-grid' });
+  for (const e of entries) grid.append(lootTile(e));
+  return grid;
 }
 
 function takeAllBtn(ctx, paint) {
@@ -1010,11 +1059,13 @@ function takeAllBtn(ctx, paint) {
 }
 
 function leftoverLootRow(ctx, st, paint) {
-  const tray = st.lootTray ?? ctx.state.combat?.lootTray ?? [];
-  const chips = lootChipsFor(tray);
-  if (!chips.length) return null;
-  const row = el('div', { class: 'leftover-loot leftover-tray' });
-  row.append(chipRow('leftover-loot-chips chips', chips));
+  const tray = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
+  if (!tray.length) return null;
+  const row = el('div', {
+    class: 'leftover-loot leftover-tray',
+    'aria-label': 'Loot to collect',
+  });
+  row.append(lootTileRow(tray));
   row.append(takeAllBtn(ctx, paint));
   return row;
 }
@@ -1035,17 +1086,26 @@ function mountFightLoot(ctx, st, paint) {
 
 function fillFightLoot(row, ctx, st, paint) {
   const pending = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
-  clear(row);
   row.classList.toggle('is-empty', pending.length === 0);
   row.classList.toggle('leftover-loot', pending.length > 0);
   if (!pending.length) {
+    clear(row);
+    if (row.dataset) row.dataset.lootFp = '';
     row.setAttribute('hidden', '');
     row.setAttribute('aria-hidden', 'true');
+    row.removeAttribute('aria-label');
     return;
   }
   row.removeAttribute('hidden');
   row.removeAttribute('aria-hidden');
-  row.append(chipRow('leftover-loot-chips chips', lootChipsFor(pending)));
+  row.setAttribute('aria-label', 'Loot to collect');
+  const fp = trayFingerprint(pending);
+  if (row.dataset?.lootFp === fp && row.querySelector('.loot-tile') && row.querySelector('.leftover-take')) {
+    return;
+  }
+  if (row.dataset) row.dataset.lootFp = fp;
+  clear(row);
+  row.append(lootTileRow(pending));
   row.append(takeAllBtn(ctx, paint));
 }
 

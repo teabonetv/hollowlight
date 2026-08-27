@@ -309,6 +309,68 @@
   max-height: 44px;
   overflow: hidden;
 }
+.loot-tray-grid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  min-height: 32px;
+}
+.loot-tile {
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  height: 40px;
+  max-width: 120px;
+  min-width: 72px;
+  padding: 0 6px 0 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  box-shadow: inset 0 0 0 1px var(--gold-lo);
+  overflow: hidden;
+}
+.loot-tile .loot-glyph,
+.loot-tile .bank-glyph {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 6px;
+}
+.loot-tile .loot-glyph svg,
+.loot-tile .bank-glyph svg {
+  width: 32px;
+  height: 32px;
+}
+.loot-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding-right: 2px;
+}
+.loot-name {
+  font-size: 11px;
+  line-height: 1.15;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.loot-qty {
+  font-size: 11px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--gold-hi);
+}
 .leftover-actions {
   display: flex;
   flex-wrap: nowrap;
@@ -338,11 +400,25 @@
   z-index: 1;
 }
 .combat-fight:not(.leftover-station) .fight-loot .leftover-loot-chips {
-  min-height: 24px;
+  min-height: 32px;
+  max-height: 32px;
 }
-.combat-fight:not(.leftover-station) .fight-loot .chip {
+.combat-fight:not(.leftover-station) .fight-loot .loot-tile {
+  height: 32px;
+  min-width: 64px;
+  max-width: 108px;
+}
+.combat-fight:not(.leftover-station) .fight-loot .loot-tile .loot-glyph,
+.combat-fight:not(.leftover-station) .fight-loot .loot-tile .bank-glyph {
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 0;
+}
+.combat-fight:not(.leftover-station) .fight-loot .loot-name,
+.combat-fight:not(.leftover-station) .fight-loot .loot-qty {
   font-size: 10.5px;
-  padding: 0 6px;
 }
 .combat-fight:not(.leftover-station) .fight-loot .leftover-take {
   min-height: 32px;
@@ -367,13 +443,6 @@
   gap: 4px;
   overflow-x: auto;
   min-height: 32px;
-}
-.leftover-loot .chip {
-  padding: 0 7px;
-  font-size: 11px;
-  line-height: 1.15;
-  min-height: 0;
-  flex: 0 0 auto;
 }
 .leftover-take {
   margin: 0;
