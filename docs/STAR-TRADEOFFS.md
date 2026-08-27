@@ -1,79 +1,77 @@
-# Star tradeoffs — Radiance constellation (Wave 1 design)
+# Star tradeoffs — Two Crowns (locked pick)
 
-**Status:** design only. No gameplay. Conductor picks; Luke sees it before any code.
+**Status:** design only. No gameplay in this PR. **Locked pick: System A — Two Crowns**, with a thousand-hour elite layer.
 **Audience:** Conductor (Game Orchestrator) and Luke.
-**Non-goals:** do not implement; do not edit `src/game`, tests, CSS, or save schema; do not start Phase A, Hunt loot, Almanac search, or any other lane. Do not “fix” the wound by raising Apex’s cost or slowing `RADIANCE_PER_XP` — those are delays, not tradeoffs.
+**Non-goals:** do not implement; do not edit `src/game`, tests, CSS, or save schema; do not start Phase A, Hunt loot, Almanac search, or any other lane. Do not “fix” the wound by raising Apex’s cost or slowing `RADIANCE_PER_XP`.
 
-Radiance stays a never-resets prestige (charter §4, item 9). Skills, bank, and levels are never wiped to earn or spend it. `SAVE_VERSION` stays **5** unless a system below cannot land any other way.
+Radiance stays a never-resets prestige (charter §4, item 9). Skills, bank, and levels are never wiped to earn or spend it. `SAVE_VERSION` stays **5**.
 
 ---
 
-## 0. Ground truth (do not change in this PR)
+## Owner (Luke), 28 Aug 2026 ~00:20 UK
 
-The live tree is a **completion grid**. Forty perks. Origin Kindling, then four identical-depth branches, then conjunctions, then Apex that requires every capstone. Respec exists and refunds every spark. Nothing is exclusive. The only choice is purchase order.
+> If you think the two crowns system is best lets go for that but does it fit into our goal of a game thats playable for thousands of hours. We need the player to feel progression but needs to have late game end goals thats hard to reach maybe ‘elite Capstones’ that unlock once certains skills hit certain levels, send in the design again to make sure its up to standard. Let me know your thoughts when its done.
 
-### Current nouns (`src/game/data/perks.js`)
+**Conductor:** Two Crowns is the identity layer. Today’s sky is a first-evening sheet (~339 sparks, ~1 hour of Tend). Two Crowns that only refuse a third *early* capstone is a character-build for week one, then the tree is quiet for 999 hours. That fails the thousand-hour test. This file is the spec that hangs **elite faces** on the XP curve we already shipped (`MAX_LEVEL` 120, milestone 99, soft caps at 30/60/90, elite tax past 99).
+
+---
+
+## 0. Ground truth (unchanged live tree)
+
+The live constellation is a **completion grid**. Forty perks. Origin Kindling, four identical-depth branches, conjunctions, Apex that requires every capstone. Respec exists (`RESPEC_LUMEN_PER_NODE = 25`) and refunds every spark. Nothing is exclusive. The only choice is purchase order.
 
 | Noun | Id(s) | Role now |
 |---|---|---|
-| **Kindling** | `kindling` | Origin. Cost 1. +5% XP. Everything hangs from it. |
+| **Kindling** | `kindling` | Origin. Cost 1. +5% XP. |
 | **Wick** | `wick-1`…`wick-7`, `wick-cap` | Speed. Capstone **The Unquenchable** (18). |
 | **Satchel** | `yield-1`…`yield-7`, `yield-cap` | Yield. Capstone **Horn of the Hollow** (18). |
 | **Scholar** | `scholar-1`…`scholar-7`, `scholar-cap` | XP. Capstone **The Lit Page** (18). |
-| **Flame** | `flame-1`…`flame-7`, `flame-cap` | Lumen + Radiance (+ mastery on `flame-6`). Capstone **Heart of Hollowflame** (18). |
-| **Conjunctions** | `cross-wy` Quick Hands, `cross-sf` Studied Fire, `cross-ws` Lantern Heart, `cross-yf` Fog Harvest | Mid-tree pairs at ranks 3 or 5. |
-| **Dual crowns** | `cap-wy` Hollow Crown, `cap-sf` Star Crown | Require **both** parent capstones. |
-| **Apex** | `apex` **The First Beacon** | Requires Hollow Crown **and** Star Crown → all four branches finished. |
+| **Flame** | `flame-1`…`flame-7`, `flame-cap` | Lumen + Radiance. Capstone **Heart of Hollowflame** (18). |
+| **Conjunctions** | Quick Hands, Studied Fire, Lantern Heart, Fog Harvest | Mid-tree pairs. |
+| **Dual crowns** | Hollow Crown, Star Crown | Need **both** parent caps. |
+| **Apex** | `apex` **The First Beacon** | Needs both dual crowns → all four branches. |
 
-Two pairings have no crown of their own: Wick+Flame, Satchel+Scholar.
+Sum of current `cost` fields = **339 sparks**. `RADIANCE_PER_XP = 0.025`. Tend the Flame ≈ **5.25 sparks/min** raw → Kindling in ~12 s, one full branch including cap (~56 sparks) in ~11 min, the whole sky in **about an hour** of Tend. After that, stars do not ask anything.
 
-Costs: origin 1; fillers 2–10; branch caps 18; mid conjunctions 8 or 12; dual crowns 22; Apex 30. Sum of current `cost` fields = **339 sparks** (balance-notes rounds this ≈335). `RESPEC_LUMEN_PER_NODE = 25`. Respec refunds **all** spent Radiance; Lumen fee only. `state.perks = { owned: [], respecs: 0 }`.
+XP curve (`src/core/xp.js`, balance-notes): total XP 1→90 ≈ **3.45M**, 1→99 ≈ **5.78M**, 1→110 ≈ **10.2M**, 1→120 ≈ **17.5M**. Raw Tend (~12.6k XP/h) is ~270 h to 90, ~460 h to 99, ~810 h to 110, ~1,390 h to 120 — **in that one skill**. Charter pacing: minutes to feel progress, hours to master a skill, **weeks toward 99**. Offline cap stays 12 h; elites must not raise it.
 
-### Why “purchase order” is not a build
+UI that must survive: Almanac → Stars is a **branch-list** of `perk-card`s, flavor on the card, full-width Kindle, capstone gold chip, touch ≥44px, no hover-gated map, no canvas.
 
-`RADIANCE_PER_XP = 0.025` (40 action-XP ≈ 1 spark). Tend the Flame is 14 XP / 4 s → ~0.35 sparks/cycle → **~5.25 sparks/min** of raw tending. Kindling in ~12 s. One full branch including its capstone (56 sparks) in ~11 min of Tend. The whole sky (~339 sparks) in **about an hour** of continuous Tend, a few hours of mixed idle. Offline cap is 12 h of production, not of Radiance starvation.
-
-So the 100-hour problem is not “still filling the grid.” Under today’s rule the grid is a **first-evening sheet**. After that, stars do not ask anything. A system that only slows the sheet, or that only matters at Apex, leaves the wound in place for every session after the first.
-
-### UI that must survive
-
-Almanac → Stars is a **branch-list** (`renderStars` in `src/ui/screens/meta.js`): section titles Origin / Wick / Satchel / Scholar / Flame / Conjunctions, then `perk-card` articles with flavor, `+% stat`, Needs-line, and a full-width Kindle button. Cards already mark capstones with a gold chip. Touch targets follow the shell (`min-height: 44px` on buttons). Flavor is on the card, not behind hover. There is no canvas, no star map, no Three.js, and there must not be.
-
-Camp’s “Next star” row is `cheapestAvailable` — lowest-cost legal node. Completion `perkCompletion` is `owned.length / PERKS.length`. Feats: *A Star Pinned*, *Five Lights Hung*, *A Capstone*, *Rearranged Heaven*.
-
-### The wound (owner)
-
-> The stars (skill tree) also lacks choice. I want it to feel like you’re actually building your character and have to make choices and tradeoffs on the skills. Right now you can just take everything no need to ever respec.
-
-Apex is the structural enforcer of take-everything: it **pays you** for lighting all four crowns.
-
-The four systems below keep the gothic lantern voice and the existing branch names. They change **topology and permission**, not the art pipeline.
+The wound (owner, earlier): *“I want it to feel like you’re actually building your character… Right now you can just take everything no need to ever respec.”* Apex currently **pays you** for lighting all four crowns.
 
 ---
 
-## System A — Two Crowns
+## Spec — Two Crowns (identity layer)
 
 **You are a Lampwright who can wear two crowns, never four.**
 
-### 1. Fantasy
+### Standing rule (load-bearing)
 
-The pilgrim road remembers specialists. A lantern may lift two finished trades into a crown. A third crown would snuff the first two. You are not the sun. You are two bright rooms in a dark house.
+Cheap branch fillers and mid-conjunctions stay **collectable**. You may **kindle at most two** of the four named branch capstones:
 
-### 2. Hard rule (the tradeoff)
+- **The Unquenchable** (Wick)
+- **Horn of the Hollow** (Satchel)
+- **The Lit Page** (Scholar)
+- **Heart of Hollowflame** (Flame)
 
-Cheap branch fillers and mid-conjunctions stay **collectable**. You may **kindle at most two** of the four branch capstones (The Unquenchable, Horn of the Hollow, The Lit Page, Heart of Hollowflame). Lighting a third is illegal until you extinguish one.
+Lighting a third is illegal until you extinguish one.
 
-Dual crowns stay as the prize for a *legal pair*:
+Dual crowns are the prize for a *legal pair*. Add the two missing pair identities so every 2-of-4 has a name:
 
-- Wick + Satchel → **Hollow Crown** (unchanged).
-- Scholar + Flame → **Star Crown** (unchanged).
-- Wick + Scholar → promote **Lantern Heart** (already a conjunction) into a crown when both caps are lit, or add a thin crown node that requires `wick-cap` + `scholar-cap`.
-- Satchel + Flame → same for **Fog Harvest**.
-- Wick + Flame and Satchel + Scholar currently have **no** dual node. Add two crowns so every 2-of-4 pair has an identity (suggested names, flavor-only here: **Draught Crown**, **Margin Crown**).
+| Worn pair | Dual crown |
+|---|---|
+| Wick + Satchel | **Hollow Crown** (exists) |
+| Scholar + Flame | **Star Crown** (exists) |
+| Wick + Scholar | **Lantern Heart** (promote from conjunction, or a thin crown node on both caps) |
+| Satchel + Flame | **Fog Harvest** (same) |
+| Wick + Flame | **Draught Crown** (new) |
+| Satchel + Scholar | **Margin Crown** (new) |
 
-**The First Beacon does not require all four caps.** It becomes the *generalist* exception: you may light Apex only with **zero branch capstones worn**. Dual-crowns go dark with them. Apex then grants a small all-stat (today’s Apex numbers, or smaller — balance later). Specialist wears two sharp capstones (and their dual-crown). Generalist wears a dimmer sun and **no** Unquenchable / Horn / Lit Page / Heart bonuses. You cannot wear Hollow Crown and The First Beacon together. You cannot wear four caps “because Apex is on.” The 2-of-4 cap rule never relaxes; Apex replaces the crowns, it does not sit on top of them.
+Quick Hands and Studied Fire stay cheap rank-3 conjunctions. They are **not** crowns and do not count toward 2-of-4.
 
-That is the tradeoff: **two sharp trades, or one pale beacon, never both, never four.**
+**The First Beacon does not require all four caps.** It is the *pale generalist*: you may light Apex only with **zero branch capstones worn**. Dual-crowns go dark with them. Apex grants a small all-stat. Specialist wears two sharp caps (and their dual-crown). Generalist wears a dimmer sun and **no** Unquenchable / Horn / Lit Page / Heart bonuses. You cannot wear Hollow Crown and The First Beacon together. You cannot wear four caps “because Apex is on.” Apex **replaces** the crowns; it does not sit on top of them.
+
+**Two sharp trades, or one pale beacon, never both, never four.**
 
 ```mermaid
 flowchart TD
@@ -90,369 +88,236 @@ flowchart TD
   YC --- PICK
   SC --- PICK
   FC --- PICK
-  PICK -->|Wick+Satchel| HC[Hollow Crown]
-  PICK -->|Scholar+Flame| ST[Star Crown]
-  PICK -->|Wick+Scholar| LH[Lantern Heart crown]
-  PICK -->|Satchel+Flame| FH[Fog Harvest crown]
-  PICK -->|Wick+Flame| DC[Draught Crown]
-  PICK -->|Satchel+Scholar| MC[Margin Crown]
+  PICK -->|legal pair| DUAL[Dual crown]
   PICK -->|unwear caps| AP[The First Beacon]
+  WC --> E1[Elite faces 90 / 99 / 110]
+  YC --> E2[Elite faces]
+  SC --> E3[Elite faces]
+  FC --> E4[Elite faces]
+  E1 -.->|only while worn| WC
+  AP -.->|no elite faces| X[Pale path]
 ```
 
-### 3. Why respec, and what it costs
+### Why respec, and what it costs
 
-You respec when the *work* changes: a long Foraging / Hunt night wants Horn + Unquenchable; a 99-push wants The Lit Page + Heart of Hollowflame; a Lumen drought wants Heart + Horn; a cycle-length problem wants Unquenchable + Lit Page.
+You respec when the *work* changes: a gather / Hunt night wants Horn + Unquenchable; a 99-push wants The Lit Page + Heart; a Lumen drought wants Heart + Horn.
 
-**Cost:** do not wipe the fillers. **Crown-trim:** extinguish 1–2 caps and their dual-crown for **✦25 × (caps + duals released)** plus a **Radiance tithe of half those nodes’ sticker cost, not refunded**. Fillers stay kindled; their Radiance stays spent. Full-tree respec (today’s button) remains as a panic hatch at **✦25 × every owned node**, refunding filler sparks but **not** the tithe already paid on previous trims.
+**Crown-trim:** extinguish 1–2 caps and their dual-crown for **✦25 × (caps + duals released)** plus a **Radiance tithe of half those nodes’ sticker cost, not refunded**. Fillers stay kindled. First **three** trims in a save: Lumen only, full crown-spark refund. After that, the tithe sticks. Full-tree respec remains a panic hatch at ✦25 × every owned node (refunds filler sparks, not prior tithes).
 
-First three crown-trims in a save: Lumen only, full crown-spark refund (the lantern’s three honest trims). After that, the tithe sticks. `perks.respecs` already exists for the feat *Rearranged Heaven*.
+Elite faces (below) **stay in the book** when you unwear a crown; they **stop applying** until that crown is worn again. Levels are never wiped. That is why hour-400 respec is real: you may have been a Wickwright who quietly 99’d Foraging, then trim onto Horn and kindle its Vowed face the same evening — Radiance pays the sticker, **Foraging 99 was the gate you already walked**.
 
-If the player never wants to respec, that is still a character-build: they *picked two trades* and lived them. The First Beacon is the one late fork that asks them to give the crowns away.
+### SAVE_VERSION (identity layer)
 
-### 4. Noun mapping
-
-Keep every filler name and flavor. Keep the four capstone names. Hollow Crown and Star Crown stay. Lantern Heart and Fog Harvest graduate from “extra +%” to pair-identity. Quick Hands and Studied Fire stay as cheap mid-conjunctions (ranks 3) — they are not crowns and do not count toward the 2-of-4. Kindling stays origin. Apex stays the noun; its **requires** list changes from `(Hollow ∧ Star)` to “no branch capstone currently worn” (the player has released the two).
-
-### 5. Feel at 10 minutes, 10 hours, 100 hours
-
-- **10 minutes:** Kindling + first Wick or Satchel ranks. No crown yet. Choice is still “which road first,” but the card copy on each capstone should already say **“A lantern wears two crowns.”** The decision is visible before it bites.
-- **10 hours:** The book of fillers is likely done or close. Two caps are lit. The other two sit Kindled-dark with “Extinguish a crown first.” This is the first time the grid *refuses*. Offline still runs the fitted bonuses; you do not babysit the tree.
-- **100 hours:** New crafts and places (Chandlercraft, Vigils, later beacons) make a different pair correct. Respec is a planned evening, not a tax on XP. Completionists chase The First Beacon as a *different character*, not as the last sticker.
-
-### 6. 360×640
-
-Same branch-list. On each capstone card: a chip **Worn** / **Dark** / **Blocked — two crowns already**. Dual-crown cards show “Needs these two worn caps.” Apex card shows “Release both crowns to raise the Beacon.” All of that is existing card chrome (name, flavor, fx, Needs, wide button). No map.
-
-### 7. Charter §4.9
-
-Radiance still accrues from every skill. Spending it still fills the cheap sky. Nothing in the bank or the 99s is touched. Prestige fuel stays. The deeper optional reset named in the charter is **not** this system.
-
-### 8. Honest comparison
-
-**Path of Exile keystones / Timeless jewels, not Melvor 99-everything.** PoE lets you fill a lot of small nodes and then asks you to pick a few identity jewels that fight each other. Melvor’s skill “tree” is a shopping list that ends at 99 in every skill; the account is supposed to own the sheet. Two Crowns keeps the shopping list for fillers (Melvor-brain still gets a book to finish) and puts PoE-style exclusivity only on the named identities. It is **not** Melvor, because finishing the sheet does not finish the *build* — two crowns remain dark forever unless you take the pale Beacon and give the sharp ones away.
-
-### 9. SAVE_VERSION
-
-**Can land on v5.** No new required fields. Hydrate (same pattern as leftover-tray on v5): if `owned` contains more than two of `{wick-cap, yield-cap, scholar-cap, flame-cap}`, keep the two most recently kindled (or the two that still complete a dual-crown), strip the extras and `apex` if illegal, **refund those sticker costs into `radiance`**. `owned` IDs stay the same. Do not bump. If Draught / Margin crowns are added as new IDs, they are new rows in `PERKS`; old saves simply do not own them.
-
-### 10. Risks
-
-- **Fake tradeoff:** if fillers already grant most of the %. Then wearing two caps is a cherry and people still “have everything that matters.” Mitigate by keeping the **+8% capstone chunks** as the identity, and by making dual-crowns the only place the extra +5% pair lives.
-- **Still take-everything:** shipping Apex as “all four, just more expensive” would restore the wound. The release-crowns rule is load-bearing. Do not also let Apex stack with Hollow Crown.
-- **Too late:** first refusal is at capstone (18 sparks into a branch). Mitigate with the chip on every cap card from minute one, and with Camp “Next star” never pointing at a third cap.
-- **Punitive:** stripping three caps from a live tester on hydrate without a refund would feel like a wipe. Refund the illegal sticker costs.
-- **Completion %:** `owned.length / 40` can still count dark caps if we keep them in `owned` as “charted but not worn.” Prefer a later `lit` flag only if Conductor wants worn vs charted on the card; Two Crowns can encode worn as “in `owned` and among the two permitted caps.”
+**v5 hydrate, no bump.** If `owned` contains more than two of `{wick-cap, yield-cap, scholar-cap, flame-cap}`, keep the two most recently kindled (prefer a pair that still completes a dual-crown), strip extras and illegal `apex`, **refund those sticker costs into `radiance`**. New dual-crown IDs are new `PERKS` rows; old saves simply do not own them.
 
 ---
 
-## System B — The Fitted Lamp
+## Two Crowns at a thousand hours
 
-**You are a Lampwright who charts every star, but the brass only bears so many at once.**
+Two Crowns without a late layer fails Luke’s test. The fillers and the early caps are a **first-evening sheet**. The thousand-hour game is the **same two crowns, with faces the early lamp cannot wear**.
 
-### 1. Fantasy
+### 1. Standing rule stays
 
-The Almanac is a sky. The lantern is a small tin of fire. You may learn the whole choir. You may only **fit** a handful of voices into the wick at a time. Collection is memory. Fitting is character.
+Wear 2 of 4 *named* branch caps. Fillers stay collectable. Apex is the pale generalist who wears **zero** branch caps, never four. Do not restore take-everything. Do not add a third crown “because 99.” Do not let Radiance buy an elite that Combat 20 could afford.
 
-### 2. Hard rule (the tradeoff)
+### 2. Elite capstones — level is the gate, Radiance is the sticker
 
-Split the tree into two layers:
+Elites are a **second, rare layer of cards** under each named crown. They are **illegal to kindle until a skill (or pair of skills) hits a hard level**. Radiance still pays the sticker. **Level is the gate.** Spark-rich, level-poor saves see the card and cannot press Kindle.
 
-- **Charted** (the book): spending Radiance **learns** a star. Permanent. This is today’s `owned`. Feats and LOG completion count charted.
-- **Fitted** (the lamp): at most **8** stars may be lit on the lantern at once, **plus Kindling, which is always fitted and does not consume a socket**.
+Bands use the curve we already shipped, not a shop of +1% forever:
 
-Every charted star that is not fitted is flavor + Almanac ink. It does **not** apply `effects`. `perkBonus` sums **fitted only**.
-
-Eight is one complete trade (7 fillers + that trade’s capstone) **or** a mix (two caps + dabbles, or four mid-nodes across three branches, etc.). You cannot fit two full branches (16). You cannot fit all four caps and their dual-crowns and Apex.
-
-Apex stays. It costs a socket like any other star, and it still requires its parents **fitted**, not merely charted. Fitting The First Beacon means those parents occupy sockets too — a generalist lamp is *possible* and **expensive in holes**, not automatic.
-
-```mermaid
-flowchart LR
-  subgraph book [Almanac sky - charted]
-    K[Kindling]
-    W[Wick 1-7 + cap]
-    Y[Satchel 1-7 + cap]
-    S[Scholar 1-7 + cap]
-    F[Flame 1-7 + cap]
-    C[Conjunctions + Apex]
-  end
-  subgraph lamp [The lamp - 8 sockets]
-    S1[Fit]
-    S2[Fit]
-    S3[Fit]
-    S4[Fit]
-    S5[Fit]
-    S6[Fit]
-    S7[Fit]
-    S8[Fit]
-  end
-  book -->|"choose 8 + Kindling"| lamp
-```
-
-### 3. Why respec, and what it costs
-
-Respec **is** the system. You re-trim when the idle target changes: fit Wick+Satchel for a fog-gather night; fit Scholar for a mastery week; fit Flame when the stall and the altar are hungry; fit a Hunt-facing mix when Vigils exist.
-
-This is **not** a full refund of the sky. Charted stays charted. Radiance spent to learn is gone (prestige remains prestige).
-
-**Trim cost:** ✦10 × number of stars you **unfit** in that edit, minimum ✦10. No Radiance tax. No cooldown (cooldowns punish offline). You may unfit and fit in one sheet (see UI). First trim in a save is free (lights *Rearranged Heaven*). Unlimited trims after that; Lumen is the wick-cost.
-
-If a player never trims, they still built a character: they *chose which eight burn*. The other thirty-two are a book, not a second lamp.
-
-### 4. Noun mapping
-
-Do not rename branches. Kindling is the always-fitted pin. Wick / Satchel / Scholar / Flame stay lists. Conjunctions require their parents **fitted** (a Quick Hands socket is wasted if Wick-3 is charted-only). Dual crowns and Apex same. Suggested card verbs: **Chart** (spend Radiance) and **Fit** / **Unfit** (spend Lumen only when unfitting). Do not say “equip” — that word belongs to Phase A’s doll. These are stars on a lantern, not a cloak.
-
-### 5. Feel at 10 minutes, 10 hours, 100 hours
-
-- **10 minutes:** Kindling + 2–4 cheap charts, all of which fit automatically while sockets remain. The lamp is “whatever you just learned.” No lecture. A quiet line under the header: **Fitted 3/8**.
-- **10 hours:** The book is full or nearly full. Sockets are the evening puzzle. Offline uses whatever was fitted when you closed the tin. You do not tap during the night; you trim before a long sit if you care.
-- **100 hours:** The sky is a solved Almanac page. The lamp is a living build as new crafts come online. This is the 100-hour Radiance game, which today does not exist.
-
-### 6. 360×640
-
-Same branch-list. Header already says `N/40 stars` — change to **`Charted 40/40 · Fitted 8/8`**. Each card: existing Kindled state becomes **Charted**; add a second wide button **Fit** / **Unfit** (44px). A blocked Fit reads **Lamp is full — unfit one**. Optional: a sticky “Fitted now” strip of eight names above the branches, each a 44px chip that jumps to that card. Still typographic. No starfield.
-
-Do not build a second doll grid. If the Fitted strip ever looks like six gear slots, it has stolen Phase A.
-
-### 7. Charter §4.9
-
-Learning still spends Radiance earned from all skills. Charting never wipes bank or levels. Unfitting is a Lumen trim, not a prestige reset. Prestige fuel stays.
-
-### 8. Honest comparison
-
-**Last Epoch blessings + Grim Dawn constellation points, not Melvor 99.** Last Epoch lets you *find* many blessings and **slot a few**. Grim Dawn lets you devote a finite point budget across a sky of stars. Melvor lets the account own every skill at 99; there is no “unequip Woodcutting.” Fitted Lamp is the idle-native version of blessings: the completionist book still fills (we already have an Almanac for that hunger) while the lamp stays a **load of eight**. It is not Melvor’s eventual-all, because the eighth socket is the last hole you will ever have.
-
-### 9. SAVE_VERSION
-
-**Prefer v5 hydrate, no bump.** Add `state.perks.fitted: string[]` in `hydrateState` (same family as v5 leftover-tray: new keys, no `SAVE_VERSION` bump). Migration of `owned`:
-
-- `owned` remains the charted book.
-- If `fitted` is missing, copy **Kindling + the first 8 other owned IDs in purchase order** into `fitted`.
-- If a live tester already owns 20 powered stars, they **lose active bonuses** on the overflow. That is the point of the system, but it will feel like a nerf. Honest options: (a) grant one free trim-sheet on first load that starts with those 8 pre-ticked, or (b) bump to v6 so old saves keep full power until the player opens Stars once and confirms. Conductor’s call. This doc’s default is **(a) on v5**, because the campaign wants `SAVE_VERSION` 5.
-
-Do not treat overflow as deleted from `owned` — feats *Five Lights Hung* would break.
-
-### 10. Risks
-
-- **Feels like a second doll / loadout screen.** Copy and layout must stay Almanac-Stars, not Camp-gear. Phase D loadouts are a later layer; do not invent two fittings “day lamp / night lamp” here.
-- **Fake tradeoff:** if 8 is enough to fit all four caps + both duals + Apex, the wound returns. Count those IDs: 4 caps + 2 duals + Apex = 7, plus Kindling free, **one socket left**. That still lets a completionist wear the whole identity layer. **Mitigate:** conjunction crowns and Apex cost **2 sockets each** (still one list, a number on the card). Then Apex+two duals is 6 sockets, plus four caps is 10 — illegal. Four caps alone is 4; the player chooses caps vs conjunctions. If Conductor wants even simpler math, drop Apex as a powered node and keep it as a title feat for charting the whole sky.
-- **Punitive:** unfitting during a 12 h sit because you forgot to trim is the player’s choice; do not auto-unfit. Do not charge Radiance to trim.
-- **Too early locked:** auto-fit while sockets remain so the first session is still “pin a star, feel a number.”
-- **Still take-everything:** charting all 40 without a socket cap is today’s game. The cap is load-bearing. Do not grow sockets with beacons, feats, or time. Eight is eight at hour 100.
-
----
-
-## System C — Crossed Temperaments
-
-**You are a Lampwright of one temperament: the wick and the page cannot both burn full.**
-
-### 1. Fantasy
-
-Keepers used to say the lantern has two hungers. One is **haste** (Wick) opposed to **study** (Scholar). One is **taking** (Satchel) opposed to **feeding the world’s flame** (Flame). You may dabble in a rival. You may not finish both.
-
-### 2. Hard rule (the tradeoff)
-
-The four branches are a cross, not a shopping list:
-
-```mermaid
-flowchart TB
-  W[Wick - haste]
-  S[Scholar - study]
-  Y[Satchel - taking]
-  F[Flame - feeding]
-  W -.-|opposed| S
-  Y -.-|opposed| F
-```
-
-- Ranks **1–3** on every branch stay free (dabble). Quick Hands and Studied Fire (the rank-3 same-side conjunctions) stay legal.
-- From rank **4** upward, a branch is **exclusive with its opposite**. Lighting `wick-4` makes `scholar-4`…`scholar-cap` illegal (and extinguishes them if a respec-trim needs to). Same for Satchel ↔ Flame.
-- Capstones: you may wear **The Unquenchable or The Lit Page, never both**. You may wear **Horn of the Hollow or Heart of Hollowflame, never both**.
-- **Lantern Heart** (`cross-ws`, Wick+Scholar) and **Fog Harvest** (`cross-yf`, Satchel+Flame) become **hybrid keystones**, not free extras: lighting one **forbids both opposed capstones**. They are the “I refuse to finish either trade” identity — a real middle, not a stack.
-- Hollow Crown requires Wick-cap + Satchel-cap (same “hand” pair — legal). Star Crown requires Scholar-cap + Flame-cap (same “mind” pair — legal). Apex requires both dual crowns → **impossible** under the opposed-cap rule, unless Apex is rewritten (below).
-
-**The First Beacon:** do not pay the player for breaking the cross. Replace Apex’s requires with a **temperament vow**: light it by naming which axis you surrender forever this age (haste-or-study, taking-or-feeding). The Beacon then grants a modest all-stat **and permanently locks the surrendered axis’s capstone**. That is a 100-hour signature, not a sticker.
-
-```mermaid
-flowchart TD
-  K[Kindling]
-  K --> W123[Wick 1-3 dabble]
-  K --> Y123[Satchel 1-3]
-  K --> S123[Scholar 1-3]
-  K --> F123[Flame 1-3]
-  W123 --> W47[Wick 4-7]
-  S123 --> S47[Scholar 4-7]
-  W47 --> WC[The Unquenchable]
-  S47 --> SC[The Lit Page]
-  WC -.->|never both| SC
-  Y123 --> Y47[Satchel 4-7]
-  F123 --> F47[Flame 4-7]
-  Y47 --> YC[Horn of the Hollow]
-  F47 --> FC[Heart of Hollowflame]
-  YC -.->|never both| FC
-  W123 --> LH[Lantern Heart hybrid]
-  S123 --> LH
-  LH -.->|forbids both haste/study caps| WC
-```
-
-### 3. Why respec, and what it costs
-
-You respec to **flip an axis**: Wick-deep → Scholar-deep for a 99 push; Satchel-deep → Flame-deep when Radiance and Lumen matter more than stems.
-
-**Cost:** an **axis-flip**, not a full sky wipe. Unkindle the deep ranks (4+) on one side, refund those sparks, pay **✦25 × nodes released** plus a **Radiance tithe of 8 sparks per flip** (not refunded). Dabble ranks 1–3 stay. Conjunction hybrids on that axis go dark. First two flips in a save: Lumen only, no tithe. After that, tithe sticks.
-
-If you never flip, you still have a character: a haste-taker, a haste-feeder, a study-taker, or a study-feeder — four named temperaments, plus two hybrid cowards who took Lantern Heart or Fog Harvest instead of a cap.
-
-### 4. Noun mapping
-
-Keep every node id and display name. The cross is a **permission rule**, not a rename. Quick Hands / Hollow Crown = the legal “hands” pair (Wick+Satchel). Studied Fire / Star Crown = the legal “mind” pair (Scholar+Flame). Lantern Heart / Fog Harvest = the illegal pairs, reused as hybrids. Kindling unchanged. Apex rewritten as a vow, same name.
-
-### 5. Feel at 10 minutes, 10 hours, 100 hours
-
-- **10 minutes:** dabble ranks. You can pin Wick-1 and Scholar-1 and feel both. The cards for rank 4 already read **“Opposes The Lit Page.”**
-- **10 hours:** you have finished one side of each axis, or you have taken a hybrid and felt the missing caps. Offline does not care about the dark side.
-- **100 hours:** flipping an axis is a planned season (new artisan, new Vigil). The Beacon vow is a once-per-age signature.
-
-### 6. 360×640
-
-Branch-list with a two-line legend under the header: **Wick opposed to Scholar · Satchel opposed to Flame.** Blocked buttons use the existing `gate.error` string: **“The Lit Page is wearing this temperament.”** Hybrid cards get a chip **Hybrid — no caps on this axis.** No diagram that requires pinch-zoom; the mermaid in this doc is for Conductor, not the phone.
-
-### 7. Charter §4.9
-
-Flipping refunds some Radiance (the deep ranks) but does not touch skills, bank, or levels. Earning Radiance is unchanged. This is not the later deeper reset.
-
-### 8. Honest comparison
-
-**Grim Dawn opposing celestial paths, not Melvor.** Grim Dawn’s constellation screen lets you walk a sky and then **closes** the opposite devotion if you commit. Slay the Spire’s pathing is a cousin (you cannot take every hallway), but StS is a run; this is an account. Melvor never asks you to stop Woodcutting to have Runecrafting. Crossed Temperaments is not Melvor because **two capstones in the sky are structurally dark** for as long as you wear their rivals.
-
-### 9. SAVE_VERSION
-
-**v5 hydrate, no bump.** Walk `owned`. If both members of an opposed deep pair exist, keep the side with more nodes (tie: keep the more recently pushed id), strip the other side’s ranks 4+ and its cap, refund those sticker costs. If `apex` is owned under the old requires, strip it and refund 30; the vow has not been sworn. No new fields required. Optional later: `perks.vow` (`haste`|`study`|`taking`|`feeding`) when Apex ships in this shape.
-
-### 10. Risks
-
-- **Fake tradeoff:** if ranks 1–3 + every conjunction already equal the old sheet, depth never matters. Mitigate by keeping the **big +% on ranks 6–7 and caps** (today’s 4%, 4%, 8%).
-- **Still take-everything:** leaving Apex as “own both dual crowns” would force illegal state or force a patch that lets you wear all four. Rewrite Apex or delete its bonuses.
-- **Confusing on a phone:** “rank 4 exclusive” is one extra rule. If the legend is not in the header, it will feel random. Do not hide opposition behind flavor italics.
-- **Punitive:** a hydrate that strips a live tester’s Scholar-cap without refund after they also bought Unquenchable. Refund.
-- **Too early locked:** ranks 1–3 exist so the first session is not a class-select. Do not move exclusivity to Kindling in this system (that is System D).
-- **Hybrid trap:** Lantern Heart must be *good enough* to be a build, not a noob tax. If it is weaker than either cap, nobody takes it and the “middle” is fake.
-
----
-
-## System D — The Indenture
-
-**You are a Lampwright sworn to one trade of the lantern.**
-
-### 1. Fantasy
-
-Hearthway still remembers indenture. After the first spark, you swear Wickwright, Satchel-bearer, Page, or Flame-tender. The other trades remain in the book as roads you did not walk. You may break indenture. Breaking it costs more the longer you served.
-
-### 2. Hard rule (the tradeoff)
-
-After Kindling, the next act on Stars is not a filler — it is a **vow** (four wide buttons). **Your vocation branch is fully available; its opposed branch is locked; the two neighbors dabble through rank 3.** Opposition is the same cross as System C (Wick ↔ Scholar, Satchel ↔ Flame). You do not buy the locked branch at a tax. Locked means locked until you break indenture.
-
-| Vocation | Full | Neighbors (dabble 1–3) | Opposed (locked) |
+| Face | Level gate | Hours band (one skill, raw Tend-equivalent) | Calendar (charter) |
 |---|---|---|---|
-| **Wickwright** | Wick | Satchel, Flame | Scholar |
-| **Satchel-bearer** | Satchel | Wick, Scholar | Flame |
-| **Page** | Scholar | Satchel, Flame | Wick |
-| **Flame-tender** | Flame | Wick, Scholar | Satchel |
+| **Kindled** (today’s cap) | none (Radiance only) | minutes–an evening | first session |
+| **Settled** | **90** | ~270 h raw in that skill | weeks; last climb before 99 |
+| **Vowed** | **99** (milestone) | ~460 h raw | weeks-to-months |
+| **Last Wick** | **110** | ~810 h raw | months more; post-99 elite tax |
+| *(120 exists as MAX_LEVEL; it is not a fifth elite shop. 120 is mastery brag, titles, maybe Phase E laws — not another +% star.)* | | ~1,390 h raw | thousand-hour cap per skill |
 
-Conjunctions whose parent is locked are locked. You finish **one** capstone (your vocation) plus neighbor dabbles. **Hollow Crown and Star Crown stay dark** — they need two caps, and indenture only lights one. Apex is **not** all four trades. It becomes **the vocation’s First Beacon** — four flavor lines, one powered node, sticker cost 30, requires *your* capstone (not the old dual-crown pair):
+Cards are **visible before reachable**. Copy: **Locked — Emberkeeping 90**, never a mystery `?`. Locked is not “coming soon” toast; it is a named door with a number the HUD already shows.
 
-- Wickwright → The First Beacon, Unquenchable
-- Satchel-bearer → The First Beacon, Horned
-- Page → The First Beacon, Lit
-- Flame-tender → The First Beacon, Hearted
+### 3. Elites still obey Two Crowns — pick: deeper face of a worn crown
 
-Same `apex` id. One Beacon per indenture; it goes dark if you break the vow, and lights again only after the new trade’s capstone.
+**Locked option: an elite is a deeper face of a crown you already wear.** You wear The Unquenchable; Emberkeeping 99 lets you kindle **The Vowed Wick**. The 2-of-4 rule still holds. You do not grow a fifth hole.
 
-```mermaid
-flowchart TD
-  K[Kindling]
-  K --> V{Swear a trade}
-  V -->|Wickwright| W[Full Wick]
-  V -->|Satchel-bearer| Y[Full Satchel]
-  V -->|Page| S[Full Scholar]
-  V -->|Flame-tender| F[Full Flame]
-  W --> WD[Dabble Satchel and Flame]
-  W --> WL[Scholar locked]
-  Y --> YD[Dabble Wick and Scholar]
-  Y --> YL[Flame locked]
-  S --> SD[Dabble Satchel and Flame]
-  S --> SL[Wick locked]
-  F --> FD[Dabble Wick and Scholar]
-  F --> FL[Satchel locked]
-```
+The player should feel: *I am still a Wick+Satchel Lampwright at hour 800, but the Unquenchable I earned at hour 2 is not the Unquenchable I wear at hour 800.*
 
-### 3. Why respec, and what it costs
+**Rejected: a third socket that only exists at 99.** That is Fitted Lamp in disguise and it weakens Two Crowns. At hour 800 everyone wears two early caps plus a “99 hole” stuffed with the best leftover elite — take-everything with extra steps.
 
-You respec to **break indenture** and swear again: the Page who wants Unquenchable for a factory phase; the Wickwright who needs Heart of Hollowflame when Radiance is the bottleneck.
+**Allowed, still 2-of-4: dual-crown vowed faces.** Hollow Crown at Emberkeeping 99 **and** Foraging 99 kindles **The Road Hurries, Vowed**. Harder. Still only two branch caps. Not a third crown.
 
-**Early (charted stars ≤ 8, including Kindling):** ✦50, full Radiance refund of the vocation branch, dabble stays or refunds too (player choice on a two-button sheet: “Keep the dabbles” / “Clear the lamp”). First **three** breaks: this cheap rate. `respecs` counts them.
+**How faces apply.** You may **Kindle** an elite only while its parent cap is among the two worn crowns. Elite IDs may then sit in `owned` (the book). `perkBonus` applies an elite **only while that parent is still worn**. Unwear Unquenchable → Settled/Vowed/Last Wick go dark. Charted, not powered. Respec does not delete the 99 you walked. Touring all four crowns to bank faces is possible and **expensive** (trim tithe after the three free trims); it still never powers more than two crowns at once.
 
-**Late:** ✦25 × all vocation+dabble nodes **plus an unrefunded tithe of 40 sparks** (prestige remembers you quit; flat, not a percent of `radianceEarned`). Skills/bank/levels untouched. The old vocation capstone goes dark. You may swear a new trade immediately; there is no sitting in the dark. Offline is never paused as punishment.
+**Apex** wears **no elite faces**. The pale path may later get its own generalist faces (see gate table) that never restore branch-cap bonuses.
 
-If you never break indenture, that is the loudest character-build of the four systems: you **are** a Page, for a hundred hours.
+### 4. Progression without power creep
 
-### 4. Noun mapping
+Do not raise live speed / yield / XP into +400%. Yield already hard-caps at **55%**. Elites should change **identity verbs** — named laws in the same family as leftover-eat, recap-honesty, auto-restart, “one action until a second-wick lantern perk” — more than raw %.
 
-Kindling stays the first pin, then a **vow** rather than a new origin perk id if we can help it (`perks.vocation: 'wick'|'yield'|'scholar'|'flame'`). Branch names unchanged. Locked cards stay visible (charter: no hover-gated info — show the name, the flavor, and **Locked — you swore Wickwright**). Conjunctions and dual crowns follow permission. Apex stays one id, four flavor strings.
+If an elite is +%, it is a **Last Wick (110) last-band** of **+1–2%** on that crown’s stat, not a second camp track. Settled (90) and Vowed (99) are verbs. They may grant **+0**.
 
-Do not hide the locked branch. A Melvor player who cannot *see* Runecrafting thinks the game is small. A Lampwright who can read The Lit Page and cannot swear it yet feels a tradeoff.
+**Do not** steal Phase A’s chimney / second-wick / doll. If Phase A ships “a second action when the first chimney is smithed,” that is a **lantern law on a clock of hours**, not Emberkeeping 90 (a clock of hundreds of hours). Wick elites must be *other* verbs.
 
-### 5. Feel at 10 minutes, 10 hours, 100 hours
+Suggested verbs (flavor + implementable law; numbers are doors, not this PR’s code):
 
-- **10 minutes:** Kindling, then four buttons. This is the first real identity tap. Cheap breaks exist so a wrong vow is a Lumen mistake, not a ruined save.
-- **10 hours:** One capstone, two dabbles, a dark opposed list you still read. Offline is “my trade running.”
-- **100 hours:** Either a legendary stubborn indenture (title, Beacon of that trade) or one expensive break when a new settlement asks for a different craft. Not a weekly chore.
+| Crown | Face | Identity verb (not a +% shop) |
+|---|---|---|
+| Unquenchable | Settled (90) | **The wick names the halt.** Action card previews dry-halt 3 cycles out (tinder/fuel remaining as a named line). You are not surprised. |
+| Unquenchable | Vowed (99) | **Choir that holds.** One pinned Wick-side action resumes after halt, death, and recap Claim without a re-tap (stronger auto-restart; still spends fuel honestly). |
+| Unquenchable | Last Wick (110) | **Outlives the keeper.** +2% speed last-band. First cycle after Claim starts full. **Do not raise the 12 h offline cap.** |
+| Horn | Settled (90) | **Second glance (law).** Failed bonus-find rerolls once; still under the 55% yield cap. |
+| Horn | Vowed (99) | **The land leans.** Gathering cycles on kindled stretches may roll one named extra (tinder, resin) that is **not** yield%. Separate small table. |
+| Horn | Last Wick (110) | **Horn of Twelve.** +2% yield last-band toward the same 55% cap. Phase B door: kindling a settlement yields a one-time Horn cache. |
+| Lit Page | Settled (90) | **The page keeps the next want.** Camp “Next star” / next feat / next mastery hook stay honest when you rotate crafts (no stale cheapest-node). |
+| Lit Page | Vowed (99) | **Open Codex (law).** Mastery hooks on *worn-crown skills* also write a short Almanac journal line (skip-able). Study is visible. |
+| Lit Page | Last Wick (110) | **Ink that does not cool.** +2% XP last-band. |
+| Heart | Settled (90) | **Kindred spark (law).** Daily embers: +1 spark on claim while Heart is worn. Retention, not combat power. |
+| Heart | Vowed (99) | **Beacon dues (law).** Wave 2 door: Flame/altar spend (Phase A parked) is cheaper while Heart is worn. Wave 1: Radiance frac survives recap freeze without leaking ticks — honesty, not a mint. |
+| Heart | Last Wick (110) | **Heart that remembers the sun.** +1% lumen and +1% radiance last-band. |
+| Hollow Crown | Vowed pair (Ek 99 ∧ Fo 99) | **The Road Hurries, Vowed.** Hunt leftover tray keeps one extra named stem while this dual is worn. Hunt furniture, not a fifth crown. |
+| Star Crown | Vowed pair (two 99s on Scholar’s gate ∧ Emberkeeping 99) | **Star Crown, Vowed.** Almanac LOG mean does not change on visit (already S4e); additionally, next-feat hint names a Radiance door. Pale prestige, not +% combat. |
+| Apex (pale) | Settled generalist | **Four crafts at 60.** Small all-stat already on Apex; this face only **names** them on the card. No branch caps. |
+| Apex (pale) | Vowed generalist | **Four skills at 99.** Title + lantern frame. Still zero branch caps. The completionist sun, dimmer than two Vowed specialists. |
 
-### 6. 360×640
+These verbs are **spec targets**. Wave 1 may ship the cards as Locked without the verbs wired. Do not invent a 72-perk sheet (CUT).
 
-After Kindling, Stars opens on **four `btn-wide` vocation cards** (name, one-line fantasy, “Swear”). After the vow, the usual branch-list; locked branches render as cards with disabled 44px buttons and the lock reason in the Needs line. Header: **Indenture: Page · 3 breaks remain at the cheap rate.** No canvas.
+### 5. Feel at 10 min / 10 h / 100 h / 1000 h / 3000 h
 
-### 7. Charter §4.9
+| Band | What you wear | Camp **Next star** | Still dark | Why respec? |
+|---|---|---|---|---|
+| **10 min** | Kindling + first Wick or Satchel fillers. No crown yet. | Cheapest legal filler (`cheapestAvailable`). Cap cards already read **A lantern wears two crowns.** | All caps, all elites (**Locked — Emberkeeping 90** visible). | You don’t. Three free trims exist later. |
+| **10 h** | Fillers done or close. **Two early caps** worn. Dual-crown if the pair matches. | Dual-crown sticker, or “Blocked — two crowns already” pointing at a **filler on a dark branch** (still collectable), never a third cap. Elite line: **Next crown face: Settled Wick — Locked, Emberkeeping 90.** | Two named caps (refused). All elite faces. Apex unless you released the two. | Hour 8: you picked the wrong pair for the work (Hunt night vs Tend). Cheap trim. |
+| **100 h** | Same two early caps. Skills likely in the 30–60 band (1→60 ≈ 0.69M XP ≈ tens of hours, not 90). | Still the Settled face, still Locked on 90. The tree is **quiet on purpose**; progression is the skill bar, not a new +%. | Elites. The other two crowns. | Only if a **new live craft** (Phase A Chandlercraft, a Vigil) makes another pair the work. Not a weekly chore. |
+| **1000 h** | Same identity (e.g. Wick+Satchel) with **Settled and maybe Vowed** faces kindled on those two. Someone who split XP across eight crafts may only just be touching 90s. | **Kindle The Vowed Wick** (if 99), or **Locked — Foraging 99** on Horn, or the dual-crown vowed face. | The other pair’s faces (you don’t wear them). Last Wick 110. Apex-if-specialist. | **Hour 400–800:** you 99’d a skill whose crown you do *not* wear. Trim onto that crown; elite faces kindle in an evening of sparks because **the level was the real cost.** Tithe is the prestige tax for changing identity. |
+| **3000 h** | One or two **Last Wicks**. Maybe a 120 as brag. A stubborn Lampwright still Wick+Satchel; a trimmer has worn three pairs *across seasons* but never four at once. | Last Wick on a worn crown, or a dual-crown vowed, or pale Apex as a *different character*. | Whatever pair you are not. That darkness is the build. | Seasonal: factory phase wants Heart; road phase wants Horn; 120-push wants Lit Page. Never “collect the last elite for the sheet.” |
 
-Breaking indenture is a Radiance tithe and a Lumen fee, not a skill wipe. The opposed branch is permission, not deleted content. Prestige fuel stays. Do not gate *skills* behind vocation — Foraging is still Foraging if you swore Page; you only lack Satchel stars.
+Offline: bonuses are whatever was worn when you closed the tin. You do not babysit elites during a 12 h sit. Trim **before** a long sit if the work changed.
 
-This must not become a gated tutorial. All eight crafts remain available from the start (charter §3). Vocation is stars, not a locked skill list.
+### 6. New skills add faces and gates, not 40 cheap fillers
 
-### 8. Honest comparison
+CUT already forbids **72 Radiance perks**. Cheap fillers stay **Wave-1 sized** (the current 7+cap per branch). Later crafts **do not** clone Wick-1…Wick-7.
 
-**PoE ascendancy / a single Grim Dawn devotion constellation, not Melvor.** Ascendancy is “you are this kind of witch, and the other three witch-ascendancies are not yours until you reroll.” Melvor is “you will 99 everything; order is convenience.” Indenture is not Melvor because **one quarter of the sky is sworn-dark** unless you pay the break (Lumen + 40 sparks, after the three cheap trims). It is closer to a class than the other three systems — which is its strength and its danger.
+Each new craft adds a **gate alternative** and/or a **named face** on an existing crown:
 
-### 9. SAVE_VERSION
+| Wave / phase | What exists | What stars do |
+|---|---|---|
+| **Wave 1** (now) | Emberkeeping, Foraging, Combat playable. Two Crowns rule. | Early caps + duals + Apex rewrite. Elite **cards** for live gates, mostly Locked. |
+| **Phase A = Wave 2** | Chandlercraft, first Smithing hammer, spend Flame/Souls, doll after first chimney. | **Name** Chandlercraft elites as doors. Do not spend Flame/Souls in this spec. **The Spool:** Chandlercraft 90 may Settle Unquenchable *instead of* Emberkeeping 90 (either/or). Heart Vowed altar-law waits for spend-Flame. |
+| **B — road** | Settlements, travel. | Horn Last Wick cache on kindle. Hollow Crown vowed as road identity. No new filler branch. |
+| **C — factory / oil tiers** | Oil, wick goods. | Chandlercraft 99 / 110 faces on Wick or Heart. Still 2-of-4. |
+| **D — loadouts / sets** | Gear sets. | Do **not** turn crowns into doll sockets. Loadouts are chimney and cloak, not stars. |
+| **E — late laws** | Named account laws. | Last Wick verbs and 120 brag titles live here if not already shipped. |
+| **F — 400–500 items** | Lattice fill. | No star sheet. Items are uses, not perks. |
 
-**Can land on v5 with a new hydrate key** `perks.vocation: null | 'wick' | 'yield' | 'scholar' | 'flame'`. Infer vocation from the deepest owned branch if `owned` already has post-Kindling stars; if two branches are both deep (a live take-everything save), pick the deeper, **strip the opposed branch**, refund those sparks, and toast once: “The lantern kept your strongest trade.” Do not bump. If inference feels too magical, bumping to v6 for an explicit chooser-on-load is cleaner — but the campaign wants v5, so default to infer-and-refund.
+**Scholar’s Wave-1 proxy gate** (Almanac skill is not playable yet): Settled Page = **two live skills at 90**; Vowed Codex = **two live skills at 99**; Last Wick = **two live skills at 110**. When Almanac the craft ships, those gates **become Almanac 90 / 99 / 110** (plus one other 99 for the vowed dual). Do not leave both proxies and Almanac stacked forever — one sentence in data when that skill goes live.
 
-### 10. Risks
+**Mining / Fishing:** Satchel gate alternatives (Foraging 90 **or** Mining 90 to Settle Horn). The land includes shafts and meres. Not a new Satchel filler list.
 
-- **Too early locked:** vow at minute two, before the player knows Wick from Scholar. Mitigate with three cheap breaks and with dabble ranks so the first evening is not a monoculture.
-- **Punitive:** a **percent** of `radianceEarned` as the late tithe would punish the 100-hour player hardest and recreate today’s “never touch respec,” just inverted. That is why the late cost is a **flat 40 sparks + Lumen**, not a lifetime tax. Do not add a “cold lantern” timer; idle players treat cooldowns as a slap.
-- **Feels like a gated tutorial / class screen.** Copy must say you can still Gather and Hunt. Stars are the indenture, not the crafts.
-- **Still take-everything:** if dabbles extend to rank 7 “at 2× cost,” that is a delay, not a lock. Do not tax-buy the opposed branch. Locked means locked.
-- **Fake tradeoff:** if one vocation is strictly best (Flame’s Radiance feeding more stars), everyone swears Flame-tender. Keep vocation bonuses as they are today (each branch already has a different stat) and do not add hidden Flame synergy on the vow itself.
-- **Apex four-flavor** can collapse to a rename. The Beacon must require the vocation capstone and must **not** be wearable after a break until the new cap is lit — otherwise it is a sticker you carry between identities.
+**Smithing:** Draught / Heart face door (hardware feeding the flame). Wave 2+.
+
+### 7. 360×640 UI
+
+Same branch-list. Under each named capstone, three elite cards (Settled / Vowed / Last Wick), full-width buttons ≥44px.
+
+Chips: **Worn** / **Dark** / **Blocked — two crowns already** on the four caps. Elite chips: **Locked — Emberkeeping 90** / **Kindle · N Radiance** / **Worn face**. Dual-crown elite: **Locked — Emberkeeping 99 and Foraging 99**.
+
+Header: `Radiance unspent · 2 of 4 crowns · faces 1/6` (two worn crowns × three faces). Flavor on the card, Needs-line names the skill **and** the current level (`Emberkeeping 62 / 90`). No hover, no canvas, no starfield, no kit.
+
+Camp “Next star” may point at a Locked elite (breadcrumb). It must never point at a third early cap.
+
+**Honest completion:** LOG mean stays Skills / Mastery / Items / Feats. Do not pad it with unkindleable Chandlercraft elites (empty-99 honesty). Stars may show the cards; `perkCompletion` should count **kindleable** rows only (live gates). Feats: *A Capstone* stays; add *A Crown Settled* (first 90 face), not *Own every elite*.
+
+### 8. SAVE_VERSION 5, charter §4.9
+
+No bump. Elite rows are new perk IDs (`wick-cap-90`, `wick-cap-99`, `wick-cap-110`, …) or a `perks.faces` map. Prefer **IDs so they render as cards**. Hydrate:
+
+- Unknown IDs ignored (forward-safe).
+- `perks.owned` may contain elite IDs before the parent cap is worn; effects stay off until wear-check.
+- If a live tester already owns four early caps, identity-layer hydrate still strips to two and refunds (see above). Elites they could not have kindled yet (no 90s in Wave 1 testers) simply appear Locked.
+- Do not wipe skills, bank, or levels. Radiance refund is only for **illegal early caps / Apex**, never for XP.
+
+### 9. Honest comparison
+
+**OSRS 99s:** a 99 is a cape and a skill done; the account is expected to 99 *many* skills. The cape does not ask you to take off another cape. Two Crowns + elites: you may 99 all eight crafts; you still wear **two** crown-faces. The 99 **opens a door on a worn trade**, it is not a pet.
+
+**Melvor 99 + pets:** Melvor’s long game is 99 everything, then pets, then 99 mastery, then completion. The sheet is supposed to fill. **Elite ≠ a pet you get for 99 everything.** A Melvor pet is an account sticker that stacks with every other pet. Our Vowed Wick **replaces** the Kindled Unquenchable’s *meaning* while you wear it; the Lit Page’s Vowed face stays dark if you do not wear Scholar. Finishing every 99 does not finish the *lamp*.
+
+**PoE ascendancy + Uber Lab:** you pick an ascendancy (Two Crowns ≈ a pair of notables) and Uber Lab gives **deeper points in that ascendancy**, not a second class. Elite faces are Uber Lab. You do not Lab into four classes at once.
+
+**Last Epoch weaver tree:** a huge sky you specialize by occupying regions. We refuse that UI on a phone. We take only the idea that **late points deepen a region you already chose**.
+
+### 10. Stress test / fail conditions
+
+This design **fails** if any of these ship:
+
+1. **Radiance at Combat 20 kindles an elite.** Level gate was skipped or replaced with a spark tax. *Fix:* Kindle disabled until `levelFromXp` meets the band; sparks do not substitute.
+2. **Elites invisible until 99** (mystery gates, empty `?`, hover-only desktop). *Fix:* cards exist from Wave 1 with **Locked — Emberkeeping 90** and current level.
+3. **Elites are just more +%.** A second camp track. *Fix:* 90/99 are verbs; 110 is +1–2% last-band only; yield never breaks 55%.
+4. **Third socket at 99** or Apex that stacks with two caps. Take-everything returns.
+5. **Elite effects apply while the parent cap is not worn.** Then a trimmer banks all twelve faces and swaps for Lumen — the book *is* the build again. Wear-check is load-bearing.
+6. **72 cheap fillers** when Mining ships. *Fix:* gates and faces only.
+7. **Offline cap raised** as a Wick elite. Honesty dies.
+8. **Chandlercraft elite verbs coded in Wave 1.** Phase A is parked; cards may exist as Locked — Chandlercraft 90.
+9. **LOG 0=0 / empty 99s** because unkindleable elites entered the mean. Stars ≠ LOG denominator.
+10. **No reason to respec after hour 20** because only one pair is viable and elites don’t change the work. *Fix:* pair identities stay different verbs (halt-naming vs second-glance vs study vs dues); new crafts add gates that make another pair the right lamp for a season.
 
 ---
 
-## Conductor notes
+## Thoughts (for Luke)
 
-If this bot had to pick **one** system for Wave 1, it would pick **System B — The Fitted Lamp**, with **System A — Two Crowns** as runner-up.
+Two Crowns is the right identity: a lantern of two rooms, not a sun. Alone, it is done by bedtime. The XP curve we already shipped is the thousand-hour machine — 90 / 99 / 110 are **weeks, months, and the post-99 tax**, not an evening of sparks. Hanging elite *faces* on those bands means the Wickwright at hour 800 is still a Wickwright, and the star is not the same star. A player who 99s everything still cannot wear four Last Wicks. That is the difference from Melvor’s pets and from “eventually you have it all.”
 
-**Why Fitted Lamp.** The live income rate makes the sky a first-evening sheet. Any rule that only bites at Apex, or that only changes purchase order, is gone by hour two. Sockets remain after the book is full; they turn Radiance from a shopping list into a lamp you re-trim when the *work* changes (gather night, 99 push, Lumen drought, later Vigils). That is the idle-native reason to touch respec. Chart vs Fit also respects the Almanac we already shipped: completionists still fill a book; the book is not the build. UI stays a branch-list plus a Fitted 8/8 header. Charter §4.9 is untouched. Save can stay v5 if `fitted` hydrates like other v5 keys.
+The pale Beacon stays for the Lampwright who wants a dimmer, wider sun. That is a character, not the last sticker.
 
-**Caveat on B:** eight unweighted sockets still let someone fit four caps + both dual-crowns + Apex (7) with Kindling free. If Luke picks B, **weight dual-crowns and Apex at 2 sockets** (or retire Apex as a powered node and keep it as a “charted the sky” title). Do not grow the socket count with beacons. Do not call Fit “equip.”
+---
 
-**Why Two Crowns is the runner-up.** Smallest topology change. Identity already lives in the capstone names. Fillers stay a completion sheet (Melvor-brain is fed) while 2-of-4 is a standing refusal. Apex-as-generalist (release the crowns) is a real 100-hour fork. Save stay on v5 with a refunding hydrate. Choose A if Luke does not want a second layer of buttons on every card, or if “another socket screen” would muddy Phase A’s doll.
+## Conductor brief
 
-**Why not C as the pick.** The cross is elegant and the existing conjunctions already encode it, but the phone has to teach “dabble 1–3, exclusive from 4, hybrids forbid caps, Apex is a vow.” That is two lectures. Hybrids will either be traps or secret-best. C is the right pick only if Luke wants *temperament* fantasy more than *lamp* fantasy.
+Locked rule, eight bullets:
 
-**Why not D as the pick.** Loudest character-build, and the one that most risks “you rolled the wrong Lampwright before you understood the game,” which fights charter “no gated tutorial” and “all eight crafts deepen rather than gate.” Three cheap early breaks patch the first evening; after that the opposed quarter of the sky stays dark unless you pay Lumen + 40 sparks. That is a real class. It is the right pick only if Luke wants a class more than a lamp you re-trim. Do not replace the flat tithe with a percent of `radianceEarned`.
+1. Wear **2 of 4** named caps (Unquenchable / Horn / Lit Page / Heart). Fillers collectable. Dual-crown for the legal pair (add Draught, Margin; promote Lantern Heart, Fog Harvest).
+2. **Apex = pale generalist, zero branch caps**, never four, never stacked with a dual-crown.
+3. Elites are **deeper faces** of a **worn** crown (90 Settled / 99 Vowed / 110 Last Wick). Not a fifth crown, not a 99 socket.
+4. **Level is the gate; Radiance is the sticker.** Visible Locked cards. No spark substitute.
+5. **90/99 = identity verbs; 110 = +1–2% last-band** (yield still 55%). No +400%. No 12 h cap raise.
+6. Elite effects **only while parent cap is worn**. Book keeps faces across trims; levels never wipe (charter §4.9).
+7. New crafts add **gates/faces**, not 40 fillers. No 72-perk sheet.
+8. **SAVE_VERSION 5.** Hydrate illegal extra caps with Radiance refund. Elite IDs hydrate as Locked.
 
-**Do not stack these.** Sockets plus exclusive crowns plus a vocation chooser is three UIs and a save blob the size of a doll. Ship one standing constraint. Leave Melvor’s 99-everything in Melvor.
+### Elite gate table
 
-**Phase A is still parked.** None of these systems spend Flame/Souls, open Chandlercraft, or put six gear slots on minute one. Fitted stars are not chimney slots.
+| Elite noun | Parent crown | Gate | Hours band | Wave |
+|---|---|---|---|---|
+| The Settled Wick | Unquenchable | Emberkeeping **90** (later: **or** Chandlercraft 90) | weeks | W1 card / W2 Chandlercraft door |
+| The Vowed Wick | Unquenchable | Emberkeeping **99** (later: or Chandlercraft 99) | weeks–months | W1 card |
+| The Last Wick | Unquenchable | Emberkeeping **110** | months+ | W1 card; verb may wait |
+| The Remembering Horn | Horn | Foraging **90** (later: or Mining 90 / Fishing 90) | weeks | W1 card |
+| Horn, Vowed | Horn | Foraging **99** | weeks–months | W1 card |
+| Horn of Twelve | Horn | Foraging **110** | months+ | W1 card; cache = Phase B |
+| The Settled Page | Lit Page | **Two live skills at 90** (becomes Almanac 90 when that craft ships) | weeks | W1 proxy |
+| The Vowed Codex | Lit Page | **Two live skills at 99** (becomes Almanac 99) | months | W1 proxy |
+| The Page That Outlasts Ink | Lit Page | **Two live skills at 110** | months+ | W1 proxy |
+| Heart Settled | Heart | Emberkeeping **90** ∧ Combat **70** | weeks | W1 card |
+| Heart Vowed | Heart | Emberkeeping **99** | months | W1 card; altar-law = Phase A door |
+| Heart that Remembers the Sun | Heart | Emberkeeping **110** | months+ | W1 card |
+| Pale-Wise / Road Hurries, Vowed | Hollow Crown | Combat **85** ∧ Foraging **70** for Hunt furniture; **both 99s** for the vowed dual | Hunt: long Wave 1; dual 99s: months | W1 Hunt card; road = Phase B |
+| Star Crown, Vowed | Star Crown | Scholar gate at 99 ∧ Emberkeeping 99 | months | later |
+| The First Beacon, Pale | Apex (no caps) | Four live skills at **60**, then four at **99** | 100 h → 1000 h+ | W1 Apex rewrite; pale faces later |
 
-Conductor shows Luke this file, records the pick, and only then briefs a builder. This agent stops at the PR.
+Sticker costs (balance later, not this PR): Settled ~20, Vowed ~30, Last Wick ~45. Must not be the bottleneck; **level is**.
+
+### What NOT to implement this Wave
+
+- **Do not code Chandlercraft / Mining / Fishing / Almanac-skill / Smithing elite verbs.** You may **show** those cards as **Locked — Chandlercraft 90** (honest door) or omit them until the skill is playable. Prefer omit-from-LOG, show-on-Stars only when the skill exists.
+- **Do not** spend Flame/Souls, open the doll, ship second-wick as an Emberkeeping-90 elite, raise offline cap, or add 40 fillers.
+- **Wave 1 builder (when Conductor briefs one):** Two Crowns permission on the four named caps + Apex rewrite + dual-crown pair completions + **elite cards as Dark/Locked** for live gates (Emberkeeping, Foraging, Combat). Verbs may land in later S4 rounds. This PR is still **design only**.
+
+---
+
+## Appendix — rejected systems (one paragraph each)
+
+**B — The Fitted Lamp** (chart every star, fit 8). Strong idle loop, and it would survive a thousand hours without elites — but it is a second doll on Almanac, fights Phase A’s chimney slots, and Luke picked crowns. Do not stack sockets on Two Crowns.
+
+**C — Crossed Temperaments** (Wick ↔ Scholar, Satchel ↔ Flame). Elegant, but the phone must teach dabble/exclusive/hybrids/vow. Two Crowns already refuses two caps; opposition would double-lecture. Keep the cross only as flavor in pair names (hands vs mind), not as a second permission engine.
+
+**D — The Indenture** (swear one trade at Kindling). Loudest class, worst first-evening lock, fights “all eight crafts deepen rather than gate.” Two Crowns lets you *wear* two trades without rolling a Lampwright at minute two. Cheap indenture-breaks were a patch; we did not pick a class.
