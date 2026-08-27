@@ -236,8 +236,8 @@ Items completion is a **completionist book**, not live occupancy. Hollow N/MAX i
 | What counts | `itemFound > 0` **or** `state.discovered[id]`. Occupancy (`uniqueStackCount`) is a different number. |
 | Fresh save | Starter pack is **known** because hydrate floors Times Found to held qty (S2h). Almanac Items starts at 6 / N, not 0. The `discovered` map stays empty until a live pickup. |
 | First pickup | Action yields, combat loot, and stall / bundle buys call `markDiscovered` and increment Times Found. |
-| Last stack | Dumping or spending to 0 never un-knows the id. Catalogue does not paint a mystery dash. Items 6/N cannot fall to 5/N. HUD Known stays `6/137`; Hollow falls to `5/12`. The Food tab stays. |
-| HUD | Dual chips on every tab: `Known N/137` (noun visible) beside `Hollow N/MAX`. Both are doors: Known opens Bank Catalogue (item log); Hollow opens the owned grid. Do not merge occupancy back into known. |
+| Last stack | Dumping or spending to 0 never un-knows the id. Known-empty keeps the name (qty 0). Never-found Catalogue tiles paint `?` / still-in-the-dark, not `— Bog-moss`. Items 6/N cannot fall to 5/N. HUD Known stays `6/137`; Hollow falls to `5/12`. The Food tab stays. |
+| HUD | Dual chips on every tab: `Known N/137` (noun visible) beside `Hollow N/MAX`. Both are doors: Known opens Almanac Items (the found-log); Hollow opens the owned grid. Do not land Known on Bank Catalogue. Do not merge occupancy back into known. |
 | Save | Schema **v5**. Do not bump. v4 saves migrate to an empty `discovered` map; held stacks still floor Times Found, so they stay known. |
 
 Tapping Skills / Mastery / Items / Feats on the LOG opens a drill-down (per-skill 1/99, per-action mastery, found-vs-missing items, feats grid) and keeps the bucket % in the header.

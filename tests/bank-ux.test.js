@@ -24,6 +24,7 @@ const tabs = await import('../src/ui/screens/tabs.js');
 const {
   prefersDockedInspector, itemTileGlyph, itemTileChrome, itemTileStallPip,
   ownedNameFits, ownedNameClientWidth, OWNED_NAME_LAYOUT,
+  UNKNOWN_ITEM_MARK, STILL_IN_THE_DARK,
 } = await import('../src/ui/screens/bank.js');
 const { inspectorPriceLawLine, inspectorStackStatsLine } = await import('../src/ui/item-inspector.js');
 const { liveSellUnit, addSellPressure } = await import('../src/game/systems/store.js');
@@ -137,6 +138,10 @@ test('owned tab chips are core tabs plus only categories that hold stock', () =>
 
 function tileByName(root, name) {
   return root.querySelectorAll('.bank-tile').find((t) => new RegExp(name).test(t.textContent ?? ''));
+}
+
+function tileByItem(root, id) {
+  return root.querySelector(`[data-item="${id}"]`);
 }
 
 test('every registry glyph exists and Fuel items are unique', () => {
@@ -654,10 +659,28 @@ test('dump a unique starter stack decrements Hollow occupancy, not known', () =>
   assert.equal(loaf.classList.contains('unowned'), false, 'not a never-found ghost');
   assert.ok(loaf.classList.contains('known-empty'));
   assert.equal(loaf.querySelector('.bank-qty').textContent, '0');
+  assert.equal(loaf.querySelector('.bank-name').textContent, 'Lantern-loaf');
   assert.doesNotMatch(loaf.querySelector('.bank-qty').textContent ?? '', /—/);
   loaf.click();
   assert.deepEqual(opened, [loafId], 'known-empty inspects; does not toast never-found');
   assert.equal(toasts.some((m) => /not yet found/.test(m)), false);
+
+  const bog = tileByItem(scr.node, 'bogmoss');
+  assert.ok(bog, 'never-found fuel still has a catalogue tile');
+  assert.ok(bog.classList.contains('unowned'));
+  assert.equal(bog.querySelector('.bank-name').textContent, UNKNOWN_ITEM_MARK);
+  assert.equal(bog.querySelector('.bank-qty').textContent, UNKNOWN_ITEM_MARK);
+  assert.doesNotMatch(bog.textContent ?? '', /Bog-moss/);
+  assert.equal(bog.getAttribute('aria-label'), STILL_IN_THE_DARK);
+  for (const [id, name] of [['cindercoal', 'Cinder-coal'], ['peatbrick', 'Peat-brick']]) {
+    const tile = tileByItem(scr.node, id);
+    assert.ok(tile, `${name} occupies a never-found tile`);
+    assert.equal(tile.querySelector('.bank-name').textContent, UNKNOWN_ITEM_MARK);
+    assert.doesNotMatch(tile.textContent ?? '', new RegExp(name));
+  }
+  bog.click();
+  assert.equal(toasts.at(-1), STILL_IN_THE_DARK);
+  assert.equal(toasts.some((m) => /Bog-moss/.test(m)), false);
 
   const almanac = renderAlmanacScreen({
     state: s,
@@ -717,9 +740,11 @@ test('Food tab stays on the starter row after dump; HUD chips and tab chips wrap
   assert.match(html, /<button[^>]*id="hud-hollow"/);
   assert.match(html, /Known 0\/137/);
   assert.match(html, /Hollow 0\/12/);
+  assert.match(css, /\.screen\.log-items\s*\{[^}]*gap:\s*8px/s);
+  assert.match(css, /\.screen\.log-items \.section-title\s*\{[^}]*margin-top:\s*4px/s);
 });
 
-test('bankTab all opens Catalogue with named found and unowned tiles, not Camp', () => {
+test('bankTab all opens Catalogue with named found and mystery unfound tiles, not Camp', () => {
   const s = createState({ rngSeed: 1 });
   const scr = tabs.renderBankScreen(makeCtx(s, { bankTab: 'all' }));
   assert.ok(scr.node.classList.contains('bank-screen'));
@@ -729,7 +754,15 @@ test('bankTab all opens Catalogue with named found and unowned tiles, not Camp',
   assert.ok(tiles.length >= 100, 'catalogue lists the registry');
   assert.ok(tiles.some((t) => t.classList.contains('unowned')));
   assert.ok(tileByName(scr.node, 'Lantern-loaf'), 'found starter is named');
-  assert.ok(tileByName(scr.node, 'Pale-cap'), 'not-yet-held is still a named tile');
+  const pale = tileByItem(scr.node, 'palecap');
+  assert.ok(pale, 'never-found still occupies a tile');
+  assert.ok(pale.classList.contains('unowned'));
+  assert.equal(pale.querySelector('.bank-name')?.textContent, UNKNOWN_ITEM_MARK);
+  assert.equal(pale.querySelector('.bank-qty')?.textContent, UNKNOWN_ITEM_MARK);
+  assert.equal(pale.getAttribute('aria-label'), STILL_IN_THE_DARK);
+  assert.equal(pale.getAttribute('title'), STILL_IN_THE_DARK);
+  assert.doesNotMatch(pale.textContent ?? '', /Pale-cap/);
+  assert.equal(tileByName(scr.node, 'Pale-cap'), undefined, 'never-found must not spoil its name');
   assert.equal(scr.node.querySelector('.camp'), null);
 });
 

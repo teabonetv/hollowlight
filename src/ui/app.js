@@ -382,7 +382,7 @@ function boot() {
     afterMutation({ stamp: false });
   }
 
-  /** Known chip → Catalogue; Hollow chip → owned grid. Melvor's Bank / Log are doors. */
+  /** Hollow chip → owned grid. Melvor's Bank N/MAX is this door. */
   function openBank(tab = DEFAULT_BANK_TAB) {
     if (recapOpen) return;
     ui.tab = 'bank';
@@ -391,6 +391,12 @@ function boot() {
     ui.bankTab = resolveBankTab(tab);
     showRoute();
     afterMutation({ stamp: false });
+  }
+
+  /** Known chip → Almanac Items found-log. Melvor's Completion Log is this door. */
+  function openFoundLog() {
+    if (recapOpen) return;
+    ctx.openAlmanac('log-items');
   }
 
   // ── ctx handed to screens & modals ─────────────────────────────
@@ -532,6 +538,7 @@ function boot() {
     openAlmanac(view = 'overview') {
       ui.tab = 'journal';
       ui.almanac = view;
+      ui.skillId = null;
       ui.campView = null;
       if (view === 'stars') game.stats.starsOpens = (game.stats.starsOpens ?? 0) + 1;
       game.stats.almanacOpens = (game.stats.almanacOpens ?? 0) + 1;
@@ -748,7 +755,7 @@ function boot() {
     showSettingsModal(modalRoot, ctx);
     afterMutation({ stamp: false });
   });
-  hudKnown?.addEventListener('click', () => openBank('all'));
+  hudKnown?.addEventListener('click', () => openFoundLog());
   hudHollow?.addEventListener('click', () => openBank('owned'));
 
   document.addEventListener('visibilitychange', () => {

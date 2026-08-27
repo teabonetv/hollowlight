@@ -600,6 +600,13 @@ button.pill:active {
 .bank-tile:active { transform: scale(0.96); border-color: var(--gold-lo); }
 .bank-tile.owned { border-color: rgba(217, 164, 65, 0.35); }
 .bank-tile.unowned { opacity: 0.52; }
+.bank-tile.unowned .bank-name {
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  font-size: 14px;
+}
+.bank-glyph-mystery { color: var(--faint); }
+.bank-glyph-mystery svg { width: 32px; height: 32px; }
 .bank-tile.known-empty { opacity: 0.88; border-color: rgba(217, 164, 65, 0.22); }
 .bank-tile.known-empty .bank-qty { color: var(--muted); }
 .bank-tile.selected { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(217, 164, 65, 0.45); }
@@ -1271,6 +1278,19 @@ html.reduced-motion *::after {
 .daily-ready { border-color: rgba(217, 164, 65, 0.45); }
 .daily-claimed { opacity: 0.7; }
 .log-back { margin-top: 4px; }
+.screen.log-items { gap: 8px; }
+.screen.log-items .section-title { margin-top: 4px; margin-bottom: 0; }
+.screen.log-items .log-back { margin-top: 0; }
+.screen.log-items [data-log-drill="items-found"] .cat-bar { display: none; }
+@media (max-width: 719px) {
+  .screen.log-items [data-log-drill="items-found"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .screen.log-items [data-log-drill="items-found"] .log-tile {
+    min-height: 64px;
+    padding: 6px 3px 4px;
+  }
+}
 .log-detail-list { display: flex; flex-direction: column; gap: 8px; width: 100%; }
 .log-detail-row {
   display: grid; grid-template-columns: 1fr auto; gap: 4px 10px;

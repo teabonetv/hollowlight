@@ -132,10 +132,13 @@ test('tapping an owned bank stack opens the sell sheet; unowned still toasts', (
 
   const catTab = scr.node.querySelectorAll('.bank-tab').find((t) => /Catalogue/.test(t.textContent ?? ''));
   catTab.click();
-  const emberstone = scr.node.querySelectorAll('.bank-tile').find((t) => /Emberstone/.test(t.textContent ?? ''));
+  const emberstone = scr.node.querySelector('[data-item="emberstone"]');
+  assert.ok(emberstone, 'never-found ore still has a catalogue tile');
   emberstone.click();
   assert.equal(opened.length, 1, 'unowned item did not open sheet');
   assert.equal(toasts.length, 1, 'unowned item toasted instead');
+  assert.equal(toasts[0], 'Still in the dark');
+  assert.equal(toasts.some((m) => /Emberstone/.test(m)), false);
 });
 
 function bootSellSheet(state) {
