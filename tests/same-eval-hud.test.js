@@ -19,6 +19,7 @@ const elements = {
   'hud-radiance': new FakeNode('span'),
   'hud-flame': new FakeNode('span'),
   'hud-known': new FakeNode('button'),
+  'hud-complete': new FakeNode('span'),
   'hud-hollow': new FakeNode('button'),
   screen: new FakeNode('main'),
   'modal-root': new FakeNode('div'),
@@ -81,7 +82,7 @@ if (!globalThis.navigator) globalThis.navigator = {};
 const { SAVE_KEY, serializeSave, deserializeSave } = await import('../src/core/save.js');
 const { createState, STARTER_BANK } = await import('../src/game/state.js');
 const { ensureDailies, claimDaily, taskProgress } = await import('../src/game/systems/dailies.js');
-const { paintHud, formatHollowChip, formatKnownChip } = await import('../src/ui/hud.js');
+const { paintHud, formatHollowChip, formatKnownChip, formatTrueCompletionChip } = await import('../src/ui/hud.js');
 const { formatNumber } = await import('../src/core/format.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { pushLog } = await import('../src/game/state.js');
@@ -89,6 +90,7 @@ const { unlockPerk } = await import('../src/game/systems/radiance.js');
 const { bankSellValue, bankCount, uniqueStackCount, lanternRoom } = await import('../src/game/systems/bank.js');
 const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
 const { itemTimesFound } = await import('../src/game/systems/stats.js');
+const { trueCompletion } = await import('../src/game/systems/completion.js');
 const { SAVE_VERSION } = await import('../src/core/save.js');
 
 function hudNum(node) {
@@ -122,6 +124,9 @@ function assertHudEqualsSave(label) {
   assert.ok(known, `${label}: known chip painted`);
   assert.equal(elements['hud-known'].textContent, formatKnownChip(state));
   assert.match(elements['hud-known'].textContent, /^Known \d+\/\d+$/);
+  assert.equal(elements['hud-complete'].textContent, formatTrueCompletionChip(state), `${label}: HUD % == catalogue`);
+  assert.equal(elements['hud-complete'].textContent, trueCompletion(state).label, `${label}: HUD % == trueCompletion`);
+  assert.match(elements['hud-complete'].textContent ?? '', /^\d+(?:\.\d+)?%$/);
 }
 
 await import('../src/ui/app.js?same-eval');
@@ -171,16 +176,18 @@ test('claim + kindling path: persist-then-paint matches deserialize in one shot'
   const hudFlame = new FakeNode('span');
   const hudRadiance = new FakeNode('span');
   const hudKnown = new FakeNode('span');
+  const hudComplete = new FakeNode('span');
   const hudHollow = new FakeNode('span');
   const unspent = new FakeNode('span');
   const raw = serializeSave(s, s.savedAt ?? 1);
-  paintHud(hudLumen, hudFlame, s, hudRadiance, { unspentRadiance: unspent, hudKnown, hudHollow });
+  paintHud(hudLumen, hudFlame, s, hudRadiance, { unspentRadiance: unspent, hudKnown, hudComplete, hudHollow });
   const env = JSON.parse(raw);
   assert.equal(hudNum(hudLumen), env.state.lumen);
   assert.equal(hudNum(hudRadiance), env.state.radiance ?? 0);
   assert.equal(hudNum(unspent), env.state.radiance ?? 0);
   assert.match(unspent.textContent, /Radiance unspent/);
   assert.equal(hudKnown.textContent, formatKnownChip(s));
+  assert.equal(hudComplete.textContent, formatTrueCompletionChip(s));
   assert.equal(hudHollow.textContent, formatHollowChip(s));
 });
 
@@ -279,6 +286,10 @@ test('tapping Known chip leaves Camp for Almanac Items (found-log)', () => {
   assert.ok(elements.screen.querySelector('.camp'), 'start on Camp');
   assert.match(elements['hud-known'].textContent ?? '', /^Known \d+\/\d+$/);
   assert.equal(elements['hud-known'].tagName, 'BUTTON');
+  const hudPct = elements['hud-complete'].textContent;
+  const campPct = elements.screen.querySelector('[data-true-complete="camp"]')?.textContent;
+  assert.equal(hudPct, campPct, 'Camp face matches HUD % before the door');
+  assert.equal(hudPct, trueCompletion(deserializeSave(storage.getItem(SAVE_KEY)).state).label);
 
   elements['hud-known'].click();
 
@@ -308,6 +319,8 @@ test('tapping Known chip leaves Camp for Almanac Items (found-log)', () => {
   assert.match(logTab?.textContent ?? '', /Log/i);
   const journalTab = tabButtons.find((b) => b.dataset.tab === 'journal');
   assert.equal(journalTab.classList.contains('active'), true, 'Almanac tab is selected');
+  const itemsPct = elements.screen.querySelector('[data-true-complete="items"]')?.textContent;
+  assert.equal(itemsPct, hudPct, 'Almanac Items head matches HUD %');
   assertHudEqualsSave('after Known chip → Almanac Items');
 });
 
@@ -331,9 +344,11 @@ test('tapping Hollow chip opens the owned Bank grid', () => {
   assertHudEqualsSave('after Hollow chip → Owned');
 });
 
-test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () => {
+test('dump lantern-loaf: Known stays 6/137, % does not jump, Hollow 5/12, chips still doors', () => {
   const campTab = tabButtons.find((b) => b.dataset.tab === 'camp');
   campTab.click();
+  const pctBefore = elements['hud-complete'].textContent;
+  assert.equal(elements['hud-known'].textContent, 'Known 6/137');
   elements['hud-hollow'].click();
 
   const sellToggle = findButton(elements.screen, /Sell Mode|^Selling$/);
@@ -352,6 +367,7 @@ test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () 
   loaf.click();
 
   assert.equal(elements['hud-known'].textContent, 'Known 6/137');
+  assert.equal(elements['hud-complete'].textContent, pctBefore, 'dump must not jump True Completion');
   assert.equal(elements['hud-hollow'].textContent, 'Hollow 5/12');
   const { state } = deserializeSave(storage.getItem(SAVE_KEY));
   assert.equal(itemTimesFound(state, 'lantern-loaf'), STARTER_BANK['lantern-loaf'],
@@ -362,12 +378,15 @@ test('dump lantern-loaf: Known stays 6/137, Hollow 5/12, chips still doors', () 
   campTab.click();
   assert.ok(elements.screen.querySelector('.camp'), 'back on Camp');
   assert.equal(elements['hud-known'].textContent, 'Known 6/137');
+  assert.equal(elements['hud-complete'].textContent, pctBefore);
+  assert.equal(elements.screen.querySelector('[data-true-complete="camp"]')?.textContent, pctBefore);
   assert.equal(elements['hud-hollow'].textContent, 'Hollow 5/12');
 
   elements['hud-known'].click();
   assert.ok(elements.screen.querySelector('.almanac.log-items'), 'Known still opens the found-log');
   assert.equal(elements.screen.querySelector('.bank-screen'), null);
   assert.equal(elements.screen.querySelector('.screen-title')?.textContent, 'Items');
+  assert.equal(elements.screen.querySelector('[data-true-complete="items"]')?.textContent, pctBefore);
   const found = elements.screen.querySelector('[data-log-drill="items-found"]');
   const logLoaf = found.querySelector('[data-log-row="lantern-loaf"]');
   assert.match(found.textContent ?? '', /Lantern-loaf/);
@@ -396,6 +415,7 @@ test('Known and Hollow chips stay on-screen buttons on every tab', () => {
     assert.equal(elements['hud-known'].tagName, 'BUTTON', `${tab}: Known is a button`);
     assert.equal(elements['hud-hollow'].tagName, 'BUTTON', `${tab}: Hollow is a button`);
     assert.match(elements['hud-known'].textContent ?? '', /^Known \d+\/\d+$/, `${tab}: Known noun`);
+    assert.match(elements['hud-complete'].textContent ?? '', /^\d+(?:\.\d+)?%$/, `${tab}: True Completion %`);
     assert.match(elements['hud-hollow'].textContent ?? '', /^Hollow \d+\/\d+$/, `${tab}: Hollow noun`);
   }
 });

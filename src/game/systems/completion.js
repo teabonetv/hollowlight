@@ -1,5 +1,7 @@
-// Log Book / completion percentages. Total completion is the mean of four
-// honest buckets we actually have: Skills, Mastery, Items, Feats.
+// Log Book / completion percentages.
+// Wave 1 True Completion (HUD identity) is items known / live catalogue.
+// The LOG book headline is still the mean of four honest buckets:
+// Skills, Mastery, Items, Feats — not a fifth Melvor hub pillar.
 
 import { ACHIEVEMENTS, ACHIEVEMENT_CATEGORIES, TAB_OPEN_FEAT_IDS } from '../data/achievements.js';
 import { PERKS } from '../data/perks.js';
@@ -143,9 +145,8 @@ function masteryLogRow(state) {
 }
 
 function itemsLogRow(state) {
-  const have = knownItemCount(state);
-  const total = ITEMS.length;
-  return { id: 'items', name: 'Items', done: have, total, pct: clampRatio(have, total) };
+  const t = trueCompletion(state);
+  return { id: 'items', name: 'Items', done: t.done, total: t.total, pct: t.pct };
 }
 
 /** Unique registry ids marked found in play. Starter pack is not discovered. */
@@ -259,7 +260,19 @@ export function formatCompletionPct(pct) {
   return `${Math.floor(hundred)}%`;
 }
 
-/** Front-and-centre number: mean of Skills / Mastery / Items / Feats. */
+/**
+ * Wave 1 True Completion: unique items known / live catalogue.
+ * Persistent HUD identity — same string on HUD beside Known, Almanac
+ * Items head, and Camp completion face. Occupancy (Hollow) is separate.
+ */
+export function trueCompletion(state) {
+  const done = knownItemCount(state);
+  const total = ITEMS.length;
+  const pct = clampRatio(done, total);
+  return { done, total, pct, label: formatCompletionPct(pct) };
+}
+
+/** LOG book headline: mean of Skills / Mastery / Items / Feats. */
 export function totalCompletion(state) {
   const rows = logCategoryStats(state);
   const pct = rows.length ? rows.reduce((s, r) => s + r.pct, 0) / rows.length : 0;

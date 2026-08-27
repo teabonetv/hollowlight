@@ -23,7 +23,7 @@ const { renderAlmanacScreen } = await import('../src/ui/screens/meta.js');
 const { showOfflineModal, openModal } = await import('../src/ui/modals.js');
 const { computeOfflineProgress, formatRecapLine } = await import('../src/core/offline.js');
 const { ACTIONS_BY_ID } = await import('../src/game/data/actions.js');
-const { logCategoryStats, totalCompletion, COMPLETION_HONESTY_RULE, liveMasteryTracks } = await import('../src/game/systems/completion.js');
+const { logCategoryStats, totalCompletion, trueCompletion, COMPLETION_HONESTY_RULE, liveMasteryTracks } = await import('../src/game/systems/completion.js');
 const { cascadeAchievements } = await import('../src/game/systems/achievements.js');
 const { shouldRebuildScreen } = await import('../src/ui/live-paint.js');
 const { readFileSync } = await import('node:fs');
@@ -204,6 +204,7 @@ test('opening Almanac tab-open feats does not move the CAMP headline', () => {
   const state = createState({ nowMs: 0, rngSeed: 9 });
   cascadeAchievements(state);
   const camp = totalCompletion(state);
+  const identity = trueCompletion(state);
   state.stats.almanacOpens = 1;
   state.stats.mapOpens = 1;
   state.stats.starsOpens = 1;
@@ -214,6 +215,8 @@ test('opening Almanac tab-open feats does not move the CAMP headline', () => {
   const after = totalCompletion(state);
   assert.equal(after.label, camp.label);
   assert.equal(after.pct, camp.pct);
+  assert.equal(trueCompletion(state).label, identity.label,
+    'catalogue True Completion must not move when you open the Almanac');
 });
 
 test('Claim on an open Embers tab keeps the same article and button node', () => {
