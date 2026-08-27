@@ -18,6 +18,7 @@ import {
 import { grantRadianceFromXp } from '../game/systems/radiance.js';
 import { tryBankAdd } from '../game/systems/bank.js';
 import { cascadeAchievements } from '../game/systems/achievements.js';
+import { recordTinderHalt } from '../game/systems/stats.js';
 import { pushLog } from '../game/state.js';
 
 export const OFFLINE_CAP_HOURS = 12;
@@ -181,9 +182,11 @@ export function computeOfflineProgress({
 
   // Fuel-halt (×0 or run-until-dry) dies on Claim — Melvor isActive false.
   // Leave the workstation dead until the player starts it again; do not wait
-  // for the next live tick to fail the cost check.
+  // for the next live tick to fail the cost check. Stamp tinderHalts here so
+  // Claim / feat preview share the same counter live tickActions uses.
   for (const note of idleNotes) {
     delete next.actions.active[note.actionId];
+    recordTinderHalt(next, note);
   }
 
   const levelUps = [];

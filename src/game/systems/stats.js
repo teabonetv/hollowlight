@@ -142,6 +142,18 @@ export function totalCycles(state) {
   return n;
 }
 
+/** Live halt and offline Claim share this. Out of Tinder reads tinderHalts. */
+export function isTinderHalt({ missingId, reason } = {}) {
+  return missingId === 'tinderscrap' || /tinderscrap/i.test(String(reason ?? ''));
+}
+
+/** Stamp the starve the recap already named. No-op for idle / other materials. */
+export function recordTinderHalt(state, halt = {}) {
+  if (!state || !isTinderHalt(halt)) return;
+  state.stats ??= {};
+  state.stats.tinderHalts = (state.stats.tinderHalts ?? 0) + 1;
+}
+
 export function recordCycle(state, appliedGains = []) {
   state.stats ??= {};
   state.stats.actionsDone = (state.stats.actionsDone ?? 0) + 1;
