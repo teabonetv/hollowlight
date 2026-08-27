@@ -175,7 +175,7 @@ test('Radiance accrues from XP and can buy Kindling without wiping progress', ()
   assert.equal(s.radiance, 1, 'cost refunded, 1-node respec fee in Lumen not Radiance');
 });
 
-test('offline Claim absorbs credited wall-clock into playtimeMs', () => {
+test('offline Claim absorbs full-window work into playtimeMs', () => {
   const s = createState({ nowMs: 0, rngSeed: 8 });
   s.stats.playtimeMs = 19 * 60_000 + 18_000; // 19m 18s
   s.bank.tinderscrap = 10_000;

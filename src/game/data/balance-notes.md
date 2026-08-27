@@ -257,20 +257,24 @@ True completion must not move when you open the Almanac. Visit and tab-open feat
 
 ## Offline playtime (S4 honesty)
 
-`playtimeMs` (“Time by the Flame”) adds **credited** away-time on Claim
-**only when cycles actually ran** (capped at 12 h, same cap as production).
-A feats-only or fuel-halt rewind does not stuff wall-clock into playtime
-and does not increment `offlineClaims` / light “The Work Went On”.
+`playtimeMs` (“Time by the Flame”) adds **run-until-halt** ms on Claim
+when cycles actually ran (capped at 12 h, same cap as production). A fuel
+halt stops the clock when the action would have stopped — Tend ×20 then
+dry over 3 h away is ~80 s of 4 s cycles, not 3 h, and must not light
+“The Long Sit” from the stuffed tail. Recap `/h` uses that same halt
+window (×20 · 900/h, not 7/h over 3 h). A feats-only, idle, or fuel-halt
+at ×0 rewind does not stuff wall-clock into playtime and does not
+increment `offlineClaims` / light “The Work Went On”.
 The tick loop is frozen (and its accumulator reset) while the recap modal is open so Tend cannot keep counting down on an empty tinder stack and Gather cannot add Fogwort on top of the preview before Claim. Recap-open wall time is not play — Claim does not merge leaked ticks into Time by the Flame. After Claim the runner stays frozen one beat (`RECAP_THAW_MS`) so HUD stays on the recap numbers. Until Claim, autosave / hide / pagehide keep the rewound `savedAt` so a reload still offers the same recap (wallet stays pre-Claim; HUD==save).
 
-**Always recap** when away ≥ 60s, including idle `active {}` and feats-only. Copy names the time away, Cap 12h, and `Nothing ran.` plus `With nothing queued, Time by the Flame and the dailies sat still.` Claim is still required (Melvor still shows Welcome Back on empty-away). Idle Claim does not stuff playtime or light “The Work Went On”. Persist must not restamp `savedAt` while that recap is open.
+**Always recap** when away ≥ 60s, including idle `active {}` and feats-only. Copy names the time away, Cap 12h, and `Nothing ran.` plus `With nothing queued, Time by the Flame and the dailies sat still.` Claim is still required (Melvor still shows Welcome Back on empty-away). Idle Claim does not stuff playtime or light “The Work Went On”. Persist must not restamp `savedAt` while that recap is open. Capped idle must not say “kept 12 hours of work” / “Credited 12h” when the body is stillness.
 
 Recap preview == Claim: XP→Radiance sparks are a dedicated Radiance line,
 not hidden behind Feats. Level-ups and mastery print `Foraging 1 → 21` /
 `Mastery 1 → 18`. Every recap prints the 12h cap. Feat names start collapsed
 as `N feats` (tap to expand; names open above Claim in the body scrollport) so Claim stays pinned on 360 — never truncated
 to four names behind `+98 Lumen · +11 Radiance`. Item / lumen / flame /
-radiance lines include an honest `/h` EV from the credited window.
+radiance lines include an honest `/h` EV from the run-until-halt window.
 
 Lumen and mastery XP use the **live per-cycle round**, then × completions
 (`Math.round(qty × multiplier)`), not a floored batch. Skill XP already

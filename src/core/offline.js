@@ -10,7 +10,7 @@
 // so it works for any future content set without edits.
 
 import { levelFromXp } from './xp.js';
-import { formatMissingChip, formatNumber } from './format.js';
+import { formatDuration, formatMissingChip, formatNumber } from './format.js';
 import {
   xpGrantMultiplier, effectiveDurationMs, lumenGainMultiplier,
   radianceGainMultiplier, masteryXpMultiplier,
@@ -27,7 +27,7 @@ function clampPositive(n) { return Math.max(0, Math.floor(n)); }
 
 /**
  * @returns {{
- *   awayMs:number, creditedMs:number, capped:boolean,
+ *   awayMs:number, creditedMs:number, workedMs:number, capped:boolean,
  *   gains:{ items:{id:string,name:string,qty:number}, lumen:number, flame:number,
  *           radiance:number, xp:Object<string,number>, actions:Array },
  *   levelUps:Array<{skillId:string,from:number,to:number,level:number}>,
@@ -70,7 +70,8 @@ export function computeOfflineProgress({
 
       // Whole cycles the window allows — at the camp-upgrade-adjusted
       // duration (same helper live play uses, so speeds apply offline too)…
-      const timeCompletions = Math.floor(creditedMs / effectiveDurationMs(next, action));
+      const durationMs = effectiveDurationMs(next, action);
+      const timeCompletions = Math.floor(creditedMs / durationMs);
       let completions = timeCompletions;
       // …bounded by materials for every cycle cost.
       let missingId = null;
@@ -162,8 +163,12 @@ export function computeOfflineProgress({
       next.actions.completed[actionId] = (next.actions.completed[actionId] ?? 0) + completions;
       next.stats.actionsDone = (next.stats.actionsDone ?? 0) + completions;
 
+      const halted = Boolean(missingId && completions < timeCompletions);
+      const runMs = halted
+        ? Math.min(creditedMs, completions * durationMs)
+        : creditedMs;
       actionLines.push({
-        actionId, name: action.name, completions, xp: xpGain, creditedMs,
+        actionId, name: action.name, completions, xp: xpGain, creditedMs, runMs,
       });
       if (missingId && completions < timeCompletions) {
         idleNotes.push({
@@ -185,17 +190,21 @@ export function computeOfflineProgress({
     }
   }
 
-  // Credited wall-clock lands in playtime only when cycles actually ran.
-  // A feats-only / fuel-halt rewind must not stuff idle hours into
-  // "Time by the Flame" or light "The Work Went On".
+  // Playtime bills action-run ms until halt, not the credited away tail.
+  // Tend ×20 then dry over 3h is ~80s of flame, not 3h in Time by the Flame.
+  // Idle / feats-only / fuel-halt at ×0 still add nothing (Melvor stops).
   const hasGains = actionLines.length > 0;
-  if (hasGains) {
-    next.stats.playtimeMs = originalPlaytimeMs + creditedMs;
+  const workedMs = hasGains
+    ? Math.min(creditedMs, Math.max(0, ...actionLines.map((l) => l.runMs ?? 0)))
+    : 0;
+  if (hasGains && workedMs > 0) {
+    next.stats.playtimeMs = originalPlaytimeMs + workedMs;
   }
 
   return {
     awayMs,
     creditedMs,
+    workedMs,
     capped,
     originalPlaytimeMs,
     gains: {
@@ -248,7 +257,7 @@ export function formatIdleRecapStillness(res) {
   return IDLE_RECAP_STILLNESS;
 }
 
-/** `+3,240 · 1,080/h` — honest EV rate from credited window. */
+/** `+3,240 · 1,080/h` — honest EV rate from the run-until-halt window. */
 export function formatOfflineHourRate(qty, creditedMs) {
   if (!(creditedMs > 0) || !(qty > 0) || !Number.isFinite(qty)) return '';
   const perHour = qty / (creditedMs / 3_600_000);
@@ -279,18 +288,21 @@ function mergeRecapLines(actionLines, idleNotes) {
 /**
  * One recap sentence. Halted actions always include ×N (including 0 and 1)
  * and name the leftover stack (`out of Tinderscrap ×0` when empty).
- * @param {{name:string, completions?:number, missingId?:string, xp?:number, remainingQty?:number}} line
+ * Completions > 0 print an honest /h from run-until-halt, not the away tail.
+ * @param {{name:string, completions?:number, missingId?:string, xp?:number, remainingQty?:number, runMs?:number, creditedMs?:number}} line
  * @param {(id:string)=>string} [resolveItem]
  */
 export function formatRecapLine(line, resolveItem = (id) => id) {
   const n = line.completions ?? 0;
   let text = `${line.name} ×${n}`;
+  const rateMs = line.runMs ?? line.creditedMs;
+  const rate = n > 0 ? formatOfflineHourRate(n, rateMs) : '';
   if (line.missingId) {
     const left = Number.isFinite(line.remainingQty) ? line.remainingQty : 0;
+    if (rate) text += ` · ${rate}`;
     text += ` — ${formatMissingChip(resolveItem(line.missingId), left)}`;
   } else if (line.xp > 0) {
     text += ` · +${line.xp} XP`;
-    const rate = formatOfflineHourRate(n, line.creditedMs);
     if (rate) text += ` · ${rate}`;
   }
   return text;
@@ -316,6 +328,20 @@ export function formatMasteryUpLine(mu, { named = false } = {}) {
 /** Always-on cap chip. Short enough for a 360 away-line. */
 export function formatOfflineCapNote(capHours = OFFLINE_CAP_HOURS) {
   return `Cap ${capHours}h.`;
+}
+
+/**
+ * Capped-window work copy. Stillness / nothing-ran recaps must not say "work"
+ * or "Credited 12h" — the body already says Nothing ran.
+ */
+export function formatOfflineCappedWorkNote(res) {
+  if (!res?.capped || !res.hasGains) return null;
+  return `The lantern kept ${OFFLINE_CAP_HOURS} hours of work.`;
+}
+
+export function formatOfflineCreditedNote(res) {
+  if (!res?.capped || !res.hasGains) return null;
+  return `Credited ${formatDuration(res.creditedMs)}.`;
 }
 
 /**

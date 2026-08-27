@@ -45,6 +45,27 @@ test('analytic match: 1h away tending the flame with ample tinder', () => {
   assert.equal(res.gains.xp.emberkeeping, Math.round(14 * 1.01) * 900);
 });
 
+test('fuel-halt bills playtime until halt, not the credited away tail', () => {
+  const s = stateTending(20);
+  const startPlay = (2 * H) - 90_000; // 1h 58m 30s — stuffed 3h would light The Long Sit
+  s.stats.playtimeMs = startPlay;
+  const threeH = 3 * H;
+  const res = computeOfflineProgress({
+    state: s, nowMs: threeH, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const runMs = 20 * ACTIONS_BY_ID['tend-flame'].durationMs; // 80s of 4s cycles
+  assert.equal(res.hasGains, true);
+  assert.equal(res.gains.actions[0].completions, 20);
+  assert.equal(res.creditedMs, threeH);
+  assert.equal(res.workedMs, runMs);
+  assert.equal(res.gains.actions[0].runMs, runMs);
+  assert.equal(res.nextState.stats.playtimeMs, startPlay + runMs);
+  assert.ok(res.nextState.stats.playtimeMs < 2 * H,
+    'halt tail must not push Time by the Flame over 2h');
+  assert.notEqual(res.nextState.stats.playtimeMs, startPlay + threeH,
+    'must not stuff the dry 3h into playtime');
+});
+
 test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', () => {
   const empty = stateTending(0);
   const none = computeOfflineProgress({
@@ -69,7 +90,7 @@ test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', 
   );
   assert.equal(
     formatRecapLine(res.recapLines[0], names),
-    'Tend the Flame ×1 — out of Tinderscrap ×0',
+    'Tend the Flame ×1 · 900/h — out of Tinderscrap ×0',
   );
 });
 
