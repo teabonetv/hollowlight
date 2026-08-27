@@ -166,6 +166,87 @@ test('eating heals and consumes food; oil sips drain wick-oil during the fight',
   assert.ok((s.bank['wick-oil'] ?? 0) < oilBefore, 'a sip was taken');
 });
 
+function hitLogCount(state) {
+  return (state.combat.log ?? []).filter((l) => l.kind === 'hit').length;
+}
+
+test('mid-swing Eat zeros player attack progress, heals, and does not land a blow that step', () => {
+  const s = createState({ rngSeed: 5 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 3 });
+  s.combat.player.hp = 10;
+  const speed = combat.playerOffense(s, s.combat.player.style).speedMs;
+  assert.ok(speed > 400, `weapon speed ${speed}`);
+  const rem = Math.floor(speed / 4);
+  s.combat.player.nextActMs = rem;
+  s.combat.foe.nextActMs = 50_000;
+  assert.ok(combat.playerSwingProgress(s) > 0.5);
+  const foeHp = s.combat.foe.hp;
+  const hits0 = hitLogCount(s);
+  const hp0 = s.combat.player.hp;
+  const ate = combat.eatFood(s, 'lantern-loaf');
+  assert.equal(ate.ok, true);
+  assert.equal(s.combat.player.hp, hp0 + 14);
+  assert.equal(combat.playerSwingRemainingMs(s), speed);
+  assert.equal(combat.playerSwingProgress(s), 0);
+  assert.equal(s.combat.foe.nextActMs, 50_000, 'foe timer is not the eat letter');
+
+  combat.tickCombat(s, rem);
+  assert.equal(s.combat.fighting, true);
+  assert.equal(s.combat.foe.hp, foeHp, 'old remainder must not complete the new swing');
+  assert.equal(hitLogCount(s), hits0);
+  assert.ok(s.combat.player.nextActMs > 0);
+});
+
+test('a second Eat also zeros swing progress; ready-to-hit Eat skips the blow that step', () => {
+  const s = createState({ rngSeed: 5 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 3 });
+  s.combat.player.hp = 10;
+  const speed = combat.playerOffense(s, s.combat.player.style).speedMs;
+  s.combat.foe.nextActMs = 50_000;
+  s.combat.player.nextActMs = Math.floor(speed / 3);
+  assert.equal(combat.eatFood(s, 'lantern-loaf').ok, true);
+  assert.equal(combat.playerSwingProgress(s), 0);
+  assert.equal(s.combat.player.nextActMs, speed);
+
+  s.combat.player.nextActMs = 80;
+  assert.ok(combat.playerSwingProgress(s) > 0);
+  const hp1 = s.combat.player.hp;
+  assert.equal(combat.eatFood(s, 'lantern-loaf').ok, true);
+  assert.ok(s.combat.player.hp > hp1);
+  assert.equal(combat.playerSwingProgress(s), 0);
+  assert.equal(s.combat.player.nextActMs, speed);
+
+  const foeHp = s.combat.foe.hp;
+  const hits0 = hitLogCount(s);
+  s.combat.player.nextActMs = 0;
+  assert.equal(combat.eatFood(s, 'fogwort').ok, true);
+  assert.equal(s.combat.player.nextActMs, speed);
+  combat.tickCombat(s, 0);
+  combat.tickCombat(s, 50);
+  assert.equal(s.combat.foe.hp, foeHp);
+  assert.equal(hitLogCount(s), hits0);
+});
+
+test('failed Eat does not restart the swing; leftover Eat does not need a live windup', () => {
+  const s = createState({ rngSeed: 5 });
+  combat.startFight(s, 'pale-moth', { encounterSeed: 3 });
+  const speed = combat.playerOffense(s, s.combat.player.style).speedMs;
+  s.combat.player.hp = combat.playerMaxHp(s);
+  s.combat.player.nextActMs = 180;
+  const fail = combat.eatFood(s, 'lantern-loaf');
+  assert.equal(fail.ok, false);
+  assert.equal(s.combat.player.nextActMs, 180);
+
+  combat.fleeFight(s);
+  s.combat.player.hp = 10;
+  const leftoverSwing = s.combat.player.nextActMs;
+  const ate = combat.eatFood(s, 'lantern-loaf');
+  assert.equal(ate.ok, true);
+  assert.equal(s.combat.fighting, false);
+  assert.equal(s.combat.player.nextActMs, leftoverSwing);
+  assert.equal(speed, combat.playerOffense(s, s.combat.player.style).speedMs);
+});
+
 test('eat heal, log line, and HP delta are the same integer', () => {
   const s = createState({ rngSeed: 5 });
   s.combat.player.hp = 32;
