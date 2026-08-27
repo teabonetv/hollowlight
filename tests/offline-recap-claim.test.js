@@ -28,7 +28,8 @@ import {
   formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, formatIdleRecapLine,
   formatIdleRecapStillness, IDLE_RECAP_STILLNESS, formatRecapLine,
   formatOfflineHourRate, shouldOfferOfflineRecap, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
-  formatOfflineAwayLine, IDLE_RECAP_FLAME_UNCHANGED,
+  formatOfflineAwayLine, IDLE_RECAP_FLAME_UNCHANGED, haltedEarly, formatHaltCoda,
+  creditsOfflineLabour,
 } from '../src/core/offline.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -49,10 +50,10 @@ function gatheringState({ radiance = 12 } = {}) {
   return s;
 }
 
-/** Claim path: adopt nextState, credit claims only when work ran, cascade feats. */
+/** Claim path: adopt nextState, credit claims only for full-span labour, cascade feats. */
 function applyClaim(res) {
   const game = hydrateState(structuredClone(res.nextState));
-  if (res.hasGains) {
+  if (creditsOfflineLabour(res)) {
     game.stats.offlineClaims = (game.stats.offlineClaims ?? 0) + 1;
   }
   cascadeAchievements(game);
@@ -140,7 +141,7 @@ test('Tend fuel-halt recap /h uses run-until-halt, not the 3h tail', () => {
   const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
   const recap = formatRecapLine(res.recapLines[0], names);
   assert.match(recap, /Tend the Flame ×20/);
-  assert.match(recap, /900\/h/);
+  assert.match(recap, /900\/h for 1m 20s/);
   assert.doesNotMatch(recap, /7\/h/);
   assert.match(recap, /out of Tinderscrap/);
 
@@ -155,7 +156,7 @@ test('Tend fuel-halt recap /h uses run-until-halt, not the 3h tail', () => {
   const mount = new FakeNode('div');
   showOfflineModal(mount, { ...res, featPreview }, { onClaim() {} });
   const text = mount.textContent ?? '';
-  assert.match(text, /900\/h/);
+  assert.match(text, /900\/h for 1m 20s/);
   assert.doesNotMatch(text, /7\/h/);
   assert.match(text, /Tend the Flame ×20/);
 });
@@ -190,6 +191,8 @@ test('S4m: Tend ×20 then 3h recap names the halt clock; idle has no work copy; 
   assert.match(haltAway, /3h 00m away · worked 1m 20s/);
   assert.match(haltAway, /Cap 12h/);
   assert.doesNotMatch(haltAway, /hours of work/);
+  assert.match(haltMount.textContent ?? '', /Then the flame sat still for 2h 58m/);
+  assert.doesNotMatch(haltMount.textContent ?? '', /The Work Went On/);
 
   const idlePlay = 90_000;
   const idle = createState({ nowMs: 0, rngSeed: 22 });
@@ -241,6 +244,140 @@ test('S4m: Tend ×20 then 3h recap names the halt clock; idle has no work copy; 
   assert.match(fullAway, /3h 00m away\./);
   assert.doesNotMatch(fullAway, / · worked/);
   assert.match(fullAway, /Cap 12h/);
+});
+
+test('S4n: Tend dry 3h recap sits still; Work Went On stays dark', () => {
+  const play = (2 * H) - 90_000;
+  const tendMs = ACTIONS_BY_ID['tend-flame'].durationMs;
+  const halt = createState({ nowMs: 0, rngSeed: 31 });
+  halt.stats.playtimeMs = play;
+  halt.stats.offlineClaims = 0;
+  halt.bank.tinderscrap = 10;
+  halt.actions.active['tend-flame'] = { progressMs: 0 };
+  const haltRes = computeOfflineProgress({
+    state: halt, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(haltRes.gains.actions[0].completions, 10);
+  assert.equal(haltRes.workedMs, 10 * tendMs, 'playtime bills run-until-halt, not the 3h tail');
+  assert.equal(haltRes.workedMs, 40_000);
+  assert.equal(haltRes.nextState.stats.playtimeMs, play + 40_000);
+  assert.equal(haltedEarly(haltRes), true);
+  assert.equal(creditsOfflineLabour(haltRes), false,
+    'fuel-halt sliver is not hours-of-work labour');
+  assert.equal(
+    formatHaltCoda(haltRes),
+    'Then the flame sat still for 2h 59m.',
+  );
+  assert.equal(
+    formatOfflineAwayLine(haltRes),
+    '3h 00m away · worked 40s. Cap 12h.',
+  );
+
+  const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
+  const recap = formatRecapLine(haltRes.recapLines[0], names);
+  assert.match(recap, /Tend the Flame ×10/);
+  assert.match(recap, /out of Tinderscrap/);
+  assert.match(recap, /900\/h for 40s/);
+  assert.doesNotMatch(recap, /7\/h/);
+
+  const haltPreview = previewOfflineClaim(haltRes);
+  assert.equal(haltPreview.state.stats.offlineClaims ?? 0, 0);
+  assert.equal(isUnlocked(haltPreview.state, 't-off-1'), false,
+    'The Work Went On must not light from a fuel-halt sliver');
+  assert.ok(!(haltPreview.feats ?? []).some((a) => a.id === 't-off-1'));
+  assert.ok(!(haltPreview.feats ?? []).some((a) => a.name === 'The Work Went On'));
+  assert.equal(isUnlocked(haltPreview.state, 't-2h'), false,
+    'The Long Sit stays dark');
+  const haltClaimed = applyClaim(haltRes);
+  assert.equal(haltClaimed.stats.offlineClaims ?? 0, 0);
+  assert.equal(isUnlocked(haltClaimed, 't-off-1'), false);
+  assert.equal(haltClaimed.stats.playtimeMs, play + 40_000);
+
+  const haltMount = new FakeNode('div');
+  showOfflineModal(haltMount, { ...haltRes, featPreview: haltPreview }, { onClaim() {} });
+  const haltText = haltMount.textContent ?? '';
+  const haltAway = haltMount.querySelector('.offline-away')?.textContent ?? '';
+  const coda = haltMount.querySelector('.offline-halt-coda');
+  const featList = haltMount.querySelector('.offline-feat-list');
+  assert.match(haltAway, /3h 00m away · worked 40s/);
+  assert.match(haltAway, /Cap 12h/);
+  assert.ok(coda, 'sat-still coda sits above the list, not behind feats');
+  assert.equal(coda.textContent, 'Then the flame sat still for 2h 59m.');
+  assert.match(haltText, /Then the flame sat still for 2h 59m/);
+  assert.ok(!featList || !featList.contains(coda),
+    'coda is visible without expanding feats');
+  if (featList) {
+    assert.ok(featList.classList.contains('is-collapsed'),
+      'feats stay collapsed; coda must not require Hide feats');
+  }
+  assert.doesNotMatch(haltText, /The Work Went On/);
+  assert.match(haltText, /900\/h for 40s/);
+  assert.doesNotMatch(haltText, /7\/h/);
+  assert.doesNotMatch(haltAway, /hours of work/);
+
+  const idlePlay = 90_000;
+  const idle = createState({ nowMs: 0, rngSeed: 32 });
+  idle.stats.playtimeMs = idlePlay;
+  idle.actions.active = {};
+  const idleRes = computeOfflineProgress({
+    state: idle, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(idleRes.hasGains, false);
+  assert.equal(idleRes.workedMs, 0);
+  assert.equal(idleRes.nextState.stats.playtimeMs, idlePlay,
+    'idle playtime stays unpadded');
+  assert.equal(formatHaltCoda(idleRes), null);
+  assert.equal(creditsOfflineLabour(idleRes), false);
+  const idlePreview = previewOfflineClaim(idleRes);
+  assert.equal(isUnlocked(idlePreview.state, 't-off-1'), false);
+  const idleMount = new FakeNode('div');
+  showOfflineModal(idleMount, { ...idleRes, featPreview: idlePreview }, { onClaim() {} });
+  const idleText = idleMount.textContent ?? '';
+  const idleAway = idleMount.querySelector('.offline-away')?.textContent ?? '';
+  assert.equal(idleMount.querySelector('.offline-halt-coda'), null);
+  assert.match(idleText, /Nothing ran/);
+  assert.match(idleText, /With nothing queued, Time by the Flame and the dailies sat still/);
+  assert.match(idleAway, /Time by the Flame unchanged/);
+  assert.doesNotMatch(idleAway, / · worked/);
+  assert.doesNotMatch(idleText, /Then the flame sat still/);
+  assert.doesNotMatch(idleText, /hours of work/);
+  assert.doesNotMatch(idleText, / · worked/);
+
+  const fullPlay = 19 * 60_000 + 18_000;
+  const full = createState({ nowMs: 0, rngSeed: 33 });
+  full.stats.playtimeMs = fullPlay;
+  full.stats.offlineClaims = 0;
+  full.bank.tinderscrap = 10_000;
+  full.actions.active['tend-flame'] = { progressMs: 0 };
+  const fullRes = computeOfflineProgress({
+    state: full, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(fullRes.hasGains, true);
+  assert.equal(fullRes.workedMs, fullRes.creditedMs);
+  assert.equal(fullRes.creditedMs, 3 * H);
+  assert.equal(fullRes.nextState.stats.playtimeMs, fullPlay + 3 * H,
+    'ample fuel still bills the credited span');
+  assert.equal(haltedEarly(fullRes), false);
+  assert.equal(formatHaltCoda(fullRes), null, 'ample fuel has no sat-still coda');
+  assert.equal(creditsOfflineLabour(fullRes), true);
+  const fullPreview = previewOfflineClaim(fullRes);
+  assert.ok((fullPreview.state.stats.offlineClaims ?? 0) >= 1);
+  assert.equal(isUnlocked(fullPreview.state, 't-off-1'), true,
+    'full-span labour still lights The Work Went On');
+  const fullMount = new FakeNode('div');
+  showOfflineModal(fullMount, { ...fullRes, featPreview: fullPreview }, { onClaim() {} });
+  const fullText = fullMount.textContent ?? '';
+  const fullAway = fullMount.querySelector('.offline-away')?.textContent ?? '';
+  assert.equal(fullMount.querySelector('.offline-halt-coda'), null);
+  assert.match(fullAway, /3h 00m away\./);
+  assert.doesNotMatch(fullAway, / · worked/);
+  assert.doesNotMatch(fullText, /Then the flame sat still/);
+  assert.doesNotMatch(fullText, / for 3h/);
+  assert.match(fullText, /\/h/);
+
+  const appSrc = readFileSync(join(here, '../src/ui/app.js'), 'utf8');
+  assert.match(appSrc, /creditsOfflineLabour\(res\)/,
+    'Claim must use the same labour gate as preview');
 });
 
 test('idle rewind does not inflate playtime or grant Work Went On with zero cycles', () => {

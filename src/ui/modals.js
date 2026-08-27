@@ -6,8 +6,8 @@ import { formatNumber } from '../core/format.js';
 import {
   formatRecapLine, formatLevelUpLine, formatMasteryUpLine,
   formatOfflineCapNote, formatIdleRecapLine, formatIdleRecapStillness,
-  formatOfflineHourRate, formatOfflineCappedWorkNote, formatOfflineCreditedNote,
-  formatOfflineAwayHead,
+  formatOfflineHourRateChip, formatOfflineCappedWorkNote, formatOfflineCreditedNote,
+  formatOfflineAwayHead, formatHaltCoda, haltedEarly,
 } from '../core/offline.js';
 import { SAVE_VERSION } from '../core/save.js';
 import { itemName, ITEMS_BY_ID } from '../game/data/items.js';
@@ -184,8 +184,8 @@ export function openModal(mount, {
 }
 
 /** "While you were away…" — honest, capped, per-action breakdown. */
-function qtyWithHourRate(qty, rateMs, { gold = false } = {}) {
-  const rate = formatOfflineHourRate(qty, rateMs);
+function qtyWithHourRate(qty, rateMs, { gold = false, forMs = 0 } = {}) {
+  const rate = formatOfflineHourRateChip(qty, rateMs, { forMs });
   const text = `+${formatNumber(qty)}${rate ? ` · ${rate}` : ''}`;
   return el('span', { class: gold ? 'offline-detail gold' : 'offline-detail' }, text);
 }
@@ -196,6 +196,7 @@ export function showOfflineModal(mount, summary, { onClaim }) {
     levelUps = [], masteryUps = [], hasGains, workedMs,
   } = summary;
   const rateMs = workedMs > 0 ? workedMs : creditedMs;
+  const haltForMs = haltedEarly(summary) ? (workedMs ?? 0) : 0;
   const rows = [];
   const idleLine = formatIdleRecapLine({ hasGains, idleNotes }, featPreview);
   if (idleLine) {
@@ -228,22 +229,22 @@ export function showOfflineModal(mount, summary, { onClaim }) {
   if (gains.lumen > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Lumen'),
-      qtyWithHourRate(gains.lumen, rateMs, { gold: true })));
+      qtyWithHourRate(gains.lumen, rateMs, { gold: true, forMs: haltForMs })));
   }
   if (gains.radiance > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Radiance'),
-      qtyWithHourRate(gains.radiance, rateMs, { gold: true })));
+      qtyWithHourRate(gains.radiance, rateMs, { gold: true, forMs: haltForMs })));
   }
   if (gains.flame > 0) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, 'Flame units'),
-      qtyWithHourRate(gains.flame, rateMs, { gold: true })));
+      qtyWithHourRate(gains.flame, rateMs, { gold: true, forMs: haltForMs })));
   }
   for (const item of gains.items) {
     rows.push(el('div', { class: 'offline-line' },
       el('span', { class: 'offline-name' }, itemName(item.id) ?? item.name ?? item.id),
-      qtyWithHourRate(item.qty, rateMs)));
+      qtyWithHourRate(item.qty, rateMs, { forMs: haltForMs })));
   }
   const feats = featPreview?.feats ?? [];
   if (featPreview?.lumen > 0 || featPreview?.radiance > 0 || feats.length > 0) {
@@ -292,6 +293,7 @@ export function showOfflineModal(mount, summary, { onClaim }) {
 
   const workNote = formatOfflineCappedWorkNote(summary);
   const creditedNote = formatOfflineCreditedNote(summary);
+  const haltCoda = formatHaltCoda(summary);
   const body = el('div', {},
     el('p', { class: 'offline-away' },
       formatOfflineAwayHead(summary), ' ',
@@ -299,6 +301,7 @@ export function showOfflineModal(mount, summary, { onClaim }) {
         workNote ?? formatOfflineCapNote()),
     ),
     creditedNote ? el('p', { class: 'muted small' }, creditedNote) : null,
+    haltCoda ? el('p', { class: 'offline-halt-coda muted' }, haltCoda) : null,
     el('div', { class: 'offline-list' }, rows),
   );
 

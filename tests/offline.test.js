@@ -90,7 +90,7 @@ test('offline names the Tinderscrap halt instead of hiding a ×0 or quiet ×1', 
   );
   assert.equal(
     formatRecapLine(res.recapLines[0], names),
-    'Tend the Flame ×1 · 900/h — out of Tinderscrap ×0',
+    'Tend the Flame ×1 · 900/h for 4s — out of Tinderscrap ×0',
   );
 });
 
