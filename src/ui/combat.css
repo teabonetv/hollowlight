@@ -321,6 +321,7 @@
 }
 .loot-tile {
   box-sizing: border-box;
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   flex-direction: row;
@@ -370,6 +371,36 @@
   font-variant-numeric: tabular-nums;
   font-weight: 600;
   color: var(--gold-hi);
+}
+/* Leftover can spend the 44px row on portraits so names are not jammed into Take all. */
+.leftover-station .loot-tile {
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 1px;
+  width: 56px;
+  min-width: 56px;
+  max-width: 60px;
+  height: 44px;
+  padding: 2px 2px 3px;
+}
+.leftover-station .loot-copy {
+  align-items: center;
+  width: 100%;
+  padding: 0;
+}
+.leftover-station .loot-name {
+  font-size: 9.5px;
+  line-height: 1.1;
+  max-width: 100%;
+  text-align: center;
+}
+.leftover-station .loot-qty {
+  position: absolute;
+  top: 1px;
+  right: 2px;
+  font-size: 9px;
+  line-height: 1;
+  text-shadow: 0 0 4px #07090d;
 }
 .leftover-actions {
   display: flex;
