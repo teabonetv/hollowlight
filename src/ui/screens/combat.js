@@ -12,6 +12,7 @@ import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vi
 import { ITEMS_BY_ID } from '../../game/data/items.js';
 import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemies/index.js';
 import { bankCount } from '../../game/systems/bank.js';
+import { buyFromStore, liveBuyUnit } from '../../game/systems/store.js';
 import * as combat from '../../game/systems/combat.js';
 
 /**
@@ -30,18 +31,21 @@ export const COMBAT_360 = {
   xpBlock: 40,
   lobbyHead: 50,
   gap: 3,
-  leftoverGap: 2,
+  leftoverGap: 1,
   leftoverStationTop: 161, // 360 wrapped topbar 105 + pad 8 + detail-head 44 + gap 4
   kicker: 14,
   fighter: 26,
+  leftoverFighter: 22,
   acc: 26,
+  leftoverAcc: 22,
   oil: 14,
+  oilBuy: 44,
   eat: 44,
   hand: 44,
   styles: 44,
   keep: 44,
   hunt: 44,
-  loot: 18,
+  loot: 44,
   souls: 32,
   zoneChips: 44,
   huntCardAboveBtn: 140,
@@ -93,23 +97,29 @@ export function cockpitLogVsTab(kind = 'leftover') {
 }
 
 /**
- * Leftover 360 geometry after kill (loot chips) or Fall back (no loot).
+ * Leftover 360 geometry after kill (loot tray) or Fall back (no pile).
  * leftover-station is height-capped to the hub; .cockpit-fill eats the
- * chrome remainder so loot cannot shove logWrap.bottom into the tab.
+ * chrome remainder so the tray / oil buy cannot shove logWrap.bottom into the tab.
+ * oilBuy: dry leftover paints a 44px stall buy on the oil row.
  */
-export function leftoverLogVsTab({ loot = true } = {}) {
+export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const C = COMBAT_360;
   const box = cockpitLogVsTab('leftover');
   const stationTop = C.leftoverStationTop;
   const lootH = loot ? C.loot : 0;
-  const chromeItems = 8 + (loot ? 1 : 0);
-  const chrome = C.kicker + 2 * C.fighter + C.acc + C.oil + C.eat + C.hand + C.styles + lootH;
-  const chromeGaps = (C.leftoverGap ?? C.gap) * chromeItems;
+  const oilH = oilBuy ? (C.oilBuy ?? 44) : C.oil;
+  const fighterH = C.leftoverFighter ?? C.fighter;
+  const accH = C.leftoverAcc ?? C.acc;
+  const chromeBlocks = 8 + (loot ? 1 : 0);
+  const chrome = C.kicker + 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + lootH;
+  const chromeGaps = (C.leftoverGap ?? C.gap) * (chromeBlocks - 1);
   const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
   return {
     ...box,
     loot,
     lootH,
+    oilBuy,
+    oilH,
     fillH,
     stationTop,
     stationBottom: box.logBottom,
@@ -833,31 +843,64 @@ function leftoverStation(ctx, st, paint) {
   wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
   const sips = combat.oilSipsRemaining(ctx.state);
   const dry = sips <= 0;
-  wrap.append(el('p', { class: `oil-line ${dry ? 'danger leftover-dry' : 'muted'}` },
-    dry ? 'Need oil' : `${formatNoun(sips, 'lantern sip')} remaining`));
+  wrap.append(leftoverOilRow(ctx, st, paint, { sips, dry }));
   wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
   wrap.append(handChip(ctx, st, paint));
   wrap.append(styleRow(ctx, st, paint));
-  const loot = leftoverLootRow(last);
+  const loot = leftoverLootRow(ctx, st, paint);
   if (loot) wrap.append(loot);
   wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
   return wrap;
 }
 
-function leftoverLootRow(last) {
-  if (last.ended !== 'kill') return null;
+function leftoverOilRow(ctx, st, paint, { sips, dry }) {
+  if (!dry) {
+    return el('p', { class: 'oil-line muted' },
+      `${formatNoun(sips, 'lantern sip')} remaining`);
+  }
+  const unit = liveBuyUnit(ctx.state, 'wick-oil');
+  const row = el('div', { class: 'oil-line danger leftover-dry leftover-oil-row' });
+  row.append(el('span', { class: 'leftover-dry-copy' }, 'Need oil'));
+  row.append(el('button', {
+    class: 'btn leftover-oil-buy',
+    type: 'button',
+    onclick: () => {
+      let res;
+      if (ctx.storeBuy) res = ctx.storeBuy('wick-oil', 1);
+      else res = buyFromStore(ctx.state, 'wick-oil', 1);
+      if (!res?.ok) ctx.toast?.(res?.error ?? 'Could not buy wick-oil.', 'warn');
+      paint();
+    },
+  }, `Wick-oil ✦${formatNumber(unit)}`));
+  return row;
+}
+
+function leftoverLootRow(ctx, st, paint) {
+  const tray = st.lootTray ?? ctx.state.combat?.lootTray ?? [];
+  if (!tray.length) return null;
   const chips = [];
-  if (last.souls) chips.push(el('span', { class: 'chip chip-gold' }, formatNoun(last.souls, 'soul')));
-  for (const d of last.loot ?? []) {
-    if (d.kind === 'lumen') {
+  for (const d of tray) {
+    if (d.kind === 'soul') {
+      chips.push(el('span', { class: 'chip chip-gold' }, formatNoun(d.qty, 'soul')));
+    } else if (d.kind === 'lumen') {
       chips.push(el('span', { class: 'chip chip-gold' }, `✦${formatNumber(d.qty)}`));
     } else {
       chips.push(el('span', { class: 'chip' }, `${d.name ?? d.id} ×${d.qty}`));
     }
   }
-  if (!chips.length) chips.push(el('span', { class: 'chip' }, 'nothing but quiet'));
-  return chipRow('leftover-loot chips', chips);
+  const row = el('div', { class: 'leftover-loot leftover-tray' });
+  row.append(chipRow('leftover-loot-chips chips', chips));
+  row.append(el('button', {
+    class: 'btn btn-ghost leftover-take',
+    type: 'button',
+    onclick: () => {
+      if (ctx.takeAllLootTray) ctx.takeAllLootTray();
+      else combat.takeAllLootTray(ctx.state);
+      paint();
+    },
+  }, 'Take all'));
+  return row;
 }
 
 function leftoverLog(st) {

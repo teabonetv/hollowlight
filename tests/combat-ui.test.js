@@ -25,6 +25,7 @@ const { renderSkillDetail, renderSkillsScreen } = await import('../src/ui/screen
 const { cockpitLogVsTab, leftoverLogVsTab, lobbyFirstHuntBottom, COMBAT_360 } = await import('../src/ui/screens/combat.js');
 const tabs = await import('../src/ui/screens/tabs.js');
 const combat = await import('../src/game/systems/combat.js');
+const { buyFromStore } = await import('../src/game/systems/store.js');
 
 function makeCtx(state) {
   return {
@@ -44,6 +45,8 @@ function makeCtx(state) {
     selectFood: (id) => combat.selectFood(state, id),
     cycleFood: () => combat.cycleFood(state),
     dismissLastStation: () => combat.dismissLastStation(state),
+    takeAllLootTray: () => combat.takeAllLootTray(state),
+    storeBuy: (id, qty) => buyFromStore(state, id, qty),
   };
 }
 
@@ -809,6 +812,112 @@ test('Eat, Fall back, and Hunt another stay 44px taps and do not shrink under th
   assert.match(css, /\.eat-btn\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.flee-btn\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.leftover-another\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.leftover-take\s*\{[^}]*min-height:\s*44px/);
+  assert.match(css, /\.leftover-oil-buy\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.eat-slot\s*\{[^}]*flex-wrap:\s*nowrap/);
   assert.match(css, /\.eat-row\s*\{[^}]*flex-shrink:\s*0/);
+});
+
+test('leftover loot tray keeps prior chips after Hunt this foe and Take all does not double-pay', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const firstTray = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  assert.ok(firstTray.length >= 1);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  const pile = leftover.querySelector('.leftover-loot')?.textContent ?? '';
+  assert.match(pile, /soul/);
+  assert.match(pile, /✦/);
+  assert.ok(leftover.querySelector('.leftover-take'));
+  leftover.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (state.combat.foe) state.combat.foe.hp = 1;
+    state.combat.player.nextActMs = 0;
+    kill = combat.tickCombat(state, 100).find((e) => e.type === 'combat-kill') ?? kill;
+    scr.update();
+  }
+  assert.ok(kill);
+  const after = scr.node.querySelector('.leftover-station');
+  assert.ok(after);
+  const pile2 = after.querySelector('.leftover-loot')?.textContent ?? '';
+  assert.match(pile2, /soul/);
+  assert.match(pile2, /✦/);
+  for (const row of firstTray) {
+    if (row.kind === 'item') assert.match(pile2, new RegExp(row.name ?? row.id));
+    if (row.kind === 'soul') assert.match(pile2, /soul/);
+  }
+  const souls = after.querySelector('.leftover-loot-chips')?.textContent ?? pile2;
+  assert.match(souls, /[2-9] souls|[2-9] soul/);
+
+  const lumen = state.lumen;
+  const soulCount = state.souls;
+  const fang = state.bank['pall-fang'] ?? 0;
+  after.querySelector('.leftover-take').click();
+  assert.deepEqual(state.combat.lootTray, []);
+  assert.equal(state.lumen, lumen);
+  assert.equal(state.souls, soulCount);
+  assert.equal(state.bank['pall-fang'] ?? 0, fang);
+  assert.equal(scr.node.querySelector('.leftover-loot'), null);
+  assert.ok(scr.node.querySelector('.leftover-hunt'), 'Hunt-this-foe stays after Take all');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+});
+
+test('leftover after Fall back still shows the held loot pile', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const first = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  combat.startFight(state, 'pale-moth', { encounterSeed: 9 });
+  combat.fleeFight(state);
+  const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
+  assert.match(leftover.querySelector('.leftover-kicker')?.textContent ?? '', /Fell back from Pale Moth/);
+  const pile = leftover.querySelector('.leftover-loot')?.textContent ?? '';
+  assert.match(pile, /soul|✦/);
+  for (const row of first) {
+    if (row.kind === 'item') assert.match(pile, new RegExp(row.name ?? row.id));
+  }
+  assert.ok(leftover.querySelector('.leftover-take'));
+  leftover.querySelector('.leftover-another').click();
+  assert.equal(state.combat.lastStation, null);
+  assert.deepEqual(state.combat.lootTray, []);
+});
+
+test('dry leftover offers wick-oil buy; Hunt this foe enables after the stall sip', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  state.bank['wick-oil'] = 0;
+  state.bank['lamp-oil'] = 0;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  const buy = leftover.querySelector('.leftover-oil-buy');
+  assert.ok(buy, 'dry leftover paints a stall buy');
+  assert.match(buy.textContent ?? '', /Wick-oil/);
+  assert.match(buy.textContent ?? '', /✦/);
+  const hunt = leftover.querySelector('.leftover-hunt');
+  assert.equal(hunt.disabled, true);
+  const lumen = state.lumen;
+  buy.click();
+  assert.ok((state.bank['wick-oil'] ?? 0) >= 1);
+  assert.ok(state.lumen < lumen);
+  const hunt2 = scr.node.querySelector('.leftover-hunt');
+  assert.ok(hunt2);
+  assert.equal(hunt2.disabled, false);
+  assert.equal(hunt2.getAttribute('aria-disabled'), 'false');
+  assert.equal(combat.oilSipsRemaining(state) > 0, true);
+  assert.equal(scr.node.querySelector('.leftover-oil-buy'), null);
+  assert.equal(scr.node.querySelector('.hunt-list'), null, 'leftover stays a combat page');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+});
+
+test('dry leftover tray + oil buy still pins the log above tab 577', () => {
+  const box = leftoverLogVsTab({ loot: true, oilBuy: true });
+  assert.equal(box.tabTop, 577);
+  assert.ok(box.fits, `fill ${box.fillH} logBottom ${box.logBottom} vs tab ${box.tabTop}`);
+  assert.ok(box.fillH >= 0);
+  assert.ok(box.logBottom < box.tabTop);
+  assert.equal(box.wrapH, 100);
+  const fed = leftoverLogVsTab({ loot: true, oilBuy: false });
+  assert.equal(fed.logBottom, box.logBottom, 'oil buy must not move logWrap.bottom');
 });

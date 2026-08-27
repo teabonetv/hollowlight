@@ -22,6 +22,8 @@ import { recordKill, recordDeath } from './stats.js';
 
 export const COMBAT_LOG_CAP = 48;
 export const LEFTOVER_LOG_LINES = 4;
+/** Visible leftover collect pile. Stacks same kind; idle can still read it. */
+export const LEFTOVER_TRAY_CAP = 8;
 /** First blow waits at least this long so Hunt’s opening 360 is a live fight. */
 export const OPENING_WINDUP_MS = 1200;
 export const BASE_MAX_HP = 36;
@@ -60,6 +62,7 @@ export function createCombatState() {
     dryAnnounced: false,
     foodId: null, // selected eat slot; null = first owned in FOOD_ORDER
     lastStation: null, // leftover cockpit after a hunt (HP/acc snapshot)
+    lootTray: [], // visible collect pile; drops are granted on kill
   };
 }
 
@@ -88,6 +91,9 @@ export function ensureCombat(state) {
   if (c.lastStation === undefined) c.lastStation = null;
   if (c.lastStation && !Array.isArray(c.lastStation.log)) {
     c.lastStation.log = copyLogTail(c.log);
+  }
+  if (!Array.isArray(c.lootTray)) {
+    c.lootTray = leftoverTrayFromStation(c.lastStation);
   }
   return c;
 }
@@ -313,6 +319,89 @@ export function foodHeal(itemId) {
   return FOOD[itemId]?.heal ?? 0;
 }
 
+function leftoverTrayFromStation(last) {
+  if (!last || last.ended !== 'kill') return [];
+  const entries = [];
+  if (last.souls) {
+    entries.push({ kind: 'soul', qty: last.souls, granted: true });
+  }
+  for (const d of last.loot ?? []) {
+    entries.push({
+      kind: d.kind,
+      id: d.id ?? null,
+      qty: d.qty,
+      name: d.name ?? null,
+      granted: true,
+    });
+  }
+  return entries;
+}
+
+function copyTrayEntry(e) {
+  return {
+    kind: e.kind,
+    id: e.id ?? null,
+    qty: e.qty,
+    name: e.name ?? null,
+    granted: e.granted !== false,
+  };
+}
+
+function trayMatch(a, b) {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'item') return (a.id ?? null) === (b.id ?? null);
+  return true;
+}
+
+/** Visible leftover pile — loot is already in the bank/wallet unless granted is false. */
+export function leftoverLootTray(state) {
+  return ensureCombat(state).lootTray;
+}
+
+export function pushLeftoverTray(state, entries) {
+  const c = ensureCombat(state);
+  for (const raw of entries ?? []) {
+    if (!raw || !(raw.qty > 0)) continue;
+    const e = copyTrayEntry(raw);
+    const hit = c.lootTray.find((t) => trayMatch(t, e));
+    if (hit) {
+      hit.qty += e.qty;
+      if (e.granted === false) hit.granted = false;
+    } else {
+      c.lootTray.push(e);
+    }
+  }
+  if (c.lootTray.length > LEFTOVER_TRAY_CAP) {
+    c.lootTray.splice(0, c.lootTray.length - LEFTOVER_TRAY_CAP);
+  }
+  return c.lootTray;
+}
+
+/**
+ * Clear the visible pile. Pending (granted: false) rows pay into bank/wallet;
+ * already-granted kill loot is not paid again.
+ */
+export function takeAllLootTray(state) {
+  const c = ensureCombat(state);
+  const tray = Array.isArray(c.lootTray) ? c.lootTray : [];
+  const granted = [];
+  for (const e of tray) {
+    if (e.granted !== false) continue;
+    if (e.kind === 'soul') {
+      state.souls = (state.souls ?? 0) + e.qty;
+      granted.push({ ...e, granted: true });
+    } else if (e.kind === 'lumen') {
+      state.lumen += e.qty;
+      granted.push({ ...e, granted: true });
+    } else if (e.kind === 'item' && e.id) {
+      const res = bank.tryBankAdd(state, e.id, e.qty);
+      if (res.ok) granted.push({ ...e, qty: res.added, granted: true });
+    }
+  }
+  c.lootTray = [];
+  return { ok: true, granted };
+}
+
 function snapshotLastStation(state, ended = 'kill', extra = {}) {
   const c = ensureCombat(state);
   const kit = fightCockpit(state);
@@ -374,6 +463,7 @@ export function leftoverKicker(last) {
 export function dismissLastStation(state) {
   ensureCombat(state);
   state.combat.lastStation = null;
+  state.combat.lootTray = [];
   return { ok: true };
 }
 
@@ -699,6 +789,11 @@ function onKill(state, rng) {
 
   const vigilEvents = progressVigil(state, enemy);
 
+  const trayEntries = [];
+  if (enemy.souls) trayEntries.push({ kind: 'soul', qty: enemy.souls, granted: true });
+  for (const d of applied) trayEntries.push({ ...d, granted: true });
+  pushLeftoverTray(state, trayEntries);
+
   const repeatId = enemy.id;
   const auto = c.autoContinue && !enemy.boss && lanternIsFed(state);
   snapshotLastStation(state, 'kill', { souls: enemy.souls, loot: applied });
@@ -960,6 +1055,7 @@ export function combatStatus(state) {
     autoBrew: c.autoBrew,
     foodId: selectedFoodId(state),
     lastStation: c.lastStation,
+    lootTray: c.lootTray,
     log: c.log,
     deathSite: c.deathSite,
     vigils: c.vigils,

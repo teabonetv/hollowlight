@@ -590,6 +590,11 @@ function boot() {
       renderScreen();
       return res;
     },
+    takeAllLootTray() {
+      const res = combat.takeAllLootTray(game);
+      afterMutation();
+      return res;
+    },
     eatFood(itemId) {
       const res = combat.eatFood(game, itemId);
       if (res.ok) afterMutation();

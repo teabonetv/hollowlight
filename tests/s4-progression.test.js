@@ -313,6 +313,7 @@ test('v4 combat saves keep the hunt and gain leftover-station fields (v4→v5)',
   assert.equal(state.combat.kills['pale-moth'], 2);
   assert.equal(state.combat.foodId, null);
   assert.equal(state.combat.lastStation, null);
+  assert.ok(Array.isArray(state.combat.lootTray));
   assert.deepEqual(state.discovered, {});
   assert.equal(state.radiance, 1);
 });
@@ -502,6 +503,7 @@ test('v4 saves gain an empty discovered map (v4→v5)', () => {
   assert.deepEqual(state.discovered, {});
   assert.equal(state.combat.foodId, null);
   assert.equal(state.combat.lastStation, null);
+  assert.ok(Array.isArray(state.combat.lootTray));
   assert.equal(logCategoryStats(state).find((r) => r.id === 'items').done, 2,
     'held stacks floor Times Found so v4 goods stay known');
   assert.equal(state.radiance, 3);
@@ -527,6 +529,7 @@ test('S4d-only v5 saves keep discovered and gain eat/station defaults without v6
   assert.equal(state.discovered['pall-fang'], true);
   assert.equal(state.combat.foodId, null);
   assert.equal(state.combat.lastStation, null);
+  assert.ok(Array.isArray(state.combat.lootTray));
   assert.equal(state.combat.kills['pale-moth'], 1);
   assert.deepEqual(state.bankLocks, []);
   assert.deepEqual(state.stats.itemFound, {});

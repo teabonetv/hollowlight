@@ -100,6 +100,7 @@ export const MIGRATIONS = [
           ...combat,
           foodId: combat.foodId ?? null,
           lastStation: combat.lastStation ?? null,
+          lootTray: Array.isArray(combat.lootTray) ? combat.lootTray : undefined,
         },
       };
     },
