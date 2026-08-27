@@ -26,7 +26,7 @@ import { hydrateState } from '../src/game/hydrate.js';
 import {
   computeOfflineProgress, previewOfflineClaim, recapWalletDelta,
   formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, formatIdleRecapLine,
-  formatIdleRecapStillness, IDLE_RECAP_STILLNESS,
+  formatIdleRecapStillness, IDLE_RECAP_STILLNESS, formatRecapLine,
   formatOfflineHourRate, shouldOfferOfflineRecap, OFFLINE_CAP_HOURS, OFFLINE_MIN_AWAY_MS,
 } from '../src/core/offline.js';
 import { readFileSync } from 'node:fs';
@@ -111,9 +111,52 @@ test('recap preview Radiance equals post-Claim HUD Radiance for an offline gathe
   assert.equal(shouldOfferOfflineRecap(res), true);
   const fogwort = res.gains.items.find((i) => i.id === 'fogwort');
   assert.ok(fogwort, 'Fogwort EV line');
-  const fogRate = formatOfflineHourRate(fogwort.qty, res.creditedMs);
+  assert.equal(res.workedMs, res.creditedMs, 'full-window gather bills the credited span');
+  const fogRate = formatOfflineHourRate(fogwort.qty, res.workedMs);
   assert.match(text, new RegExp(fogRate.replace('/', '\\/')));
   assert.match(text, /\/h/);
+});
+
+test('Tend fuel-halt recap /h uses run-until-halt, not the 3h tail', () => {
+  const play = (2 * H) - 90_000;
+  const s = createState({ nowMs: 0, rngSeed: 11 });
+  s.stats.playtimeMs = play;
+  s.bank.tinderscrap = 20;
+  s.actions.active['tend-flame'] = { progressMs: 0 };
+  const res = computeOfflineProgress({
+    state: s, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  const runMs = 20 * ACTIONS_BY_ID['tend-flame'].durationMs;
+  assert.equal(res.gains.actions[0].completions, 20);
+  assert.equal(res.workedMs, runMs);
+  assert.equal(res.nextState.stats.playtimeMs, play + runMs);
+
+  const honest = formatOfflineHourRate(20, runMs);
+  const stuffed = formatOfflineHourRate(20, res.creditedMs);
+  assert.equal(honest, '900/h');
+  assert.equal(stuffed, '7/h');
+
+  const names = (id) => id === 'tinderscrap' ? 'Tinderscrap' : id;
+  const recap = formatRecapLine(res.recapLines[0], names);
+  assert.match(recap, /Tend the Flame ×20/);
+  assert.match(recap, /900\/h/);
+  assert.doesNotMatch(recap, /7\/h/);
+  assert.match(recap, /out of Tinderscrap/);
+
+  const featPreview = previewOfflineClaim(res);
+  assert.equal(isUnlocked(featPreview.state, 't-2h'), false,
+    'The Long Sit must not light from the stuffed halt tail');
+  assert.ok(!(featPreview.feats ?? []).some((a) => a.id === 't-2h'));
+  const claimed = applyClaim(res);
+  assert.equal(isUnlocked(claimed, 't-2h'), false);
+  assert.equal(claimed.stats.playtimeMs, play + runMs);
+
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, { ...res, featPreview }, { onClaim() {} });
+  const text = mount.textContent ?? '';
+  assert.match(text, /900\/h/);
+  assert.doesNotMatch(text, /7\/h/);
+  assert.match(text, /Tend the Flame ×20/);
 });
 
 test('idle rewind does not inflate playtime or grant Work Went On with zero cycles', () => {
@@ -245,6 +288,29 @@ test('absences below the min threshold do not offer a recap', () => {
     actionsById: ACTIONS_BY_ID,
   });
   assert.equal(shouldOfferOfflineRecap(res), false);
+});
+
+test('capped idle recap does not call the still window work', () => {
+  const idle = createState({ nowMs: 0, rngSeed: 8 });
+  idle.actions.active = {};
+  const res = computeOfflineProgress({
+    state: idle,
+    nowMs: 13 * H,
+    lastSavedAt: 0,
+    actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(res.capped, true);
+  assert.equal(res.hasGains, false);
+  assert.equal(res.nextState.stats.playtimeMs, idle.stats.playtimeMs);
+  const featPreview = previewOfflineClaim(res);
+  const mount = new FakeNode('div');
+  showOfflineModal(mount, { ...res, featPreview }, { onClaim() {} });
+  const text = mount.textContent ?? '';
+  assert.match(text, /Nothing ran/);
+  assert.match(text, /With nothing queued, Time by the Flame and the dailies sat still/);
+  assert.match(text, /Cap 12h/);
+  assert.doesNotMatch(text, /hours of work/);
+  assert.doesNotMatch(text, /Credited/);
 });
 
 test('idle recap modal prints time away, Cap 12h, and Nothing ran', () => {
