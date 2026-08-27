@@ -1254,4 +1254,116 @@ test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay abo
   assert.match(css, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*max-height:\s*100%/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.log-wrap\s*\{[^}]*margin-top:\s*auto/);
+  assert.match(css, /\.loot-tile\s*\{/);
+  const liveTile = [...css.matchAll(/\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\s+\.loot-tile\s*\{([^}]+)\}/g)];
+  assert.ok(liveTile.length >= 1, 'live loot-tile compact rule');
+  const tileH = liveTile.flatMap((m) => [...m[1].matchAll(/height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(tileH.some((h) => h <= 32), `live loot-tile height ${tileH.join(',')} must be ≤32px`);
+});
+
+function assertLootFurniture(host, { minTiles = 1 } = {}) {
+  const tray = host.querySelector('.leftover-loot') ?? host.querySelector('.fight-loot:not(.is-empty)');
+  assert.ok(tray, 'loot tray is mounted');
+  assert.equal(tray.querySelector('.chip-sep'), null, 'loot is furniture, not a · receipt');
+  assert.equal(tray.querySelectorAll('.chip').length, 0, 'no text chips in the tray');
+  const tiles = tray.querySelectorAll('.loot-tile');
+  assert.ok(tiles.length >= minTiles, `expected ≥${minTiles} loot portraits, got ${tiles.length}`);
+  for (const tile of tiles) {
+    const glyph = tile.querySelector('.loot-glyph');
+    assert.ok(glyph, '32px portrait glyph');
+    assert.match(glyph.innerHTML ?? '', /<svg/i);
+    assert.match(glyph.className, /bank-glyph/);
+    const name = (tile.querySelector('.loot-name')?.textContent ?? '').trim();
+    const qty = (tile.querySelector('.loot-qty')?.textContent ?? '').trim();
+    assert.ok(name.length > 0, 'tile shows a name');
+    assert.ok(qty.length > 0, 'tile shows a qty');
+  }
+  assert.ok(tray.querySelector('.leftover-take'), 'Take all stays on the furniture');
+  return { tray, tiles };
+}
+
+test('leftover unpaid tray is loot furniture: glyph + name + qty, Take all still grants', () => {
+  const state = createState({ rngSeed: 4 });
+  const lumen0 = state.lumen;
+  const souls0 = state.souls;
+  const bank0 = { ...state.bank };
+  assert.ok(killMoth(state));
+  const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  assert.ok(held.length >= 1);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  const { tiles } = assertLootFurniture(leftover, { minTiles: held.length });
+  assert.equal(tiles.length, held.length);
+  const pile = leftover.querySelector('.leftover-loot')?.textContent ?? '';
+  assert.match(pile, /soul/);
+  assert.match(pile, /✦/);
+  leftover.querySelector('.leftover-take').click();
+  assert.deepEqual(state.combat.lootTray, []);
+  assert.equal(state.lumen, lumen0 + traySum(held, 'lumen'));
+  assert.equal(state.souls, souls0 + traySum(held, 'soul'));
+  for (const row of held) {
+    if (row.kind === 'item' && row.id) {
+      assert.equal(state.bank[row.id] ?? 0, (bank0[row.id] ?? 0) + row.qty);
+    }
+  }
+  assert.equal(scr.node.querySelector('.leftover-loot'), null);
+  combat.takeAllLootTray(state);
+  assert.equal(state.lumen, lumen0 + traySum(held, 'lumen'));
+});
+
+test('live unpaid tray is the same furniture; Take all pays; compact height holds', () => {
+  const state = createState({ rngSeed: 4 });
+  const lumen0 = state.lumen;
+  const souls0 = state.souls;
+  assert.ok(killMoth(state));
+  const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  scr.node.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.equal(fight.classList.contains('leftover-station'), false);
+  const { tray, tiles } = assertLootFurniture(fight, { minTiles: held.length });
+  assert.ok(tray.classList.contains('fight-loot'));
+  assert.match(tray.getAttribute('aria-label') ?? '', /Loot to collect/i);
+  assert.equal(tiles.length, held.length);
+  assert.match(tray.textContent ?? '', /soul/);
+  assert.match(tray.textContent ?? '', /✦/);
+
+  const take = fight.querySelector('.leftover-take');
+  take.click();
+  assert.deepEqual(state.combat.lootTray, []);
+  assert.equal(state.lumen, lumen0 + traySum(held, 'lumen'));
+  assert.equal(state.souls, souls0 + traySum(held, 'soul'));
+  assert.equal(scr.node.querySelector('.leftover-take'), null);
+  assert.ok(scr.node.querySelector('.eat-btn'));
+  assert.ok(scr.node.querySelector('.flee-btn'));
+
+  const piled = fightLogVsTab({ loot: true });
+  assert.equal(piled.lootH, 32);
+  assert.ok(piled.trayBottom < 577);
+  assert.ok(piled.eatBottom < 577);
+});
+
+test('live unpaid furniture tiles survive combat ticks without remounting Eat/Fall back', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  scr.node.querySelector('.leftover-hunt').click();
+  combat.resumeCombat(state);
+  const eatBtn = scr.node.querySelector('.eat-btn');
+  const fleeBtn = scr.node.querySelector('.flee-btn');
+  const tray = scr.node.querySelector('.fight-loot');
+  const take = tray.querySelector('.leftover-take');
+  const tile0 = tray.querySelector('.loot-tile');
+  assert.ok(eatBtn && fleeBtn && tray && take && tile0);
+  for (let i = 0; i < 8; i++) {
+    if (state.combat.foe) state.combat.foe.hp = Math.max(4, state.combat.foe.hp);
+    combat.tickCombat(state, 100);
+    scr.update();
+    assert.equal(scr.node.querySelector('.eat-btn'), eatBtn);
+    assert.equal(scr.node.querySelector('.flee-btn'), fleeBtn);
+    assert.equal(scr.node.querySelector('.fight-loot'), tray);
+    assert.equal(tray.querySelector('.leftover-take'), take, 'Take all node survives ticks');
+    assert.equal(tray.querySelector('.loot-tile'), tile0, 'loot portrait survives ticks');
+  }
 });

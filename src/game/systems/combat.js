@@ -757,6 +757,31 @@ function consumeOilSip(state) {
   return OIL_CHECK_MS;
 }
 
+/** Remaining ms until the Lampwright's next blow. Counts down; 0 is a ready swing. */
+export function playerSwingRemainingMs(state) {
+  ensureCombat(state);
+  return Math.max(0, state.combat.player.nextActMs);
+}
+
+/**
+ * Fraction of the current swing that has elapsed (0 = just started, 1 = ready).
+ * Eat zeros this so loaf is a decision, not a free overlay on a filling bar.
+ */
+export function playerSwingProgress(state) {
+  ensureCombat(state);
+  const speed = playerOffense(state, state.combat.player.style).speedMs;
+  if (!(speed > 0)) return 0;
+  const rem = playerSwingRemainingMs(state);
+  return Math.max(0, Math.min(1, 1 - rem / speed));
+}
+
+function restartPlayerSwing(state) {
+  const c = ensureCombat(state);
+  if (!c.fighting) return;
+  const off = playerOffense(state, c.player.style);
+  c.player.nextActMs = off.speedMs;
+}
+
 export function eatFood(state, itemId) {
   ensureCombat(state);
   const food = FOOD[itemId];
@@ -768,6 +793,7 @@ export function eatFood(state, itemId) {
   const healed = eatHealAmount(state, itemId);
   const before = state.combat.player.hp;
   state.combat.player.hp = Math.min(max, before + food.heal);
+  restartPlayerSwing(state);
   pushCombatLog(state, `You eat ${food.name} (+${healed} vitality).`, 'eat');
   return { ok: true, healed, heal: healed };
 }
