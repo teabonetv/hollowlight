@@ -58,7 +58,7 @@ test('visibleBankTabs keep core chips and drop empty categories', () => {
   const bank = { fogwort: 2, tinderscrap: 1 };
   const tabs = visibleBankTabs(bank);
   const ids = tabs.map(([id]) => id);
-  assert.deepEqual(ids.slice(0, 3), ['owned', 'pinned', 'all']);
+  assert.deepEqual(ids.slice(0, 4), ['owned', 'pinned', 'all', 'stall']);
   assert.ok(ids.includes('herb'));
   assert.ok(ids.includes('fuel'));
   assert.equal(ids.includes('fish'), false);

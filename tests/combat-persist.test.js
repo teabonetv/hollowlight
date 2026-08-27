@@ -89,10 +89,13 @@ function rawSave() {
 }
 
 test('combat ticks flush HP into hollowlight.save in the same eval', () => {
-  const pale = elements.screen.querySelectorAll('button')
-    .find((b) => /Face the pale-things/.test(b.textContent ?? ''));
-  assert.ok(pale, 'camp combat door');
-  pale.click();
+  const skills = tabButtons.find((b) => b.dataset.tab === 'skills');
+  assert.ok(skills, 'Skills tab');
+  skills.click();
+  const combatTab = elements.screen.querySelectorAll('.craft-tab')
+    .find((b) => b.getAttribute('data-skill') === 'combat');
+  assert.ok(combatTab, 'Skills craft subnav has Combat');
+  combatTab.click();
 
   const hunt = elements.screen.querySelectorAll('button')
     .find((b) => (b.textContent ?? '') === 'Hunt');
@@ -123,9 +126,11 @@ function tabIs(tab) {
 
 test('after reload the selected tab matches the combat screen', async () => {
   if (!/Pale Moth/.test(elements.screen.textContent ?? '')) {
-    const pale = elements.screen.querySelectorAll('button')
-      .find((b) => /Face the pale-things/.test(b.textContent ?? ''));
-    pale?.click();
+    const skills = tabButtons.find((b) => b.dataset.tab === 'skills');
+    skills?.click();
+    const combatTab = elements.screen.querySelectorAll('.craft-tab')
+      .find((b) => b.getAttribute('data-skill') === 'combat');
+    combatTab?.click();
     const hunt = elements.screen.querySelectorAll('button')
       .find((b) => (b.textContent ?? '') === 'Hunt');
     hunt?.click();

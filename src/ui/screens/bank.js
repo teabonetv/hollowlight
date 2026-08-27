@@ -8,7 +8,9 @@ import { itemGlyph } from '../../game/data/item-glyphs.js';
 import {
   bankCount, bankSellValue, filterItems, isPinned, isLocked, isCatalogueTab, visibleBankTabs,
   needsSellConfirm, uniqueStackCount, lanternRoom, sellQtyForMode, resolveBankTab,
+  isStallTab,
 } from '../../game/systems/bank.js';
+import { renderStoreBoard } from './store.js';
 import { formatNumber } from '../../core/format.js';
 import { liveSellUnit } from '../../game/systems/store.js';
 import { isItemKnown } from '../../game/systems/stats.js';
@@ -132,9 +134,12 @@ export function renderBankScreen(ctx) {
         'aria-selected': on ? 'true' : 'false',
         onclick: () => {
           filter.tab = id;
-          if (id === 'owned' || id === 'pinned' || isCatalogueTab(id)) ctx.setBankTab?.(id);
+          if (id === 'owned' || id === 'pinned' || isCatalogueTab(id) || isStallTab(id)) {
+            ctx.setBankTab?.(id);
+          }
           paintTabs();
-          syncGrid();
+          paintMode();
+          if (!isStallTab(filter.tab)) syncGrid();
         },
       }, label);
       tabBar.append(b);
@@ -445,13 +450,8 @@ export function renderBankScreen(ctx) {
     }
   }
 
-  workspace.append(
-    el('header', { class: 'screen-head' },
-      el('div', { class: 'bank-head-row' },
-        el('h1', { class: 'screen-title' }, 'Bank'),
-        sellToggle),
-      headerSub),
-    search, tabBar, sellQtyRow, sellHint, emptyState, gridHost,
+  const packBody = el('div', { class: 'bank-pack' },
+    search, sellQtyRow, sellHint, emptyState, gridHost,
     el('h2', { class: 'section-title' }, 'Loadouts'),
     el('p', { class: 'section-sub muted' }, 'Checklists only — applying a loadout never conjures items.'),
     el('div', { class: 'preset-actions' },
@@ -465,7 +465,29 @@ export function renderBankScreen(ctx) {
       }, 'Save gear set')),
     presetHost,
     el('p', { class: 'footnote muted' },
-      'Owned is the working pack. Catalogue is completion — tap it to see what still waits.'));
+      'Owned is the working pack. Catalogue is completion — tap it to see what still waits. Stall is the buy-door.'));
+  const storeHost = el('div', { class: 'bank-stall-host' });
+
+  workspace.append(
+    el('header', { class: 'screen-head' },
+      el('div', { class: 'bank-head-row' },
+        el('h1', { class: 'screen-title' }, 'Bank'),
+        sellToggle),
+      headerSub),
+    tabBar, packBody, storeHost);
+
+  function paintMode() {
+    const stall = isStallTab(filter.tab);
+    root.classList.toggle('bank-stall', stall);
+    packBody.style.display = stall ? 'none' : '';
+    storeHost.style.display = stall ? '' : 'none';
+    sellToggle.style.display = stall ? 'none' : '';
+    if (stall) {
+      if (!storeHost.firstChild) storeHost.append(renderStoreBoard(ctx));
+    } else {
+      clear(storeHost);
+    }
+  }
 
   paintInspectorEmpty();
   paintSellBar();
@@ -478,8 +500,11 @@ export function renderBankScreen(ctx) {
       `${known} of ${ITEMS.length} known · ${used} / ${cap} · catalog worth ✦${formatNumber(bankSellValue(ctx.state.bank))}`;
     paintTabs();
     paintSellBar();
-    syncGrid();
-    paintPresets();
+    paintMode();
+    if (!isStallTab(filter.tab)) {
+      syncGrid();
+      paintPresets();
+    }
     docked?.repaint?.();
   }
   update();

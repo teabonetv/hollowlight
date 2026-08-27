@@ -450,7 +450,8 @@ button.pill:active {
 .chip-chance { font-style: normal; opacity: 0.75; font-size: 10.5px; }
 
 /* ── skill detail ──────────────────────────────────────────── */
-.detail-head { display: flex; align-items: flex-start; gap: 6px; margin-left: -8px; }
+.detail-head { display: flex; align-items: stretch; gap: 6px; margin-left: 0; }
+.detail-head .craft-nav { width: 100%; flex: 1; padding-bottom: 0; }
 
 .xp-block { display: flex; flex-direction: column; gap: 7px; }
 .xp-line { display: flex; align-items: baseline; gap: 10px; }
@@ -519,7 +520,7 @@ button.pill:active {
 .auto-toggle input:focus-visible + .switch { outline: 2px solid var(--gold); outline-offset: 2px; }
 
 /* ── camp ──────────────────────────────────────────────────── */
-.camp { align-items: center; text-align: center; padding-top: 8px; gap: 10px; }
+.camp { align-items: center; text-align: center; padding-top: 8px; gap: 8px; }
 .sigil-wrap { margin-bottom: 2px; }
 .sigil {
   width: 52px; height: 52px; border-radius: 50%;
@@ -534,20 +535,20 @@ button.pill:active {
   50% { transform: scale(1.07); opacity: 1; }
 }
 .camp-title { margin: 6px 0 0; font-family: var(--font-display); font-weight: 400; font-size: 26px; letter-spacing: 0.08em; color: var(--gold-hi); }
-.camp-flavor { margin: 6px 0 0; max-width: 34ch; color: var(--muted); font-style: italic; font-size: 14px; }
+.camp-flavor { margin: 4px 0 0; max-width: 34ch; color: var(--muted); font-style: italic; font-size: 13px; }
 
 .stat-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 4px;
 }
 .stat-cell {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel);
-  padding: 12px 8px;
+  padding: 8px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -555,7 +556,6 @@ button.pill:active {
 .stat-value { font-size: 19px; font-variant-numeric: tabular-nums; color: var(--text); }
 .stat-label { font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--faint); }
 
-.camp-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 6px; }
 .camp-hint { font-size: 12px; max-width: 36ch; }
 
 /* ── bank ──────────────────────────────────────────────────── */
@@ -1148,7 +1148,9 @@ html.reduced-motion *::after {
   color: var(--gold-hi);
   letter-spacing: 0.04em;
 }
+.camp .section-title { margin: 12px 0 2px; }
 .section-sub { margin: 0 0 10px; font-size: 13px; }
+.camp .section-sub { margin: 0 0 6px; font-size: 12px; }
 .camp-empty { padding: 14px 0 6px; }
 .camp-empty .empty-text { margin: 0; }
 
@@ -1223,7 +1225,7 @@ html.reduced-motion *::after {
   text-transform: uppercase;
   color: var(--gold);
 }
-.want-list { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; }
+.want-list { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; }
 .want-row {
   appearance: none;
   display: flex;
@@ -1232,7 +1234,7 @@ html.reduced-motion *::after {
   gap: 2px;
   width: 100%;
   min-height: 44px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   background: var(--panel);
@@ -1244,7 +1246,7 @@ html.reduced-motion *::after {
 .want-kicker { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
 .want-title { font-weight: 600; font-size: 14.5px; }
 .want-detail { font-size: 12.5px; }
-.daily-strip { display: flex; flex-direction: column; gap: 8px; width: 100%; text-align: left; }
+.daily-strip { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; }
 .daily-strip-head {
   appearance: none; display: flex; justify-content: space-between; align-items: baseline;
   width: 100%; min-height: 44px; padding: 0; border: 0; background: none; color: inherit; cursor: pointer;
@@ -1258,18 +1260,20 @@ html.reduced-motion *::after {
 }
 .daily-chip.ready { border-color: rgba(217, 164, 65, 0.45); }
 .daily-chip.claimed { opacity: 0.55; }
-.almanac-nav {
+.almanac-nav, .craft-nav {
   display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
+  flex-wrap: nowrap;
 }
-.almanac-tab {
+.almanac-tab, .craft-tab {
   appearance: none; flex: 1 0 auto;
   min-height: 44px; min-width: 56px; padding: 8px 10px;
   border: 1px solid var(--line); border-radius: 999px;
   background: var(--panel); color: var(--muted);
   font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer;
+  white-space: nowrap;
 }
-.almanac-tab.active { color: var(--gold-hi); border-color: rgba(217, 164, 65, 0.5); }
+.almanac-tab.active, .craft-tab.active { color: var(--gold-hi); border-color: rgba(217, 164, 65, 0.5); }
 .complete-hero {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 16px 12px; border: 1px solid var(--line); border-radius: var(--radius);
@@ -1554,9 +1558,11 @@ html.reduced-motion *::after {
 .store-board { display: flex; flex-direction: column; gap: 16px; }
 .trade-card { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .trade-rare { border-color: rgba(217, 164, 65, 0.4); }
-.camp-starve { padding: 10px 0; }
+.camp-starve { padding: 8px 0; }
 .repair-kits { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .repair-row { display: flex; flex-direction: column; gap: 6px; }
+.bank-stall-host { width: 100%; }
+.bank-screen.bank-stall .bank-inspector { display: none; }
 
 .theme-dusk .bank-tab.active { border-color: #7a8ab8; color: #c5d0f0; }
 .theme-choir .bank-tab.active { border-color: #c4a574; color: #f0e0c0; }
@@ -1570,6 +1576,7 @@ html.reduced-motion *::after {
     gap: 20px;
     align-items: start;
   }
+  .bank-screen.bank-stall { grid-template-columns: minmax(0, 1fr); }
   .bank-workspace { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
   .bank-inspector {
     display: flex;

@@ -38,7 +38,7 @@ import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
 import * as combat from '../game/systems/combat.js';
 import { sellItems, togglePin as pinItem, toggleLock as lockItem, savePreset as writePreset, applyPreset as usePreset,
-  deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot, resolveBankTab } from '../game/systems/bank.js';
+  deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot, resolveBankTab, STALL_TAB } from '../game/systems/bank.js';
 import * as storeSys from '../game/systems/store.js';
 import { offerItems } from '../game/systems/offerings.js';
 import { repairLantern as doRepair } from '../game/systems/repairs.js';
@@ -49,12 +49,11 @@ import { icon } from './icons.js';
 import { paintHud } from './hud.js';
 import { createToaster } from './toast.js';
 import { openModal, showOfflineModal, showSettingsModal, showSellSheet } from './modals.js';
-import { renderSkillsScreen, renderSkillDetail } from './screens/skills.js';
+import { renderSkillDetail } from './screens/skills.js';
 import {
   renderCampScreen, renderBankScreen, renderMapScreen,
 } from './screens/tabs.js';
 import { renderAlmanacScreen } from './screens/meta.js';
-import { renderStoreScreen } from './screens/store.js';
 import { hydrateState } from '../game/hydrate.js';
 import { cascadeAchievements, featToastMessage, actionFeatToast } from '../game/systems/achievements.js';
 import { unlockPerk, respecPerks } from '../game/systems/radiance.js';
@@ -86,7 +85,7 @@ function boot() {
   const modalRoot = document.getElementById('modal-root');
 
   const ui = {
-    tab: 'camp', skillId: null, almanac: 'overview', campView: null,
+    tab: 'camp', skillId: null, lastSkillId: 'emberkeeping', almanac: 'overview', campView: null,
     bankTab: DEFAULT_BANK_TAB, sellMode: false, sellQtyMode: '1',
   };
   let liveUpdate = () => {};
@@ -288,15 +287,25 @@ function boot() {
     return newly;
   }
 
+  function rememberCraft(id) {
+    if (id && SKILL_BY_ID[id]) ui.lastSkillId = id;
+  }
+
+  function skillsLanding() {
+    const id = (ui.skillId && SKILL_BY_ID[ui.skillId])
+      ? ui.skillId
+      : (ui.lastSkillId && SKILL_BY_ID[ui.lastSkillId] ? ui.lastSkillId : 'emberkeeping');
+    ui.skillId = id;
+    rememberCraft(id);
+    return id;
+  }
+
   // ── screen routing ─────────────────────────────────────────────
   function buildScreen() {
-    if (ui.tab === 'skills') {
-      return ui.skillId ? renderSkillDetail(ctx, ui.skillId) : renderSkillsScreen(ctx);
-    }
+    if (ui.tab === 'skills') return renderSkillDetail(ctx, skillsLanding());
     if (ui.tab === 'bank') return renderBankScreen(ctx);
     if (ui.tab === 'map') return renderMapScreen(ctx);
     if (ui.tab === 'journal') return renderAlmanacScreen(ctx);
-    if (ui.campView === 'store') return renderStoreScreen(ctx);
     return renderCampScreen(ctx);
   }
 
@@ -320,8 +329,8 @@ function boot() {
       window.localStorage.setItem(UI_KEY, JSON.stringify({
         tab: ui.tab,
         skillId: ui.skillId,
+        lastSkillId: ui.lastSkillId,
         almanac: ui.almanac,
-        campView: ui.campView,
         bankTab: resolveBankTab(ui.bankTab),
         sellMode: !!ui.sellMode,
         sellQtyMode: SELL_QTY_MODES.has(ui.sellQtyMode) ? ui.sellQtyMode : '1',
@@ -346,12 +355,22 @@ function boot() {
     if (!saved) return false;
     if (!UI_TABS.has(saved.tab)) return false;
     ui.tab = saved.tab;
+    ui.lastSkillId = (saved.lastSkillId && SKILL_BY_ID[saved.lastSkillId])
+      ? saved.lastSkillId
+      : 'emberkeeping';
     ui.skillId = (saved.tab === 'skills' && saved.skillId && SKILL_BY_ID[saved.skillId])
       ? saved.skillId
-      : null;
+      : (saved.tab === 'skills' ? ui.lastSkillId : null);
+    rememberCraft(ui.skillId);
     ui.almanac = typeof saved.almanac === 'string' ? saved.almanac : 'overview';
-    ui.campView = saved.tab === 'camp' && saved.campView === 'store' ? 'store' : null;
-    ui.bankTab = resolveBankTab(saved.bankTab);
+    ui.campView = null;
+    if (saved.campView === 'store') {
+      ui.tab = 'bank';
+      ui.bankTab = STALL_TAB;
+      ui.skillId = null;
+    } else {
+      ui.bankTab = resolveBankTab(saved.bankTab);
+    }
     ui.sellMode = !!saved.sellMode;
     ui.sellQtyMode = SELL_QTY_MODES.has(saved.sellQtyMode) ? saved.sellQtyMode : '1';
     if (Array.isArray(saved.bankLocks) && game) {
@@ -371,9 +390,12 @@ function boot() {
   }
 
   function setTab(tab) {
+    rememberCraft(ui.skillId);
     ui.tab = tab;
-    ui.skillId = null;
     ui.campView = null;
+    ui.skillId = tab === 'skills'
+      ? (ui.lastSkillId && SKILL_BY_ID[ui.lastSkillId] ? ui.lastSkillId : 'emberkeeping')
+      : null;
     if (tab === 'bank') ui.bankTab = DEFAULT_BANK_TAB;
     if (tab === 'journal') {
       ui.almanac = ui.almanac && ui.almanac !== 'overview' ? ui.almanac : 'overview';
@@ -440,7 +462,13 @@ function boot() {
       const orig = ref.close;
       ref.close = () => { sheetRepaint = null; orig(); };
     },
-    openStore() { ui.tab = 'camp'; ui.campView = 'store'; showRoute(); },
+    openStore() {
+      ui.tab = 'bank';
+      ui.bankTab = STALL_TAB;
+      ui.skillId = null;
+      ui.campView = null;
+      showRoute();
+    },
     backToCamp() { ui.campView = null; ui.tab = 'camp'; showRoute(); },
     storeBuy(itemId, qty) {
       const res = storeSys.buyFromStore(game, itemId, qty);
@@ -531,11 +559,16 @@ function boot() {
     },
     openSkill(id) {
       ui.tab = 'skills';
-      ui.skillId = id;
+      ui.skillId = SKILL_BY_ID[id] ? id : 'emberkeeping';
+      rememberCraft(ui.skillId);
       ui.campView = null;
       showRoute();
     },
-    openSkillsList() { ui.skillId = null; showRoute(); },
+    openSkillsList() {
+      ui.tab = 'skills';
+      ui.skillId = ui.lastSkillId && SKILL_BY_ID[ui.lastSkillId] ? ui.lastSkillId : 'emberkeeping';
+      showRoute();
+    },
     almanacView: () => ui.almanac,
     openAlmanac(view = 'overview') {
       ui.tab = 'journal';
@@ -669,6 +702,7 @@ function boot() {
       try { window.localStorage.removeItem(UI_KEY); } catch {}
       ui.tab = 'camp';
       ui.skillId = null;
+      ui.lastSkillId = 'emberkeeping';
       ui.campView = null;
       ui.bankTab = DEFAULT_BANK_TAB;
       ui.sellMode = false;
@@ -794,6 +828,7 @@ function boot() {
     if (!restored || (ui.tab === 'skills' && ui.skillId === 'combat')) {
       ui.tab = 'skills';
       ui.skillId = 'combat';
+      ui.lastSkillId = 'combat';
       ui.campView = null;
     }
   } else if (!restored) {
