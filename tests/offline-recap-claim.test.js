@@ -23,6 +23,9 @@ import { formatNumber } from '../src/core/format.js';
 import { isUnlocked } from '../src/game/systems/achievements.js';
 import { cascadeAchievements } from '../src/game/systems/achievements.js';
 import { hydrateState } from '../src/game/hydrate.js';
+import { createRng } from '../src/core/rng.js';
+import { SAVE_VERSION } from '../src/core/save.js';
+import { actionStatus, tickActions } from '../src/game/systems/action-runner.js';
 import {
   computeOfflineProgress, previewOfflineClaim, recapWalletDelta,
   formatLevelUpLine, formatMasteryUpLine, formatOfflineCapNote, formatIdleRecapLine,
@@ -37,6 +40,7 @@ import { dirname, join } from 'node:path';
 
 const { showOfflineModal, recapFeatExpandVsClaim, layoutOfflineFeatList, RECAP_360 } =
   await import('../src/ui/modals.js');
+const { renderSkillsScreen, renderSkillDetail } = await import('../src/ui/screens/skills.js');
 const here = dirname(fileURLToPath(import.meta.url));
 
 const H = 3_600_000;
@@ -58,6 +62,17 @@ function applyClaim(res) {
   }
   cascadeAchievements(game);
   return game;
+}
+
+function uiCtx(state) {
+  return {
+    state,
+    toast() {},
+    openSkill() {},
+    openSkillsList() {},
+    actionStatus: (id) => actionStatus(state, id),
+    ensureDailies() {},
+  };
 }
 
 test('recap preview Radiance equals post-Claim HUD Radiance for an offline gather', () => {
@@ -378,6 +393,114 @@ test('S4n: Tend dry 3h recap sits still; Work Went On stays dark', () => {
   const appSrc = readFileSync(join(here, '../src/ui/app.js'), 'utf8');
   assert.match(appSrc, /creditsOfflineLabour\(res\)/,
     'Claim must use the same labour gate as preview');
+});
+
+test('S4o: Claim after fuel-halt kills Tend; coda still on recap; idle stays idle; ample fuel keeps it', () => {
+  assert.equal(SAVE_VERSION, 5, 'no SAVE_VERSION bump');
+  const play = (2 * H) - 90_000;
+  const tendMs = ACTIONS_BY_ID['tend-flame'].durationMs;
+
+  const halt = createState({ nowMs: 0, rngSeed: 41 });
+  halt.stats.playtimeMs = play;
+  halt.stats.offlineClaims = 0;
+  halt.bank.tinderscrap = 10;
+  halt.actions.active['tend-flame'] = { progressMs: 0 };
+  const haltRes = computeOfflineProgress({
+    state: halt, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(haltRes.gains.actions[0].completions, 10);
+  assert.equal(haltRes.workedMs, 10 * tendMs);
+  assert.equal(haltedEarly(haltRes), true);
+  assert.equal(
+    formatHaltCoda(haltRes),
+    'Then the flame sat still for 2h 59m.',
+    'sat-still coda still present before Claim',
+  );
+  assert.ok(halt.actions.active['tend-flame'], 'pre-Claim save still queues Tend');
+  assert.equal(creditsOfflineLabour(haltRes), false);
+
+  const haltPreview = previewOfflineClaim(haltRes);
+  const haltMount = new FakeNode('div');
+  showOfflineModal(haltMount, { ...haltRes, featPreview: haltPreview }, { onClaim() {} });
+  const coda = haltMount.querySelector('.offline-halt-coda');
+  assert.ok(coda, 'sat-still coda sits on the recap before Claim');
+  assert.equal(coda.textContent, 'Then the flame sat still for 2h 59m.');
+  assert.match(haltMount.textContent ?? '', /900\/h for 40s/);
+  assert.doesNotMatch(haltMount.textContent ?? '', /The Work Went On/);
+
+  const haltClaimed = applyClaim(haltRes);
+  assert.equal(haltClaimed.actions.active['tend-flame'], undefined,
+    'Claim of a fuel-halt recap must kill Tend (Melvor isActive false)');
+  assert.equal(actionStatus(haltClaimed, 'tend-flame').running, false);
+  assert.equal(Object.keys(haltClaimed.actions.active).length, 0);
+  const haltSkills = renderSkillsScreen(uiCtx(haltClaimed));
+  const haltEmber = haltSkills.node.querySelectorAll('.skill-row')
+    .find((r) => (r.textContent ?? '').includes('Emberkeeping'));
+  assert.ok(haltEmber, 'Emberkeeping row after halt Claim');
+  assert.equal(haltEmber.querySelector('.live-dot'), null,
+    'Skills must not show Tend running after halt Claim');
+  const haltDetail = renderSkillDetail(uiCtx(haltClaimed), 'emberkeeping');
+  const haltRun = haltDetail.node.querySelector('.btn-run');
+  assert.notEqual(haltRun?.textContent, 'Stop');
+  assert.doesNotMatch(haltRun?.className ?? '', /btn-stop/);
+  assert.match(haltRun?.textContent ?? '', /Need materials|Start/);
+  const postClaimEvents = tickActions(haltClaimed, 5_000, createRng(41));
+  assert.ok(!postClaimEvents.some((e) => e.type === 'halted'),
+    'dead action is killed on Claim, not the next failed tick');
+  assert.equal(haltClaimed.actions.active['tend-flame'], undefined);
+
+  const idlePlay = 90_000;
+  const idle = createState({ nowMs: 0, rngSeed: 42 });
+  idle.stats.playtimeMs = idlePlay;
+  idle.actions.active = {};
+  const idleRes = computeOfflineProgress({
+    state: idle, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(idleRes.hasGains, false);
+  assert.equal(formatHaltCoda(idleRes), null, 'idle has no sat-still coda');
+  const idleMount = new FakeNode('div');
+  showOfflineModal(idleMount, {
+    ...idleRes, featPreview: previewOfflineClaim(idleRes),
+  }, { onClaim() {} });
+  assert.equal(idleMount.querySelector('.offline-halt-coda'), null);
+  assert.match(idleMount.textContent ?? '', /Nothing ran/);
+  const idleClaimed = applyClaim(idleRes);
+  assert.deepEqual(idleClaimed.actions.active, {});
+  assert.equal(idleClaimed.stats.playtimeMs, idlePlay);
+
+  const fullPlay = 19 * 60_000 + 18_000;
+  const full = createState({ nowMs: 0, rngSeed: 43 });
+  full.stats.playtimeMs = fullPlay;
+  full.bank.tinderscrap = 10_000;
+  full.actions.active['tend-flame'] = { progressMs: 0 };
+  const fullRes = computeOfflineProgress({
+    state: full, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(fullRes.hasGains, true);
+  assert.equal(haltedEarly(fullRes), false);
+  assert.equal(formatHaltCoda(fullRes), null, 'ample fuel has no sat-still coda');
+  const fullClaimed = applyClaim(fullRes);
+  assert.ok(fullClaimed.actions.active['tend-flame'],
+    'ample-fuel Claim may keep the action if it did not halt');
+  assert.equal(actionStatus(fullClaimed, 'tend-flame').running, true);
+  const fullSkills = renderSkillsScreen(uiCtx(fullClaimed));
+  const fullEmber = fullSkills.node.querySelectorAll('.skill-row')
+    .find((r) => (r.textContent ?? '').includes('Emberkeeping'));
+  assert.ok(fullEmber?.querySelector('.live-dot'),
+    'ample-fuel Claim may keep Tend marked running');
+
+  const dry = createState({ nowMs: 0, rngSeed: 44 });
+  dry.bank.tinderscrap = 0;
+  dry.actions.active['tend-flame'] = { progressMs: 0 };
+  const dryRes = computeOfflineProgress({
+    state: dry, nowMs: 3 * H, lastSavedAt: 0, actionsById: ACTIONS_BY_ID,
+  });
+  assert.equal(dryRes.hasGains, false);
+  assert.equal(formatHaltCoda(dryRes), null, '×0 halt has no sat-still coda');
+  assert.ok(dry.actions.active['tend-flame'], '×0 pre-Claim save still queues Tend');
+  const dryClaimed = applyClaim(dryRes);
+  assert.equal(dryClaimed.actions.active['tend-flame'], undefined,
+    '×0 fuel-halt Claim also kills the dead workstation');
 });
 
 test('idle rewind does not inflate playtime or grant Work Went On with zero cycles', () => {

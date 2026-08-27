@@ -161,8 +161,11 @@ test('save round-trip then rewind yields offline gains (hasGains, xp, lumen)', a
   assert.ok(state.actions.active['tend-flame'], 'active survives deserialize');
 
   // Rewind the clock: pretend this save was written 5 minutes ago.
+  // Restock tinder so this is ample-fuel (starter 30 cannot cover 5 min of
+  // Tend). A fuel-halt Claim kills the action — see S4o recap tests.
   const rewound = structuredClone(state);
   rewound.savedAt -= 5 * 60_000;
+  rewound.bank.tinderscrap = Math.max(rewound.bank.tinderscrap ?? 0, 10_000);
 
   const { computeOfflineProgress } = await import('../src/core/offline.js');
   const { ACTIONS_BY_ID } = await import('../src/game/data/actions.js');
@@ -179,7 +182,8 @@ test('save round-trip then rewind yields offline gains (hasGains, xp, lumen)', a
   assert.ok(res.gains.actions[0].completions > 0);
   assert.ok(res.gains.xp.emberkeeping > 0);
   assert.ok(res.gains.lumen > 0);
-  // Claiming keeps the action running (progress carries into nextState).
+  assert.equal(res.idleNotes?.length ?? 0, 0, 'ample tinder is not a fuel-halt');
+  // Claiming keeps the action running when it did not halt.
   assert.ok(res.nextState.actions.active['tend-flame'], 'claim keeps the loop alive');
 });
 
