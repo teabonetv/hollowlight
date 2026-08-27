@@ -32,7 +32,7 @@ function clampPositive(n) { return Math.max(0, Math.floor(n)); }
  *           radiance:number, xp:Object<string,number>, actions:Array },
  *   levelUps:Array<{skillId:string,from:number,to:number,level:number}>,
  *   masteryUps:Array<{actionId:string,name:string,skillId:string,from:number,to:number}>,
- *   nextState:object,
+ *   nextState:object,  // fuel-halted actions cleared (Melvor isActive false)
  * }}
  */
 export function computeOfflineProgress({
@@ -177,6 +177,13 @@ export function computeOfflineProgress({
         });
       }
     }
+  }
+
+  // Fuel-halt (×0 or run-until-dry) dies on Claim — Melvor isActive false.
+  // Leave the workstation dead until the player starts it again; do not wait
+  // for the next live tick to fail the cost check.
+  for (const note of idleNotes) {
+    delete next.actions.active[note.actionId];
   }
 
   const levelUps = [];
