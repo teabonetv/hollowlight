@@ -862,11 +862,12 @@
 .log-line.log-telegraph { color: var(--gold); font-style: italic; }
 .log-line.log-eat, .log-line.log-oil { color: #c5d4e8; }
 
-/* Side rail: tab bar is not an overlay. Do not keep a 63px empty band. */
+/* Side rail: tab bar is not an overlay. Do not keep a 63px empty band.
+   Keep safe-area-inset-bottom — the rail only pads the nav column. */
 @media (min-width: 900px) {
   #screen:has(.fight-live),
   #screen:has(.leftover-live) {
-    padding: 8px 16px 8px;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
   }
   #screen:has(.leftover-live) { padding-top: 2px; }
 }
