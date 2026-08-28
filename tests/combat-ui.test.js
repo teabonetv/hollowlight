@@ -114,7 +114,8 @@ test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
   const iKit = classes.findIndex((c) => /\bacc-station\b/.test(c) || /\bfight-cockpit\b/.test(c));
   const iOil = classes.findIndex((c) => /\boil-line\b/.test(c));
   const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
-  const iHand = classes.findIndex((c) => /\bhand-chip\b/.test(c));
+  const iKitWrap = classes.findIndex((c) => /\bleftover-kit\b/.test(c));
+  const iHand = iKitWrap >= 0 ? iKitWrap : classes.findIndex((c) => /\bhand-chip\b/.test(c));
   assert.ok(iFighter >= 0 && iKit > iFighter && iOil > iKit && iEat > iOil, 'HP then kit then oil then eat');
   assert.ok(iHand > iEat, 'weapon chip sits after the cockpit');
   assert.equal(classes.filter((c) => /\bfighter\b/.test(c)).length, 2);
@@ -314,9 +315,9 @@ test('foe chance-to-hit sits on the same kit line as yours', () => {
   assert.ok(kit.foeHitPct > 0 && kit.foeHitPct < 100);
 });
 
-function killMoth(state) {
+function killFoe(state, enemyId = 'pale-moth') {
   state.combat.autoContinue = false;
-  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  combat.startFight(state, enemyId, { encounterSeed: 1 });
   let kill = null;
   for (let i = 0; i < 80 && !kill; i++) {
     if (state.combat.foe) state.combat.foe.hp = 1;
@@ -325,6 +326,10 @@ function killMoth(state) {
     kill = events.find((e) => e.type === 'combat-kill') ?? kill;
   }
   return kill;
+}
+
+function killMoth(state) {
+  return killFoe(state, 'pale-moth');
 }
 
 function traySum(tray, kind, id) {
@@ -1280,55 +1285,41 @@ test('live-fight tray + Eat + Fall back sit above tab 577', () => {
   assert.ok(piled.fleeBottom < 577);
   assert.ok(piled.trayBottom <= 577 - COMBAT_360.tabClearance,
     `tray bottom ${piled.trayBottom} must clear tab 577 by ≥${COMBAT_360.tabClearance}px`);
-  assert.equal(piled.logBottom, empty.logBottom, 'live tray must not move logWrap.bottom');
+  assert.ok(piled.lootH >= COMBAT_360.leftoverWellMin, `live well ${piled.lootH}`);
   assert.ok(piled.fillH >= 0);
 });
 
 test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay above', () => {
-  const criticV49Top = 543;
-  const criticV49Bottom = 587;
-  const criticV54Top = 550.6;
   const criticV54Bottom = 582.6;
   const tabTop = 577;
   const clearance = COMBAT_360.tabClearance;
   assert.equal(clearance, 8);
-  assert.equal(criticV49Bottom - criticV49Top, 44, 'v49 measured leftover-loot 44px');
-  assert.ok(criticV49Bottom > tabTop, 'v49 letter 5: live tray 10px under the tab');
-  assert.equal(Number((criticV54Bottom - criticV54Top).toFixed(1)), 32, 'v54 compact tray is 32px');
-  assert.ok(criticV54Bottom > tabTop, 'v54 live unpaid tray overlaps tab 577');
-  assert.ok(criticV54Bottom - tabTop > 5, 'v54 overlap is the 5.6px SKILLS miss');
-  assert.ok(criticV54Bottom > tabTop - clearance, 'v54 compact 32px from 550.6 misses the 8px gap');
+  assert.ok(criticV54Bottom > tabTop, 'v54 32px strip overlapped tab 577');
 
   const fatLoot = COMBAT_360.loot;
   assert.equal(fatLoot, 44);
-  assert.ok(criticV49Top + fatLoot > tabTop, 'uncapped 44px live tray cannot clear 577');
-
-  assert.equal(COMBAT_360.fightLoot, 32);
-  assert.ok(COMBAT_360.fightLoot < fatLoot, 'live tray is compact vs leftover 44');
+  assert.equal(COMBAT_360.fightLoot, COMBAT_360.leftoverWellMin);
+  assert.ok(COMBAT_360.fightLoot >= 167, 'live unpaid is the leftover well, not a 32px strip');
   assert.equal(COMBAT_360.fightKeep, 32);
-  assert.ok(COMBAT_360.fightKeep < COMBAT_360.keep, 'live Keep hunting is compact vs 44');
-  const keepSaved = COMBAT_360.keep - COMBAT_360.fightKeep;
-  const accSaved = 32 - COMBAT_360.fightAcc; // v54 live Acc was cockpit 32-class; now 28
-  assert.ok(keepSaved + accSaved >= 16, 'keep+acc compact must cover the v54 13.6px miss');
-  assert.ok(criticV54Bottom - keepSaved - accSaved <= tabTop - clearance,
-    `v54 bottom ${criticV54Bottom} minus keep ${keepSaved}px acc ${accSaved}px must reach ≤${tabTop - clearance}`);
+  assert.ok(COMBAT_360.fightKeep < COMBAT_360.keep, 'live Keep hunting stays compact vs 44');
 
   const empty = fightLogVsTab({ loot: false });
   const piled = fightLogVsTab({ loot: true });
   assert.equal(piled.tabTop, tabTop);
-  assert.equal(piled.lootH, 32);
+  assert.ok(piled.lootH >= COMBAT_360.leftoverWellMin, `live well ${piled.lootH}`);
+  assert.ok(piled.lootH > fatLoot, 'live unpaid is a well, not a 44px checkout');
   assert.equal(piled.keepH, 32);
   assert.equal(piled.clearance, clearance);
   assert.ok(piled.trayBottom <= tabTop - clearance,
-    `360 live unpaid tray bottom ${piled.trayBottom} vs tab ${tabTop} gap ${piled.trayGap}`);
-  assert.ok(piled.trayGap >= clearance, `tray gap ${piled.trayGap} < ${clearance}px`);
-  assert.ok(piled.trayBottom < criticV54Bottom, 'compact keep must beat the v54 582.6px bottom');
-  assert.ok(piled.trayBottom < criticV49Bottom, 'compact must beat the v49 587px bottom');
+    `360 live unpaid well bottom ${piled.trayBottom} vs tab ${tabTop} gap ${piled.trayGap}`);
+  assert.ok(piled.trayGap >= clearance, `well gap ${piled.trayGap} < ${clearance}px`);
+  assert.ok(piled.trayBottom < criticV54Bottom, 'well must still clear the v54 582.6px tab overlap');
   assert.ok(piled.eatBottom < tabTop, `Eat ${piled.eatBottom} vs tab ${tabTop}`);
   assert.ok(piled.fleeBottom < tabTop, `Fall back ${piled.fleeBottom} vs tab ${tabTop}`);
-  assert.ok(piled.fits, `fill ${piled.fillH} tray ${piled.trayTop}–${piled.trayBottom}`);
+  assert.ok(piled.tileBottom <= piled.trayBottom, `56px tiles clip ${piled.tileBottom} vs well ${piled.trayBottom}`);
+  assert.equal(piled.glyphH, 56);
+  assert.ok(piled.fits, `fill ${piled.fillH} well ${piled.trayTop}–${piled.trayBottom}`);
   assert.ok(piled.fillH >= 0);
-  assert.equal(piled.logBottom, empty.logBottom);
 
   const leftover = leftoverLogVsTab({ loot: true });
   assert.equal(leftover.tabTop, tabTop);
@@ -1336,12 +1327,17 @@ test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay abo
   assert.ok(leftover.wellBottom <= tabTop - clearance, `well bottom ${leftover.wellBottom} vs tab ${tabTop}`);
   assert.ok(leftover.lootH >= COMBAT_360.leftoverWellMin, `leftover well ${leftover.lootH}px must beat a 44px row`);
   assert.ok(leftover.lootH > fatLoot, 'leftover unpaid is a well, not a 44px checkout');
+  assert.equal(leftover.glyphH, piled.glyphH);
+  assert.equal(leftover.tileH, piled.tileH);
+  assert.ok(Math.abs(leftover.lootH - piled.lootH) < 80,
+    `live well ${piled.lootH} and leftover well ${leftover.lootH} must be the same room`);
 
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
-  const liveLoot = [...css.matchAll(/\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{([^}]+)\}/g)];
-  assert.ok(liveLoot.length >= 1, 'live fight-loot compact rule');
-  const maxH = liveLoot.flatMap((m) => [...m[1].matchAll(/max-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
-  assert.ok(maxH.some((h) => h <= 32), `live fight-loot max-height ${maxH.join(',')} must be ≤32px`);
+  const liveLoot = [...css.matchAll(/\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{([^}]+)\}/g)];
+  assert.ok(liveLoot.length >= 1, 'live leftover-well loot rule');
+  const minH = liveLoot.flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(minH.some((h) => h >= 167), `live well min-height ${minH.join(',')} must be ≥167px`);
+  assert.doesNotMatch(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.leftover-loot\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*max-height:\s*100%/);
@@ -1349,10 +1345,10 @@ test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay abo
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.log-wrap\s*\{[^}]*margin-top:\s*auto/);
   assert.match(css, /\.loot-tile\s*\{/);
-  const liveTile = [...css.matchAll(/\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\s+\.loot-tile\s*\{([^}]+)\}/g)];
-  assert.ok(liveTile.length >= 1, 'live loot-tile compact rule');
-  const tileH = liveTile.flatMap((m) => [...m[1].matchAll(/height:\s*(\d+)px/g)].map((x) => Number(x[1])));
-  assert.ok(tileH.some((h) => h <= 32), `live loot-tile height ${tileH.join(',')} must be ≤32px`);
+  const liveTile = [...css.matchAll(/\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.loot-tile\s*\{([^}]+)\}/g)];
+  assert.ok(liveTile.length >= 1, 'live leftover-well tile rule');
+  const tileMin = liveTile.flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(tileMin.some((h) => h >= 103), `live well tile min-height ${tileMin.join(',')}`);
 });
 
 function assertLootFurniture(host, { minTiles = 1 } = {}) {
@@ -1373,6 +1369,10 @@ function assertLootFurniture(host, { minTiles = 1 } = {}) {
     assert.ok(qty.length > 0, 'tile shows a qty');
   }
   assert.ok(tray.querySelector('.leftover-take'), 'Take all stays on the furniture');
+  const meter = tray.querySelector('.loot-well-meter');
+  assert.ok(meter, 'Hollow pressure sits on the well live and leftover');
+  assert.match(meter.textContent ?? '', /Hollow \d+\/\d+/);
+  assert.equal(/100/.test(meter.textContent ?? ''), false, 'Hollow is 12, not a Melvor 100-slot clone');
   return { tray, tiles };
 }
 
@@ -1417,9 +1417,11 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
   assert.equal(state.combat.fighting, true);
   const fight = scr.node.querySelector('.combat-fight');
   assert.equal(fight.classList.contains('leftover-station'), false);
+  assert.ok(fight.classList.contains('leftover-well'), 'live unpaid mounts the leftover well');
   const { tray, tiles } = assertLootFurniture(fight, { minTiles: held.length });
   assert.ok(tray.classList.contains('fight-loot'));
   assert.match(tray.getAttribute('aria-label') ?? '', /Loot to collect/i);
+  assert.match(tray.querySelector('.loot-well-meter')?.textContent ?? '', /Hollow \d+\/\d+/);
   assert.equal(tiles.length, held.length);
   assert.match(tray.textContent ?? '', /soul/);
   assert.match(tray.textContent ?? '', /✦/);
@@ -1434,7 +1436,7 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
   assert.ok(scr.node.querySelector('.flee-btn'));
 
   const piled = fightLogVsTab({ loot: true });
-  assert.equal(piled.lootH, 32);
+  assert.ok(piled.lootH >= COMBAT_360.leftoverWellMin, `live well ${piled.lootH}`);
   assert.ok(piled.trayBottom <= 577 - COMBAT_360.tabClearance);
   assert.ok(piled.trayGap >= COMBAT_360.tabClearance);
   assert.ok(piled.eatBottom < 577);
@@ -1530,10 +1532,10 @@ test('leftover unpaid is a well: portraits, stack counts, Hollow pressure, tab c
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.loot-tile\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverTileMinH}px`));
   assert.match(css, /\.leftover-station\.leftover-well\s+\.loot-tile\s+\.loot-glyph,\s*\n\.leftover-station\.leftover-well\s+\.loot-tile\s+\.bank-glyph\s*\{[^}]*min-width:\s*56px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
-  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*167px/);
   const liveKeep = fightLogVsTab({ loot: true });
   assert.equal(liveKeep.keepH, 32);
-  assert.equal(liveKeep.lootH, 32);
+  assert.ok(liveKeep.lootH >= COMBAT_360.leftoverWellMin, `live well ${liveKeep.lootH}`);
   assert.ok(liveKeep.trayBottom <= 577 - COMBAT_360.tabClearance);
 });
 
@@ -1578,7 +1580,7 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.equal(C.leftoverActionsMin, C.leftoverWellMin + C.leftoverActionsGap + C.hunt);
   assert.equal(C.leftoverWellAcc, 22, 'leftover unpaid Acc stays a compact chip');
   assert.equal(C.leftoverWellKit, 44, 'leftover unpaid kit band stays a 44px tap row');
-  assert.equal(C.fightLoot, 32, 'live unpaid tray stays 32px');
+  assert.equal(C.fightLoot, C.leftoverWellMin, 'live unpaid well matches leftover well');
   assert.equal(C.fightKeep, 32);
   assert.ok(C.leftoverWellLogWrap >= 36, `leftover log wrap ${C.leftoverWellLogWrap} must stay readable`);
 
@@ -1637,9 +1639,9 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-kit\s*\{[^}]*max-height:\s*44px/);
   assert.match(css, /\.leftover-station\.leftover-well\s+\.acc-station\s*\{[^}]*max-height:\s*22px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
-  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*167px/);
   const live = fightLogVsTab({ loot: true });
-  assert.equal(live.lootH, 32);
+  assert.ok(live.lootH >= C.leftoverWellMin, `live well ${live.lootH}`);
   assert.equal(live.keepH, 32);
   assert.ok(live.trayBottom <= 577 - C.tabClearance);
 });
@@ -1651,7 +1653,7 @@ test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and h
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.leftover-loot\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellMin}px`));
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.log-wrap\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellLogWrap}px`));
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
-  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*167px/);
 
   const ember = renderSkillDetail(makeCtx(createState({ rngSeed: 2 })), 'emberkeeping');
   assert.equal(ember.node.classList.contains('leftover-live'), false);
@@ -1696,7 +1698,7 @@ test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and h
   assert.ok(box.fits);
   const live = fightLogVsTab({ loot: true });
   assert.equal(live.keepH, 32, 'live Keep hunting stays 32px');
-  assert.equal(live.lootH, 32, 'live unpaid tray stays 32px');
+  assert.ok(live.lootH >= COMBAT_360.leftoverWellMin, `live well ${live.lootH} must match leftover`);
   assert.ok(live.trayBottom <= 577 - COMBAT_360.tabClearance);
 });
 
@@ -1772,5 +1774,111 @@ test('Take all is not the Acc-restore trigger on leftover unpaid', () => {
   assert.ok(accBefore.length > 0);
   combat.takeAllLootTray(state);
   assert.deepEqual(state.combat.lootTray, []);
+});
+
+test('360 live unpaid loot well height and tiles match the post-kill leftover well', () => {
+  const live = fightLogVsTab({ loot: true });
+  const dead = leftoverLogVsTab({ loot: true });
+  assert.equal(live.tabTop, 577);
+  assert.equal(dead.tabTop, 577);
+  assert.ok(live.lootH >= COMBAT_360.leftoverWellMin, `live well ${live.lootH} must not be a 32px strip`);
+  assert.ok(dead.lootH >= COMBAT_360.leftoverWellMin, `post-kill well ${dead.lootH}`);
+  assert.equal(live.glyphH, 56);
+  assert.equal(dead.glyphH, 56);
+  assert.equal(live.tileH, dead.tileH);
+  assert.ok(live.tileH >= COMBAT_360.leftoverTileMinH);
+  assert.ok(live.tileBottom <= live.trayBottom);
+  assert.ok(dead.tileBottom <= dead.lootBottom);
+  assert.ok(live.trayBottom <= 577 - COMBAT_360.tabClearance);
+  assert.ok(dead.wellBottom <= 577 - COMBAT_360.tabClearance);
+  assert.ok(live.eatBottom < 577);
+  assert.ok(live.fits && dead.fits);
+  assert.ok(Math.abs(live.lootH - dead.lootH) < 80,
+    `live ${live.lootH} vs leftover ${dead.lootH} must be the same well, not strip vs room`);
+  assert.equal(COMBAT_360.fightLoot, COMBAT_360.leftoverWellMin);
+
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.leftover-loot\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellMin}px`));
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*167px/);
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.loot-tile\s*\{[^}]*min-height:\s*103px/);
+  assert.doesNotMatch(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
+});
+
+test('killing Fog-rat does not unmount Acc/kit/loaf or swap to a different loot layout', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killFoe(state, 'fog-rat'));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftoverHunt = scr.node.querySelector('.leftover-hunt');
+  assert.ok(leftoverHunt);
+  leftoverHunt.click();
+  assert.equal(state.combat.fighting, true);
+  combat.resumeCombat(state);
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.ok(fight);
+  assert.equal(fight.classList.contains('leftover-station'), false);
+  assert.ok(fight.classList.contains('leftover-well'), 'live unpaid is already the leftover well');
+  const acc = fight.querySelector('.acc-station');
+  const kit = fight.querySelector('.leftover-kit');
+  const hand = fight.querySelector('.hand-chip');
+  const loaf = fight.querySelector('.eat-pick');
+  const eat = fight.querySelector('.eat-btn');
+  const flee = fight.querySelector('.flee-btn');
+  const well = fight.querySelector('.leftover-loot');
+  const meter = well?.querySelector('.loot-well-meter');
+  assert.ok(acc && kit && hand && loaf && eat && flee && well && meter);
+  assert.ok(well.querySelector('.leftover-take'));
+  assert.ok(well.querySelector('.loot-tile'));
+  assert.match(loaf.textContent ?? '', /Lantern-loaf \+14/);
+  assert.match(hand.textContent ?? '', /Knife|Wick-knife/);
+  assert.match(fight.querySelector('.style-row')?.textContent ?? '', /Strike/);
+  assert.match(meter.textContent ?? '', /Hollow \d+\/\d+/);
+  assert.ok(fight.querySelector('.combat-keep'), 'Keep hunting stays on the living fight');
+
+  let kill = null;
+  for (let i = 0; i < 80 && !kill; i++) {
+    if (state.combat.foe) state.combat.foe.hp = 1;
+    state.combat.player.nextActMs = 0;
+    kill = combat.tickCombat(state, 100).find((e) => e.type === 'combat-kill') ?? kill;
+    scr.update();
+  }
+  assert.ok(kill);
+  assert.equal(state.combat.fighting, false);
+  const after = scr.node.querySelector('.combat-fight');
+  assert.equal(after, fight, 'kill must not remount the fight cockpit');
+  assert.equal(after.querySelector('.acc-station'), acc, 'Acc node survives the kill');
+  assert.equal(after.querySelector('.leftover-kit'), kit, 'kit row survives the kill');
+  assert.equal(after.querySelector('.hand-chip'), hand);
+  assert.equal(after.querySelector('.eat-pick'), loaf, 'loaf chip survives the kill');
+  assert.equal(after.querySelector('.eat-btn'), eat);
+  assert.equal(after.querySelector('.leftover-loot'), well, 'loot well is the same furniture');
+  assert.ok(well.querySelector('.leftover-take'));
+  assert.ok(well.querySelector('.loot-tile'));
+  assert.ok(well.querySelector('.loot-well-meter'));
+  assert.ok(after.classList.contains('leftover-well'));
+  assert.ok(after.classList.contains('leftover-station'));
+  assert.match(after.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Fog-rat/);
+  assert.match(after.querySelector('.loot-well-meter')?.textContent ?? '', /Hollow \d+\/\d+/);
+  assert.ok(after.querySelector('.leftover-another'), 'Hunt another is a door, not the only path');
+  assert.equal(after.querySelector('.hunt-list'), null, 'kill does not dump to the zone list');
+});
+
+test('Hunt Fog-rat after a kill stays on this fight; Hunt another is not the only path', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killFoe(state, 'fog-rat'));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover.classList.contains('leftover-well'));
+  assert.match(leftover.querySelector('.leftover-hunt')?.textContent ?? '', /Hunt Fog-rat/);
+  assert.ok(leftover.querySelector('.leftover-another'));
+  leftover.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+  assert.equal(scr.node.querySelector('.hunt-list'), null, 'next Fog-rat does not open the zone list');
+  assert.ok(scr.node.classList.contains('fight-live'));
+  const fight = scr.node.querySelector('.combat-fight');
+  assert.ok(fight.classList.contains('leftover-well'));
+  assert.match(fight.querySelector('.loot-well-meter')?.textContent ?? '', /Hollow \d+\/\d+/);
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
+  assert.match(fight.querySelector('.eat-pick')?.textContent ?? '', /Lantern-loaf/);
 });
 
