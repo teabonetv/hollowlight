@@ -799,6 +799,8 @@ test('leftover log-wrap CSS is 96px+ and leftover-live does not scroll the lobby
   assert.ok(maxHeights.some((h) => h >= 96), `max-height ${maxHeights.join(',')} must include 96px+`);
   assert.match(css, /\.leftover-station \.log-wrap[\s\S]*overflow:\s*hidden/);
   assert.match(css, /#screen:has\(\.leftover-live\)\s*\{\s*overflow:\s*hidden/);
+  assert.match(css, /#screen:has\(\.fight-live\),\s*\n#screen:has\(\.leftover-live\)\s*\{[^}]*safe-area-inset-bottom/s);
+  assert.match(css, /@media \(min-width: 900px\)[\s\S]*#screen:has\(\.fight-live\)[\s\S]*padding:\s*8px 16px 8px/);
   assert.match(css, /\.screen\.leftover-live\s*\{\s*overflow:\s*hidden/);
   assert.match(css, /\.leftover-station\s*\{[^}]*min-height:\s*0/);
   assert.match(css, /\.leftover-station\s*\{[^}]*height:\s*100%/);
