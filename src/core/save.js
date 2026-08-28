@@ -18,6 +18,8 @@ import { hydrateState } from '../game/hydrate.js';
 import { createCombatState } from '../game/systems/combat.js';
 
 export const SAVE_KEY = 'hollowlight.save';
+/** Tab/route chrome. Wiped with the save so a reset cannot restore locks or a stale tab. */
+export const UI_KEY = 'hollowlight.ui';
 export const SAVE_VERSION = 5;
 
 function unionCosmetics(state) {
@@ -184,4 +186,35 @@ export function storageSet(storage, json, key = SAVE_KEY) {
   } catch {
     return false; // quota/private-mode failures must never crash gameplay
   }
+}
+
+export function storageRemove(storage, key) {
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function collectLiveProgressKeys(storage) {
+  const keys = new Set([SAVE_KEY, UI_KEY]);
+  try {
+    if (typeof storage.length === 'number' && typeof storage.key === 'function') {
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i);
+        if (typeof k === 'string' && k.startsWith('hollowlight.')) keys.add(k);
+      }
+    }
+  } catch { /* private mode / exotic backends */ }
+  return keys;
+}
+
+/**
+ * Drop every live Hollowlight progress key. Used by Settings → Reset all
+ * progress so the next boot is a true createState envelope, not the old
+ * lumen painted over an in-memory adopt that pagehide can write back.
+ */
+export function wipeLiveProgress(storage) {
+  for (const key of collectLiveProgressKeys(storage)) storageRemove(storage, key);
 }

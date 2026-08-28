@@ -22,8 +22,8 @@ import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
 import { formatDuration, formatNoun, formatNumber } from '../core/format.js';
 import {
-  SAVE_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
-  storageGet, storageSet,
+  SAVE_KEY, UI_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
+  storageGet, storageSet, wipeLiveProgress,
 } from '../core/save.js';
 import {
   computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim,
@@ -63,7 +63,6 @@ import { shouldRebuildScreen } from './live-paint.js';
 const AUTOSAVE_MS = 30_000;
 /** Hold live ticks after Claim so HUD stays on recap numbers for a beat. */
 export const RECAP_THAW_MS = 800;
-const UI_KEY = 'hollowlight.ui';
 const UI_TABS = new Set(['camp', 'skills', 'bank', 'map', 'journal']);
 const SELL_QTY_MODES = new Set(['1', '10', 'keep1', 'dump']);
 const PACK_FULL_TOAST_MS = 8000;
@@ -95,6 +94,9 @@ function boot() {
   let recapOpen = false;
   let recapHold = false;
   let thawTimer = 0;
+  // After a confirmed wipe, persist must no-op: pagehide/autosave would
+  // otherwise write the old in-memory game back over the cleared keys.
+  let progressWiped = false;
 
   function runnerFrozen() {
     return recapOpen || recapHold;
@@ -120,6 +122,7 @@ function boot() {
 
   // ── save / load / adopt ────────────────────────────────────────
   function persist({ stamp = true } = {}) {
+    if (progressWiped) return;
     game.rngState = rng.getState();
     // Recap owns the save until Claim: autosave / hide / pagehide must
     // not rewrite savedAt to now while the modal is still unclaimed.
@@ -698,20 +701,13 @@ function boot() {
       }
     },
     resetGame() {
-      try { window.localStorage.removeItem(SAVE_KEY); } catch {}
-      try { window.localStorage.removeItem(UI_KEY); } catch {}
-      ui.tab = 'camp';
-      ui.skillId = null;
-      ui.lastSkillId = 'emberkeeping';
-      ui.campView = null;
-      ui.bankTab = DEFAULT_BANK_TAB;
-      ui.sellMode = false;
-      ui.sellQtyMode = '1';
-      adopt(freshGame());
-      paintTabChrome('camp');
-      writeUiRoute();
-      persist();
-      toaster.push('A new flame is kindled.', 'success');
+      // Confirm already happened in Settings. Clear storage first, then
+      // reload into a real createState boot — do not adopt+persist here:
+      // pagehide would flush the old game back, and the HUD would keep
+      // the previous lumen/completion.
+      progressWiped = true;
+      wipeLiveProgress(window.localStorage);
+      try { window.location.reload(); } catch { /* tests stub location */ }
     },
   };
 

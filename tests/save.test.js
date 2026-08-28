@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  SAVE_VERSION, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
-  storageGet, storageSet,
+  SAVE_KEY, UI_KEY, SAVE_VERSION, serializeSave, deserializeSave, SaveError,
+  adoptedSavedAt, storageGet, storageSet, storageRemove, wipeLiveProgress,
 } from '../src/core/save.js';
 import { createState, hydrateState } from '../src/game/state.js';
 
@@ -12,6 +12,8 @@ function fakeStorage() {
     getItem: (k) => (map.has(k) ? map.get(k) : null),
     setItem: (k, v) => { map.set(k, String(v)); },
     removeItem: (k) => { map.delete(k); },
+    get length() { return map.size; },
+    key: (i) => [...map.keys()][i] ?? null,
   };
 }
 
@@ -104,9 +106,15 @@ test('S2 v2 saves migrate combat fields onto schema v3', () => {
 });
 
 test('storage helpers tolerate throwing backends (private mode / quota)', () => {
-  const evil = { getItem() { throw new Error('denied'); }, setItem() { throw new Error('full'); } };
+  const evil = {
+    getItem() { throw new Error('denied'); },
+    setItem() { throw new Error('full'); },
+    removeItem() { throw new Error('denied'); },
+  };
   assert.equal(storageGet(evil), null);
   assert.equal(storageSet(evil, '{}'), false);
+  assert.equal(storageRemove(evil, SAVE_KEY), false);
+  wipeLiveProgress(evil);
 });
 
 test('storage set/get round-trip through a working backend', () => {
@@ -143,6 +151,31 @@ test('v5 envelope stays 5; missing lock hydrates; held stacks floor Times Found'
   assert.deepEqual(state.stats.itemLumen, {});
   const round = JSON.parse(serializeSave(state, 1));
   assert.equal(round.version, 5);
+});
+
+test('wipeLiveProgress drops live keys; next envelope is a fresh v5 save', () => {
+  assert.equal(SAVE_VERSION, 5);
+  const store = fakeStorage();
+  const old = createState({ nowMs: 1, rngSeed: 1 });
+  old.lumen = 9999;
+  storageSet(store, serializeSave(old, 1));
+  store.setItem(UI_KEY, '{"tab":"bank"}');
+  store.setItem('hollowlight.extra', 'stale');
+
+  wipeLiveProgress(store);
+
+  assert.equal(storageGet(store), null);
+  assert.equal(store.getItem(SAVE_KEY), null);
+  assert.equal(store.getItem(UI_KEY), null);
+  assert.equal(store.getItem('hollowlight.extra'), null, 'any hollowlight.* key is live progress');
+
+  const fresh = createState({ nowMs: 2, rngSeed: 2 });
+  const json = serializeSave(fresh, 2);
+  const env = JSON.parse(json);
+  assert.equal(env.version, 5);
+  const { state } = deserializeSave(json);
+  assert.equal(state.lumen, 20, 'createState boot, not the wiped 9999');
+  assert.notEqual(state.lumen, 9999);
 });
 
 test('v5 hydrate floors found to held qty and never invents sold history', () => {
