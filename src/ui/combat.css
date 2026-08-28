@@ -453,6 +453,10 @@
   background: var(--panel);
   box-shadow: inset 0 0 0 1px var(--gold-lo);
   overflow: hidden;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 .loot-tile .loot-glyph,
 .loot-tile .bank-glyph {
@@ -603,7 +607,7 @@
 .leftover-station.leftover-well .leftover-actions {
   flex: 1 0 auto;
   flex-shrink: 0;
-  min-height: 211px;
+  min-height: 184px;
   max-height: none;
   flex-direction: column;
   align-items: stretch;
@@ -613,7 +617,7 @@
 .leftover-station.leftover-well .leftover-loot {
   flex: 1 0 auto;
   flex-shrink: 0;
-  min-height: 167px;
+  min-height: 184px;
   max-height: none;
   flex-direction: column;
   flex-wrap: nowrap;
@@ -639,7 +643,10 @@
 }
 .leftover-station.leftover-well .leftover-another {
   width: 100%;
+  flex: 0 0 44px;
   flex-shrink: 0;
+  min-height: 44px;
+  max-height: 44px;
 }
 .leftover-station.leftover-well .cockpit-fill {
   display: none;
@@ -744,7 +751,7 @@
 .combat-fight.leftover-well:not(.leftover-station) .leftover-actions {
   flex: 1 0 auto;
   flex-shrink: 0;
-  min-height: 167px;
+  min-height: 184px;
   max-height: none;
   flex-direction: column;
   align-items: stretch;
@@ -755,7 +762,7 @@
 .combat-fight.leftover-well:not(.leftover-station) .fight-loot.leftover-loot {
   flex: 1 0 auto;
   flex-shrink: 0;
-  min-height: 167px;
+  min-height: 184px;
   max-height: none;
   flex-direction: column;
   flex-wrap: nowrap;
@@ -851,6 +858,18 @@
   max-height: 0;
   margin: 0;
   overflow: hidden;
+}
+/* Living fight always paints leftover-well chrome, even with an empty tray. */
+.combat-fight.leftover-well .fight-loot.is-empty:not([hidden]),
+.combat-fight.leftover-well .leftover-loot.is-empty:not([hidden]) {
+  display: flex;
+  min-height: 184px;
+  max-height: none;
+  margin: 0;
+  overflow: hidden;
+}
+.loot-tile.loot-inspectable {
+  cursor: pointer;
 }
 .leftover-loot-chips {
   flex: 1 1 auto;
