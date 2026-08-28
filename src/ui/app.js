@@ -23,7 +23,7 @@ import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
 import { formatDuration, formatNoun, formatNumber } from '../core/format.js';
 import {
   SAVE_KEY, UI_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
-  storageGet, storageSet, wipeLiveProgress,
+  storageGet, storageSet, confirmedProgressReset,
 } from '../core/save.js';
 import {
   computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim,
@@ -97,6 +97,8 @@ function boot() {
   // After a confirmed wipe, persist must no-op: pagehide/autosave would
   // otherwise write the old in-memory game back over the cleared keys.
   let progressWiped = false;
+  let autosaveTimer = 0;
+  let detachSaveWriters = () => {};
 
   function runnerFrozen() {
     return recapOpen || recapHold;
@@ -328,6 +330,7 @@ function boot() {
   }
 
   function writeUiRoute() {
+    if (progressWiped) return;
     try {
       window.localStorage.setItem(UI_KEY, JSON.stringify({
         tab: ui.tab,
@@ -701,13 +704,15 @@ function boot() {
       }
     },
     resetGame() {
-      // Confirm already happened in Settings. Clear storage first, then
-      // reload into a real createState boot — do not adopt+persist here:
-      // pagehide would flush the old game back, and the HUD would keep
-      // the previous lumen/completion.
-      progressWiped = true;
-      wipeLiveProgress(window.localStorage);
-      try { window.location.reload(); } catch { /* tests stub location */ }
+      // Two-tap confirm already happened. Block every save writer, unhook
+      // pagehide/hide/autosave, then destroy keys and reload a genuine
+      // createState boot. Clear-then-reload without the persist block is
+      // not a wipe — unload rewrites hollowlight.save from memory.
+      confirmedProgressReset(window.localStorage, {
+        beginReset: () => { progressWiped = true; },
+        detachWriters: () => detachSaveWriters(),
+        reload: () => { window.location.reload(); },
+      });
     },
   };
 
@@ -792,7 +797,8 @@ function boot() {
   hudKnown?.addEventListener('click', () => openFoundLog());
   hudHollow?.addEventListener('click', () => openBank('owned'));
 
-  document.addEventListener('visibilitychange', () => {
+  function persistOnPageHide() { persist(); }
+  function onVisibilityChange() {
     if (document.hidden) {
       loop.stop();
       // Stamp the hide moment with the LIVE runner state (F1d Fix 1): the
@@ -808,9 +814,19 @@ function boot() {
       persist();
       if (!runnerFrozen()) loop.start();
     }
-  });
-  window.addEventListener('pagehide', persist);
-  setInterval(persist, AUTOSAVE_MS);
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('pagehide', persistOnPageHide);
+  autosaveTimer = setInterval(persist, AUTOSAVE_MS);
+  detachSaveWriters = () => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pagehide', persistOnPageHide);
+    if (autosaveTimer) {
+      clearInterval(autosaveTimer);
+      autosaveTimer = 0;
+    }
+    try { loop.stop(); } catch { /* loop may not have started */ }
+  };
 
   // ── go ─────────────────────────────────────────────────────────
   const firstBoot = loadOrInit();

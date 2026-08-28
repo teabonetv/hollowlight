@@ -212,9 +212,26 @@ function collectLiveProgressKeys(storage) {
 
 /**
  * Drop every live Hollowlight progress key. Used by Settings → Reset all
- * progress so the next boot is a true createState envelope, not the old
- * lumen painted over an in-memory adopt that pagehide can write back.
+ * progress so the next boot is a true createState envelope.
  */
 export function wipeLiveProgress(storage) {
   for (const key of collectLiveProgressKeys(storage)) storageRemove(storage, key);
+}
+
+/**
+ * Confirmed Danger-control wipe. Callers MUST `beginReset` (block persist)
+ * and `detachWriters` (pagehide / hide / autosave) BEFORE storage is
+ * cleared. `localStorage.clear()` then `location.reload()` is not a wipe:
+ * unload re-saves the in-memory game and the player comes back on the
+ * starter HUD with the old envelope.
+ */
+export function confirmedProgressReset(storage, {
+  beginReset,
+  detachWriters,
+  reload,
+} = {}) {
+  beginReset?.();
+  try { detachWriters?.(); } catch { /* exotic test DOM */ }
+  wipeLiveProgress(storage);
+  try { reload?.(); } catch { /* tests stub location */ }
 }

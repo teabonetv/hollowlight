@@ -157,7 +157,8 @@ test('wipeLiveProgress drops live keys; next envelope is a fresh v5 save', () =>
   assert.equal(SAVE_VERSION, 5);
   const store = fakeStorage();
   const old = createState({ nowMs: 1, rngSeed: 1 });
-  old.lumen = 9999;
+  old.lumen = 80;
+  old.bank.palecap = 3;
   storageSet(store, serializeSave(old, 1));
   store.setItem(UI_KEY, '{"tab":"bank"}');
   store.setItem('hollowlight.extra', 'stale');
@@ -174,8 +175,8 @@ test('wipeLiveProgress drops live keys; next envelope is a fresh v5 save', () =>
   const env = JSON.parse(json);
   assert.equal(env.version, 5);
   const { state } = deserializeSave(json);
-  assert.equal(state.lumen, 20, 'createState boot, not the wiped 9999');
-  assert.notEqual(state.lumen, 9999);
+  assert.equal(state.lumen, 20, 'createState boot, not the wiped 80');
+  assert.equal(state.bank.palecap ?? 0, 0);
 });
 
 test('v5 hydrate floors found to held qty and never invents sold history', () => {
