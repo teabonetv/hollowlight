@@ -1450,9 +1450,17 @@ html.reduced-motion *::after {
   gap: 4px;
 }
 .screen.log-items [data-log-drill="items-found"] .log-tile {
-  min-height: 0;
+  min-height: 48px;
   padding: 4px 2px 3px;
   gap: 1px;
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.screen.log-items [data-log-drill="items-found"] .log-tile:active {
+  transform: scale(0.96);
+  border-color: var(--gold-lo);
 }
 .screen.log-items [data-log-drill="items-found"] .log-tile-icon {
   width: 22px;
@@ -1462,10 +1470,9 @@ html.reduced-motion *::after {
   width: 18px;
   height: 18px;
 }
+/* 360: glyph + ×N only. Mid-word ellipsis names are fake labels; inspect holds the name. */
 .screen.log-items [data-log-drill="items-found"] .log-tile-name {
-  font-size: 9.5px;
-  line-height: 1.15;
-  -webkit-line-clamp: 1;
+  display: none;
 }
 .screen.log-items [data-log-drill="items-found"] .log-tile-frac {
   font-size: 11px;
@@ -1570,6 +1577,16 @@ html.reduced-motion *::after {
   }
   .log-tile-grid {
     grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .screen.log-items [data-log-drill="items-found"] .log-tile-name {
+    display: block;
+    font-size: 11px;
+    line-height: 1.2;
+    overflow: visible;
+    -webkit-line-clamp: unset;
+    text-overflow: unset;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }
 

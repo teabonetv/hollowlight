@@ -37,7 +37,7 @@ export const LOG_ITEMS_360 = {
   navH: 44,
   foundHeadH: 16,
   foundCols: 6,
-  foundTileH: 56,
+  foundTileH: 48, // glyph + ×N at 360; name lives on inspect
   foundGap: 4,
   missingHeadH: 16,
   missingCols: 4,
@@ -96,7 +96,9 @@ export function renderAlmanacScreen(ctx) {
 }
 
 function navCurrent(view) {
-  if (view === 'overview' || view === 'log' || String(view).startsWith('log-')) return 'overview';
+  if (view === 'overview' || view === 'log' || view === 'stats' || String(view).startsWith('log-')) {
+    return 'overview';
+  }
   return view;
 }
 
@@ -106,7 +108,6 @@ function subnav(ctx, current) {
     ['stars', 'Stars'],
     ['dailies', 'Embers'],
     ['achievements', 'Feats'],
-    ['stats', 'Stats'],
   ];
   return el('div', { class: 'almanac-nav', role: 'tablist', 'aria-label': 'Almanac' },
     tabs.map(([id, label]) => el('button', {
@@ -151,7 +152,8 @@ function renderOverview(ctx) {
     el('div', { class: 'want-list' },
       perk ? wantRow('Next star', perk.name, `${perk.cost} Radiance`, () => ctx.openAlmanac('stars')) : null,
       next ? wantRow('Next feat', next.name, next.desc, () => ctx.openAlmanac('achievements')) : null,
-      wantRow('Daily embers', 'Three tasks, one reroll', 'No streak. No punishment.', () => ctx.openAlmanac('dailies'))),
+      wantRow('Daily embers', 'Three tasks, one reroll', 'No streak. No punishment.', () => ctx.openAlmanac('dailies')),
+      wantRow('Statistics', 'Playtime, sells, titles', 'Honest counts. Nothing hidden.', () => ctx.openAlmanac('stats'))),
     el('h2', { class: 'section-title' }, 'Completion log'),
     el('div', { class: 'cat-list' },
       logCats.map((c) => el('button', {
@@ -287,7 +289,12 @@ function renderStats(ctx) {
     el('header', { class: 'screen-head' },
       el('h1', { class: 'screen-title' }, 'Statistics'),
       el('p', { class: 'screen-sub' }, title ? `As ${title}` : 'Honest counts. Nothing hidden.')),
-    subnav(ctx, 'stats'),
+    subnav(ctx, navCurrent('stats')),
+    el('button', {
+      class: 'btn btn-ghost btn-wide log-back',
+      onclick: () => ctx.openAlmanac('overview'),
+      'aria-label': 'Back to Almanac log',
+    }, '← Log'),
     el('div', { class: 'stat-grid stats-page' },
       rows.map(([label, value, kind]) => el('div', { class: 'stat-cell' },
         el('span', { class: 'stat-value' }, formatStat(value, kind)),
@@ -477,7 +484,7 @@ function mysteryMark() {
 
 function logTile({
   id, name, glyph, done = 0, total = 99, frac, mystery = false, locked = false,
-  timesFound,
+  timesFound, onInspect,
 }) {
   const pct = total > 0 ? Math.min(1, done / total) : 0;
   const timesLabel = timesFound != null ? formatLogTimesFound(timesFound) : null;
@@ -487,12 +494,15 @@ function logTile({
     : timesFound != null ? `${name}, found ${timesLabel}`
     : `${name}, ${fracText}`;
   const known = timesFound != null;
-  return el('div', {
+  const inspectable = known && typeof onInspect === 'function';
+  return el(inspectable ? 'button' : 'div', {
+    type: inspectable ? 'button' : undefined,
     class: `log-tile${mystery ? ' log-tile-mystery' : ''}${locked ? ' log-tile-locked' : ''}${known ? ' log-tile-known' : ''}`,
     dataset: { logRow: id, ...(known ? { timesFound: String(timesFound) } : {}) },
     'data-log-row': id,
     ...(known ? { 'data-times-found': String(timesFound) } : {}),
     'aria-label': aria,
+    onclick: inspectable ? () => onInspect(id) : undefined,
   },
     el('span', { class: 'log-tile-icon', html: mystery ? mysteryMark() : icon(glyph ?? 'star') }),
     el('span', { class: 'log-tile-name' }, label),
@@ -548,6 +558,7 @@ function renderLogItems(ctx) {
         done: 1,
         total: 1,
         timesFound: r.timesFound,
+        onInspect: (id) => ctx.openSellSheet?.(id),
       })))
     : el('div', { class: 'empty-state log-items-empty' },
       el('span', { class: 'empty-icon', html: icon('book') }),
