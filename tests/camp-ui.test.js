@@ -305,8 +305,8 @@ test('shared #screen padding-bottom equals the tab bar on every tab', () => {
   assert.match(css, /\.screen\s*\{[^}]*padding-bottom:\s*var\(--screen-scroll-pad\)/s);
   assert.match(css, /\.screen\s*\{[^}]*scroll-padding-bottom:\s*var\(--screen-scroll-pad\)/s);
   assert.match(css, /\.screen\.fight-live,\s*\n\.screen\.leftover-live\s*\{[^}]*padding-bottom:\s*0/s);
-  assert.match(combat, /\.leftover-station\.leftover-well\s+\.leftover-loot\s*\{[^}]*min-height:\s*167px/s);
-  assert.match(combat, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.leftover-loot,\s*\n\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*167px/s);
+  assert.match(combat, /\.leftover-station\.leftover-well\s+\.leftover-loot\s*\{[^}]*min-height:\s*184px/s);
+  assert.match(combat, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.leftover-loot,\s*\n\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*184px/s);
   assert.doesNotMatch(css, /\.camp[^{]*\{[^}]*--tabbar-size/s,
     'tab padding is shared chrome, not a Camp-only hack');
   assert.doesNotMatch(css, /\.bank-screen[^{]*\{[^}]*--tabbar-size/s);
