@@ -1463,6 +1463,7 @@ test('leftover unpaid is a well: portraits, stack counts, Hollow pressure, tab c
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.leftover-loot\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellMin}px`));
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.leftover-loot\\s*\\{[^}]*flex-shrink:\\s*0`));
   assert.match(css, /\.leftover-station\.leftover-well\s+\.log-wrap\s*\{[^}]*margin-top:\s*0/);
+  assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.log-wrap\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellLogWrap}px`));
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.log-wrap\\s*\\{[^}]*max-height:\\s*${COMBAT_360.leftoverWellLogWrap}px`));
   assert.match(css, /\.leftover-station\.leftover-well\s+\.loot-tile\s*\{[^}]*min-width:\s*56px/);
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.loot-tile\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverTileMinH}px`));
@@ -1513,6 +1514,7 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.equal(C.leftoverActionsMin, C.leftoverWellMin + C.leftoverActionsGap + C.hunt);
   assert.equal(C.fightLoot, 32, 'live unpaid tray stays 32px');
   assert.equal(C.fightKeep, 32);
+  assert.ok(C.leftoverWellLogWrap >= 36, `leftover log wrap ${C.leftoverWellLogWrap} must stay readable`);
 
   const twoStacks = leftoverLogVsTab({ loot: true });
   assert.equal(twoStacks.tabTop, 577);
@@ -1527,6 +1529,9 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.ok(twoStacks.anotherBottom <= 577 - C.tabClearance,
     `Hunt another ${twoStacks.anotherBottom} vs tab 577`);
   assert.ok(twoStacks.lootBottom <= 577 - C.tabClearance);
+  assert.ok(twoStacks.wrapH >= 36, `leftover log-wrap ${twoStacks.wrapH}px is a 10px sliver`);
+  assert.ok(twoStacks.logBottom <= 577 - C.tabClearance,
+    `leftover log bottom ${twoStacks.logBottom} under tab 577`);
   assert.ok(twoStacks.fits);
   assert.ok(twoStacks.lootH > 90, 'must beat the live 90px overflow:hidden drawer');
 
@@ -1534,6 +1539,8 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.ok(dry.lootH >= C.leftoverWellMin, `dry leftover-loot ${dry.lootH}`);
   assert.ok(dry.tileBottom <= dry.lootBottom);
   assert.ok(dry.anotherBottom <= 577 - C.tabClearance);
+  assert.ok(dry.wrapH >= 36, `dry leftover log-wrap ${dry.wrapH}px`);
+  assert.ok(dry.logBottom <= 577 - C.tabClearance);
   assert.ok(dry.fits);
 
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
@@ -1550,6 +1557,12 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   const glyphs = [...css.matchAll(/\.leftover-station\.leftover-well\s+\.loot-tile\s+\.loot-glyph,\s*\n\.leftover-station\.leftover-well\s+\.loot-tile\s+\.bank-glyph\s*\{([^}]+)\}/g)];
   const glyphMin = glyphs.flatMap((m) => [...m[1].matchAll(/min-(?:width|height):\s*(\d+)px/g)].map((x) => Number(x[1])));
   assert.ok(glyphMin.every((h) => h >= 56), `glyphs ${glyphMin.join(',')} must stay ≥56px`);
+  const wellLog = [...css.matchAll(/\.leftover-station\.leftover-well\s+\.log-wrap\s*\{([^}]+)\}/g)];
+  assert.ok(wellLog.length >= 1, 'leftover-well log-wrap rule');
+  const logMin = wellLog.flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  const logMax = wellLog.flatMap((m) => [...m[1].matchAll(/max-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(logMin.some((h) => h >= 36), `leftover-well log-wrap min-height ${logMin.join(',')} cannot ship a 10px sliver`);
+  assert.ok(logMax.every((h) => h >= 36), `leftover-well log-wrap max-height ${logMax.join(',')} cannot cap under 36px`);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
   const live = fightLogVsTab({ loot: true });
