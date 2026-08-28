@@ -31,7 +31,7 @@ export { renderJournalScreen } from './meta.js';
 export const CAMP_360 = {
   viewportH: 640,
   tabbarH: 63, // --tab-h 62 + 1px border → tab top 577
-  topbarH: 105, // 360 wrapped Known/Hollow HUD
+  topbarH: 157, // 360 wrapped Known/Hollow HUD (measured)
   screenPadTop: 18,
   campPadTop: 8,
   campGap: 8,
