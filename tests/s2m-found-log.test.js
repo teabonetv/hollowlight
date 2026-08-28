@@ -25,6 +25,8 @@ const { formatKnownChip, formatHollowChip } = await import('../src/ui/hud.js');
 const { renderBankScreen } = await import('../src/ui/screens/bank.js');
 const { UNKNOWN_ITEM_MARK, STILL_IN_THE_DARK } = await import('../src/ui/screens/bank.js');
 const { SAVE_VERSION } = await import('../src/core/save.js');
+const { createItemInspector } = await import('../src/ui/item-inspector.js');
+const { ITEMS_BY_ID } = await import('../src/game/data/items.js');
 
 function almanacCtx(state, view = 'log-items') {
   return {
@@ -130,6 +132,7 @@ test('dump lantern-loaf keeps Known 6/137 and Almanac ×8; Catalogue unfound sta
 test('360 Known-door geometry: two Still-in-the-dark rows sit above tab 577', () => {
   assert.equal(LOG_ITEMS_360.viewportH, 640);
   assert.equal(LOG_ITEMS_360.tabbarH, 63);
+  assert.equal(LOG_ITEMS_360.foundTileH, 48);
   const fold = logItemsMissingRowsVsTab({ foundCount: 6, rows: 2 });
   assert.equal(fold.tabTop, 577);
   assert.equal(fold.rows.length, 2);
@@ -146,5 +149,86 @@ test('360 Known-door geometry: two Still-in-the-dark rows sit above tab 577', ()
   assert.match(css, /\.screen\.log-items \[data-log-drill="items-found"\]\s*\{[^}]*grid-template-columns:\s*repeat\(6,/s);
   assert.match(css, /\.screen\.log-items \.section-title\s*\{[^}]*font-size:\s*12px/s);
   assert.match(css, /\.screen\.log-items \[data-log-drill="items-missing"\] \.log-tile\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(css, /\.screen\.log-items \[data-log-drill="items-found"\] \.log-tile\s*\{[^}]*min-height:\s*48px/s);
+  assert.match(css, /\.screen\.log-items \[data-log-drill="items-found"\] \.log-tile-name\s*\{[^}]*display:\s*none/s);
+  assert.doesNotMatch(css, /\.screen\.log-items \[data-log-drill="items-found"\] \.log-tile-name\s*\{[^}]*-webkit-line-clamp:\s*1/s);
+  assert.doesNotMatch(css, /\.screen\.log-items \[data-log-drill="items-found"\] \.log-tile-name\s*\{[^}]*text-overflow:\s*ellipsis/s);
   assert.doesNotMatch(css, /\.screen\.log-items \[data-log-drill="items-found"\]\s*\{[^}]*repeat\(3,/s);
+});
+
+const STARTER_NAMES = [
+  ['tinderscrap', 'Tinderscrap'],
+  ['rushwick', 'Rushwick Reed'],
+  ['fogwort', 'Fogwort'],
+  ['lantern-loaf', 'Lantern-loaf'],
+  ['wick-oil', 'Wick-oil'],
+  ['wick-knife', 'Wick-knife'],
+];
+
+test('360 found tiles are glyph + ×N; names are full on inspect, never mid-word ellipsis', () => {
+  const state = createState({ rngSeed: 1 });
+  const opened = [];
+  const ctx = almanacCtx(state);
+  ctx.openSellSheet = (id) => opened.push(id);
+  const scr = renderAlmanacScreen(ctx);
+  const found = scr.node.querySelector('[data-log-drill="items-found"]');
+  assert.ok(found);
+
+  for (const [id, name] of STARTER_NAMES) {
+    const tile = found.querySelector(`[data-log-row="${id}"]`);
+    assert.ok(tile, `${name} is on the found grid`);
+    assert.equal(tile.tagName, 'BUTTON', 'found tiles inspect on tap');
+    assert.ok(tile.querySelector('.log-tile-icon'), `${name} shows a glyph`);
+    assert.match(tile.querySelector('.log-tile-times')?.textContent ?? '', /^×\d+$/);
+    assert.equal(tile.querySelector('.log-tile-name')?.textContent, name,
+      'DOM keeps the full name; CSS hides it at 360 so it cannot chop');
+    assert.doesNotMatch(tile.querySelector('.log-tile-name')?.textContent ?? '', /…|\.\.\./);
+    assert.match(tile.getAttribute('aria-label') ?? '', new RegExp(name));
+  }
+
+  const chopped = /Tinderscr(?!ap)|Rushwi[.…]|Lanter[.…]|Wick-[.…]/;
+  for (const tile of found.querySelectorAll('.log-tile')) {
+    assert.doesNotMatch(tile.querySelector('.log-tile-name')?.textContent ?? '', chopped);
+    assert.doesNotMatch(tile.querySelector('.log-tile-times')?.textContent ?? '', chopped);
+  }
+
+  const tinder = found.querySelector('[data-log-row="tinderscrap"]');
+  tinder.click();
+  assert.deepEqual(opened, ['tinderscrap']);
+  const inspector = createItemInspector({ state, toast() {}, sell: () => ({ ok: false }) }, 'tinderscrap');
+  assert.equal(inspector.title, 'Tinderscrap');
+  assert.equal(ITEMS_BY_ID.tinderscrap.name, 'Tinderscrap');
+  assert.equal(ITEMS_BY_ID.rushwick.name, 'Rushwick Reed');
+  inspector.dispose();
+
+  const missing = scr.node.querySelector('[data-log-drill="items-missing"]');
+  assert.ok(missing.querySelector('.log-tile-mystery'));
+  assert.equal(missing.querySelector('.log-tile-name')?.textContent, '?');
+  assert.equal((missing.textContent ?? '').includes('Bog-moss'), false);
+});
+
+test('Almanac subnav is four tabs; Stats lives behind Log', () => {
+  const state = createState({ rngSeed: 1 });
+  const items = renderAlmanacScreen(almanacCtx(state, 'log-items'));
+  const tabLabels = items.node.querySelectorAll('.almanac-tab').map((t) => t.textContent);
+  assert.deepEqual(tabLabels, ['Log', 'Stars', 'Embers', 'Feats']);
+  assert.equal(tabLabels.some((t) => /^Stats$/i.test(t)), false);
+
+  const views = [];
+  const overviewCtx = almanacCtx(state, 'overview');
+  overviewCtx.openAlmanac = (v) => views.push(v);
+  const overview = renderAlmanacScreen(overviewCtx);
+  const statsDoor = overview.node.querySelectorAll('.want-row')
+    .find((n) => /Statistics/.test(n.textContent ?? ''));
+  assert.ok(statsDoor, 'Log overview parks Statistics behind a door');
+  statsDoor.click();
+  assert.deepEqual(views, ['stats']);
+
+  const stats = renderAlmanacScreen(almanacCtx(state, 'stats'));
+  assert.equal(stats.node.querySelector('.screen-title')?.textContent, 'Statistics');
+  const statsTabs = stats.node.querySelectorAll('.almanac-tab').map((t) => t.textContent);
+  assert.deepEqual(statsTabs, ['Log', 'Stars', 'Embers', 'Feats']);
+  const active = stats.node.querySelectorAll('.almanac-tab').find((t) => t.classList.contains('active'));
+  assert.equal(active?.textContent, 'Log');
+  assert.equal(SAVE_VERSION, 5);
 });
