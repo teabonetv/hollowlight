@@ -12,7 +12,7 @@ import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vi
 import { ITEMS_BY_ID } from '../../game/data/items.js';
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemies/index.js';
-import { bankCount } from '../../game/systems/bank.js';
+import { bankCount, uniqueStackCount, lanternRoom } from '../../game/systems/bank.js';
 import { buyFromStore, liveBuyUnit } from '../../game/systems/store.js';
 import * as combat from '../../game/systems/combat.js';
 
@@ -53,6 +53,15 @@ export const COMBAT_360 = {
   fightKeep: 32,
   hunt: 44,
   loot: 44,
+  /**
+   * Leftover unpaid well min-height (header 44 + portrait floor 56 + Hunt another 44).
+   * Acc / hand / styles collapse so this room can exist above tab 577.
+   */
+  leftoverWellMin: 140,
+  leftoverTileMinW: 56,
+  leftoverTileMinH: 80,
+  leftoverGlyph: 56,
+  leftoverWellHead: 44,
   /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
   fightLoot: 32,
   fightGap: 2,
@@ -110,23 +119,75 @@ export function cockpitLogVsTab(kind = 'leftover') {
 }
 
 /**
- * Leftover 360 geometry after kill (loot tray) or Fall back (no pile).
- * leftover-station is height-capped to the hub; .cockpit-fill eats the
- * chrome remainder so the tray / oil buy cannot shove logWrap.bottom into the tab.
+ * Leftover 360 geometry after kill (loot well) or Fall back (no pile).
+ * leftover-station is height-capped to the hub. Unpaid leftover collapses
+ * Acc / Knife / styles and spends that height on a loot well so leftover is a
+ * room, not a 44px filmstrip. .cockpit-fill still exists (flex 0 in well mode)
+ * so oil buy / logWrap.bottom cannot shove into the tab.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
- * leftover-actions (Hunt another, plus chips when loot) is always 44px so
- * Hunt another is not packed onto the eat-slot past 360px.
+ * No-loot leftover-actions stays a 44px Hunt another row.
  */
 export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const C = COMBAT_360;
   const box = cockpitLogVsTab('leftover');
   const stationTop = C.leftoverStationTop;
-  const actionsH = C.loot;
-  const lootH = loot ? C.loot : 0;
   const oilH = oilBuy ? (C.oilBuy ?? 44) : C.oil;
   const fighterH = C.leftoverFighter ?? C.fighter;
-  const accH = C.leftoverAcc ?? C.acc;
   const gap = C.leftoverGap ?? C.gap;
+  const clearance = C.tabClearance ?? 8;
+  const wellMin = C.leftoverWellMin ?? 140;
+  const headH = C.leftoverWellHead ?? C.hunt;
+
+  if (loot) {
+    const chromeBlocks = 6; // kicker, 2 fighters, oil, eat, well
+    const chrome = C.kicker + 2 * fighterH + oilH + C.eat;
+    const chromeGaps = gap * (chromeBlocks - 1);
+    const wellH = (box.logTop - stationTop) - chrome - chromeGaps;
+    let y = stationTop;
+    y += C.kicker + gap;
+    y += fighterH + gap;
+    y += fighterH + gap;
+    y += oilH + gap;
+    const eatTop = y;
+    const eatBottom = y + C.eat;
+    y = eatBottom + gap;
+    const wellTop = y;
+    const wellBottom = wellTop + wellH;
+    const takeTop = wellTop;
+    const takeBottom = wellTop + headH;
+    const anotherTop = wellBottom - C.hunt;
+    const anotherBottom = wellBottom;
+    const wellClears = wellBottom <= box.tabTop - clearance
+      && anotherBottom <= box.tabTop - clearance
+      && takeBottom <= box.tabTop - clearance;
+    return {
+      ...box,
+      loot,
+      lootH: wellH,
+      oilBuy,
+      oilH,
+      fillH: wellH,
+      wellH,
+      wellMin,
+      wellTop,
+      wellBottom,
+      wellGap: box.tabTop - wellBottom,
+      stationTop,
+      stationBottom: box.logBottom,
+      eatTop,
+      eatBottom,
+      takeTop,
+      takeBottom,
+      anotherTop,
+      anotherBottom,
+      clearance,
+      fits: box.fits && wellH >= wellMin && box.logBottom < box.tabTop
+        && eatBottom < box.tabTop && wellClears,
+    };
+  }
+
+  const actionsH = C.loot;
+  const accH = C.leftoverAcc ?? C.acc;
   const chromeBlocks = 9;
   const chrome = C.kicker + 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + actionsH;
   const chromeGaps = gap * (chromeBlocks - 1);
@@ -147,16 +208,24 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   return {
     ...box,
     loot,
-    lootH,
+    lootH: 0,
     oilBuy,
     oilH,
     fillH,
+    wellH: 0,
+    wellMin,
+    wellTop: null,
+    wellBottom: null,
+    wellGap: null,
     stationTop,
     stationBottom: box.logBottom,
     eatTop,
     eatBottom,
+    takeTop: null,
+    takeBottom: null,
     anotherTop,
     anotherBottom,
+    clearance,
     fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop
       && eatBottom < box.tabTop && anotherBottom < box.tabTop,
   };
@@ -218,7 +287,7 @@ export function fightLogVsTab({ loot = false } = {}) {
   };
 }
 
-/** Eat + Hunt-this-foe on one 360 row; Take all + Hunt another on leftover-actions. */
+/** Eat + Hunt-this-foe on one 360 row; well header is Hollow meter + Take all; Hunt another is full-width under the well. */
 export function leftoverHuntRowVs360() {
   const C = COMBAT_360;
   const viewportW = C.viewportW ?? 360;
@@ -226,17 +295,21 @@ export function leftoverHuntRowVs360() {
   const contentW = viewportW - padX * 2;
   const gap = 6;
   const eatUsed = C.eat + C.hunt + gap * 2;
-  const actionsUsed = C.loot + C.hunt + gap * 2;
+  const wellHeadUsed = 110 + (C.leftoverWellHead ?? C.loot) + gap;
+  const actionsUsed = C.hunt;
   const anotherRight = padX + contentW;
   return {
     viewportW,
     contentW,
     eatUsed,
     actionsUsed,
+    wellHeadUsed,
     anotherRight,
     eatFits: eatUsed < contentW,
     actionsFits: actionsUsed < contentW,
-    fits: eatUsed < contentW && actionsUsed < contentW && anotherRight <= viewportW,
+    wellHeadFits: wellHeadUsed < contentW,
+    fits: eatUsed < contentW && actionsUsed < contentW && wellHeadUsed < contentW
+      && anotherRight <= viewportW,
   };
 }
 
@@ -931,10 +1004,18 @@ function fleeButton(ctx, paint) {
   }, 'Fall back');
 }
 
+function leftoverHasUngranted(st, ctx) {
+  return ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []).length > 0;
+}
+
 function leftoverStation(ctx, st, paint) {
   const last = st.lastStation;
   if (!last) return null;
-  const wrap = el('article', { class: 'combat-fight leftover-station', 'aria-label': 'After the hunt' });
+  const unpaid = leftoverHasUngranted(st, ctx);
+  const wrap = el('article', {
+    class: `combat-fight leftover-station${unpaid ? ' leftover-well' : ''}`,
+    'aria-label': unpaid ? 'Loot to collect' : 'After the hunt',
+  });
   wrap.append(el('p', { class: 'leftover-kicker' }, combat.leftoverKicker(last)));
   wrap.append(fighterBlock({
     title: 'You',
@@ -949,14 +1030,20 @@ function leftoverStation(ctx, st, paint) {
     max: foe.max,
     fillClass: 'hp-foe',
   }));
-  const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
-  wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
+  // Unpaid leftover spends Acc / Knife / styles on the loot well. Kit returns
+  // after Take all so Hunt-this-foe can still change stance before the next pull.
+  if (!unpaid) {
+    const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
+    wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
+  }
   const sips = combat.oilSipsRemaining(ctx.state);
   const dry = sips <= 0;
   wrap.append(leftoverOilRow(ctx, st, paint, { sips, dry }));
   wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
-  wrap.append(handChip(ctx, st, paint));
-  wrap.append(styleRow(ctx, st, paint));
+  if (!unpaid) {
+    wrap.append(handChip(ctx, st, paint));
+    wrap.append(styleRow(ctx, st, paint));
+  }
   wrap.append(leftoverActionsRow(ctx, st, paint));
   wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
@@ -1069,15 +1156,25 @@ function takeAllBtn(ctx, paint) {
   }, 'Take all');
 }
 
+function hollowPressureCopy(state) {
+  return `Hollow ${uniqueStackCount(state?.bank)}/${lanternRoom(state)}`;
+}
+
 function leftoverLootRow(ctx, st, paint) {
   const tray = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
   if (!tray.length) return null;
+  const meter = hollowPressureCopy(ctx.state);
   const row = el('div', {
     class: 'leftover-loot leftover-tray',
-    'aria-label': 'Loot to collect',
+    'aria-label': `Loot to collect · ${meter}`,
   });
+  const head = el('div', { class: 'loot-well-head' });
+  head.append(
+    el('span', { class: 'loot-well-meter' }, meter),
+    takeAllBtn(ctx, paint),
+  );
+  row.append(head);
   row.append(lootTileRow(tray));
-  row.append(takeAllBtn(ctx, paint));
   return row;
 }
 

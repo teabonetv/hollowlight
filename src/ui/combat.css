@@ -318,6 +318,24 @@
   max-height: 44px;
   overflow: hidden;
 }
+.loot-well-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+.loot-well-meter {
+  font-size: 13px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  color: var(--gold-hi);
+  white-space: nowrap;
+  min-width: 0;
+}
 .loot-tray-grid {
   flex: 1 1 auto;
   min-width: 0;
@@ -381,35 +399,49 @@
   font-weight: 600;
   color: var(--gold-hi);
 }
-/* Leftover can spend the 44px row on portraits so names are not jammed into Take all. */
-.leftover-station .loot-tile {
+/* Leftover unpaid well: portraits at arm's length. 44×56 is the floor. */
+.leftover-station.leftover-well .loot-tile {
   flex-direction: column;
-  justify-content: flex-end;
-  gap: 1px;
-  width: 56px;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 4px;
+  width: 72px;
   min-width: 56px;
-  max-width: 60px;
-  height: 44px;
-  padding: 2px 2px 3px;
+  max-width: 88px;
+  height: auto;
+  min-height: 80px;
+  padding: 8px 6px 6px;
 }
-.leftover-station .loot-copy {
+.leftover-station.leftover-well .loot-tile .loot-glyph,
+.leftover-station.leftover-well .loot-tile .bank-glyph {
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  min-height: 56px;
+  border-radius: 8px;
+}
+.leftover-station.leftover-well .loot-tile .loot-glyph svg,
+.leftover-station.leftover-well .loot-tile .bank-glyph svg {
+  width: 48px;
+  height: 48px;
+}
+.leftover-station.leftover-well .loot-copy {
   align-items: center;
   width: 100%;
   padding: 0;
+  gap: 1px;
 }
-.leftover-station .loot-name {
-  font-size: 9.5px;
-  line-height: 1.1;
+.leftover-station.leftover-well .loot-name {
+  font-size: 11px;
+  line-height: 1.15;
   max-width: 100%;
   text-align: center;
 }
-.leftover-station .loot-qty {
-  position: absolute;
-  top: 1px;
-  right: 2px;
-  font-size: 9px;
-  line-height: 1;
-  text-shadow: 0 0 4px #07090d;
+.leftover-station.leftover-well .loot-qty {
+  position: static;
+  font-size: 13px;
+  line-height: 1.2;
+  text-shadow: none;
 }
 .leftover-actions {
   display: flex;
@@ -426,6 +458,49 @@
 .leftover-actions .leftover-loot {
   flex: 1 1 auto;
   min-width: 0;
+}
+.leftover-station.leftover-well .leftover-actions {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  flex-direction: column;
+  align-items: stretch;
+  overflow: hidden;
+  gap: 8px;
+}
+.leftover-station.leftover-well .leftover-loot {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: none;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+  overflow: hidden;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: rgba(7, 9, 13, 0.55);
+  box-shadow: inset 0 0 0 1px var(--gold-lo);
+}
+.leftover-station.leftover-well .loot-tray-grid,
+.leftover-station.leftover-well .leftover-loot-chips {
+  flex: 1 1 auto;
+  min-height: 80px;
+  max-height: none;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  gap: 8px;
+}
+.leftover-station.leftover-well .leftover-another {
+  width: 100%;
+}
+.leftover-station.leftover-well .cockpit-fill {
+  flex: 0 0 0;
+  min-height: 0;
+  height: 0;
 }
 .fight-loot {
   flex: 0 0 auto;
