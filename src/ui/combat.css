@@ -461,7 +461,7 @@
 }
 .leftover-station.leftover-well .leftover-actions {
   flex: 1 1 0;
-  min-height: 0;
+  min-height: 140px;
   max-height: none;
   flex-direction: column;
   align-items: stretch;
@@ -470,7 +470,7 @@
 }
 .leftover-station.leftover-well .leftover-loot {
   flex: 1 1 0;
-  min-height: 0;
+  min-height: 80px;
   max-height: none;
   flex-direction: column;
   flex-wrap: nowrap;
@@ -501,6 +501,10 @@
   flex: 0 0 0;
   min-height: 0;
   height: 0;
+}
+/* Log stays pinned; auto margin must not steal the well's flex room. */
+.leftover-station.leftover-well .log-wrap {
+  margin-top: 0;
 }
 .fight-loot {
   flex: 0 0 auto;

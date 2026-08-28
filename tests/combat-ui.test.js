@@ -1465,6 +1465,8 @@ test('leftover unpaid is a well: portraits, stack counts, Hollow pressure, tab c
 
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
   assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-actions\s*\{[^}]*flex:\s*1 1 0/);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-actions\s*\{[^}]*min-height:\s*140px/);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.log-wrap\s*\{[^}]*margin-top:\s*0/);
   assert.match(css, /\.leftover-station\.leftover-well\s+\.loot-tile\s*\{[^}]*min-width:\s*56px/);
   assert.match(css, /\.leftover-station\.leftover-well\s+\.loot-tile\s*\{[^}]*min-height:\s*80px/);
   assert.match(css, /\.leftover-station\.leftover-well\s+\.loot-tile\s+\.loot-glyph,\s*\n\.leftover-station\.leftover-well\s+\.loot-tile\s+\.bank-glyph\s*\{[^}]*min-width:\s*56px/);
