@@ -960,25 +960,31 @@ button.pill:active {
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
 
-/* Phone item inspector: bottom sheet. Padding-top keeps the glyph row in view. */
+/* Phone item inspector: bottom sheet. Covers the tab bar; glyphs stay in the top half. */
 .sheet-overlay {
   align-items: flex-end;
   justify-content: stretch;
   padding: 0;
-  /* Leave the owned glyph row in the top half of a 360×640 pack. */
+  /* 36vh panel docks to y=640 and covers `--tab-h` (tab top 577). */
   padding-top: 64vh;
   padding-top: 64dvh;
   background: rgba(4, 6, 10, 0.38);
   backdrop-filter: none;
+  z-index: 50; /* tabbar is z-index 5 — sheet paints over the nav */
 }
 .sheet-panel {
   max-width: none;
   width: 100%;
+  height: 36vh;
+  height: 36dvh;
   max-height: 36vh;
   max-height: 36dvh;
   border-radius: var(--radius) var(--radius) 0 0;
   transform: translateY(16px);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .sheet-overlay.open .sheet-panel { transform: translateY(0); }
 .sheet-handle {
@@ -988,6 +994,10 @@ button.pill:active {
   border-radius: 999px;
   background: var(--line);
   flex: 0 0 auto;
+}
+.sheet-panel .modal-head {
+  flex: 0 0 auto;
+  padding: 6px 8px 6px 16px;
 }
 .sheet-panel .modal-body {
   min-height: 0;
@@ -1003,15 +1013,23 @@ button.pill:active {
   gap: 8px;
   min-height: 0;
   flex: 1 1 auto;
+  height: 100%;
 }
-.sheet-panel .sell-catalog,
-.sheet-panel .sell-primary {
+.sheet-panel .sell-compact,
+.sheet-panel .inspector-actions {
   flex: 0 0 auto;
+}
+.sheet-panel .sell-compact {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
 }
 .sheet-panel .item-inspector-lore {
   min-height: 0;
   flex: 1 1 auto;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .modal-head {
   display: flex;
@@ -1172,13 +1190,13 @@ html.reduced-motion *::after {
 .sell-worth { font-size: 14px; }
 .gold { color: var(--gold-hi); }
 .sell-primary {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 4px;
 }
 .sell-primary .btn { width: 100%; min-height: 44px; }
-.sell-keep1-btn { grid-column: 1 / -1; }
+.sell-keep1-btn { width: 100%; }
 .sell-pin-row {
   display: flex;
   flex-wrap: wrap;
@@ -1186,6 +1204,19 @@ html.reduced-motion *::after {
   margin-bottom: 10px;
 }
 .sell-pin-row .btn { min-height: 44px; min-width: 44px; }
+.inspector-actions {
+  display: flex;
+  gap: 8px;
+  flex: 0 0 auto;
+  align-items: stretch;
+}
+.inspector-actions .btn {
+  flex: 1 1 0;
+  width: 100%;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 8px 6px;
+}
 .sell-stack-stats {
   display: block;
   margin-top: 6px;

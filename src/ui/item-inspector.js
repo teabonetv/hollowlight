@@ -27,6 +27,63 @@ export function inspectorStackStatsLine(state, itemId) {
   return `times found ${formatNumber(found)} · sold ${formatNumber(sold)} · lumen taken ✦${formatNumber(taken)}`;
 }
 
+/**
+ * 360×640 phone inspect sheet budget. Must stay in lockstep with styles.css:
+ * `.sheet-panel` is 36vh docked to the bottom (covers `--tab-h` / tab top 577);
+ * compact lore is two lines; Sell/Pin/Lock are a flex-none action row.
+ */
+export const INSPECT_SHEET_360 = {
+  viewportH: 640,
+  viewportW: 360,
+  tabTop: 577,
+  panelVh: 0.36,
+  handleH: 12, // 8 margin + 4 bar
+  headH: 57, // pad 6+6 + 44 close + 1 border
+  bodyPadTop: 14,
+  bodyPadBottom: 12,
+  compactLines: 2,
+  compactLineH: 19, // 14px × 1.35 on the sheet
+  inspectorGap: 8,
+  actionMin: 44,
+};
+
+/**
+ * Phone sheet: compact count+worth, then scrollable extra lore, then sticky
+ * Sell/Pin/Lock whose bottoms sit in the 360 viewport (tab-bar band allowed).
+ */
+export function inspectSheetActionsVs360(C = INSPECT_SHEET_360) {
+  const panelH = Math.round(C.panelVh * C.viewportH);
+  const panelBottom = C.viewportH;
+  const panelTop = panelBottom - panelH;
+  const bodyTop = panelTop + C.handleH + C.headH + C.bodyPadTop;
+  const bodyBottom = panelBottom - C.bodyPadBottom;
+  const actionBottom = bodyBottom;
+  const actionTop = actionBottom - C.actionMin;
+  const compactTop = bodyTop;
+  const compactH = C.compactLines * C.compactLineH;
+  const compactBottom = compactTop + compactH;
+  return {
+    viewportH: C.viewportH,
+    viewportW: C.viewportW,
+    panelH,
+    panelTop,
+    panelBottom,
+    tabTop: C.tabTop,
+    coversTab: panelTop < C.tabTop && panelBottom >= C.viewportH,
+    compactTop,
+    compactBottom,
+    compactLines: C.compactLines,
+    loreTop: compactBottom + C.inspectorGap,
+    loreBottom: actionTop - C.inspectorGap,
+    actionTop,
+    actionBottom,
+    sellBottom: actionBottom,
+    pinBottom: actionBottom,
+    lockBottom: actionBottom,
+    actionMin: C.actionMin,
+  };
+}
+
 /** Grid / inspector sell copy. Feats from the same mutation ride on this line. */
 export function soldToastMessage(item, res) {
   const line = `Sold ${item.name} ×${res.sold} for ✦${formatNumber(res.gained)}.`;
@@ -205,12 +262,12 @@ export function createItemInspector(ctx, itemId, {
     sources.slice(0, 4).map((s) => el('span', { class: 'chip chip-yield' }, s)),
     uses.slice(0, 4).map((u) => el('span', { class: 'chip chip-cost' }, u)));
 
-  const pinBtn = el('button', { class: 'btn btn-ghost btn-small' });
-  const lockBtn = el('button', { class: 'btn btn-ghost btn-small' });
+  const pinBtn = el('button', { class: 'btn btn-ghost sell-pin-btn' });
+  const lockBtn = el('button', { class: 'btn btn-ghost sell-lock-btn' });
   function paintPin() {
     if (!ctx.togglePin) { pinBtn.style.display = 'none'; return; }
     pinBtn.style.display = '';
-    pinBtn.textContent = isPinned(ctx.state, itemId) ? 'Unpin' : 'Pin to top';
+    pinBtn.textContent = isPinned(ctx.state, itemId) ? 'Unpin' : 'Pin';
   }
   pinBtn.addEventListener('click', () => {
     ctx.togglePin?.(itemId);
@@ -248,28 +305,32 @@ export function createItemInspector(ctx, itemId, {
     if (ownedQty() <= 0) onEmpty?.();
   });
 
-  const catalogLine = el('p', { class: 'sell-line sell-catalog' },
-    priceLaw,
-    el('br'),
+  const compactLine = el('p', { class: 'sell-line sell-compact' },
     qtyLabel,
     el('br'),
-    worthLabel,
+    worthLabel);
+  const catalogExtra = el('p', { class: 'sell-line sell-catalog-extra' },
+    priceLaw,
     el('br'),
     statsLine);
-  const sellPrimary = el('div', { class: 'sell-primary' }, sell1Btn, confirmBtn, keep1Btn);
-  const pinRow = el('div', { class: 'sell-pin-row' }, pinBtn, lockBtn);
+  const sellMore = el('div', { class: 'sell-more' },
+    el('div', { class: 'sell-primary' }, confirmBtn, keep1Btn),
+    sellActions, sellCustomRow, offerBtn);
   const lore = el('div', { class: 'item-inspector-lore' },
+    catalogExtra,
     el('p', { class: 'sell-flavor' }, `“${item.flavor}”`),
-    pinRow,
     useChips,
-    sellActions,
-    sellCustomRow,
-    offerBtn);
+    sellMore);
+  const actions = el('div', {
+    class: 'inspector-actions',
+    role: 'group',
+    'aria-label': 'Stack actions',
+  }, sell1Btn, pinBtn, lockBtn);
 
   const node = el('div', { class: 'item-inspector-body' },
-    catalogLine,
-    sellPrimary,
-    lore);
+    compactLine,
+    lore,
+    actions);
 
   paintButtons();
   paintPin();
