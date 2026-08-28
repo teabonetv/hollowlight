@@ -57,24 +57,30 @@ export const COMBAT_360 = {
   /**
    * Leftover unpaid leftover-loot box (not leftover-actions). Header 44 +
    * pad 12 + gap 6 + 103px portrait tile (56px glyph + name + qty). Acc /
-   * Knife / styles collapse so this room can exist above tab 577. S1s 140
-   * was leftover-actions; leftover-loot then lost the flex race to 90px.
+   * leftover-kit stay on unpaid leftover — loot lives with the fight.
+   * leftover-well packs Knife + styles into one 44px band so leftover-loot
+   * can spend its empty floor (live ~227 vs min 167) instead of collapsing
+   * chrome. S1s 140 was leftover-actions; leftover-loot then lost the flex
+   * race to 90px.
    */
   leftoverWellMin: 167,
+  leftoverWellAcc: 22,
+  leftoverWellKit: 44,
   leftoverTileMinW: 56,
   leftoverTileMinH: 103,
   leftoverGlyph: 56,
   leftoverWellHead: 44,
   leftoverLootPad: 6,
-  leftoverActionsGap: 6,
-  leftoverActionsMin: 217,
+  leftoverLootInnerGap: 6,
+  leftoverActionsGap: 0,
+  leftoverActionsMin: 211,
   /**
    * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
    * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
    * leftover chrome (fighters / hidden craft-nav / leftover-live pad), not the log.
    */
   leftoverWellLogWrap: 36,
-  leftoverWellFighter: 16,
+  leftoverWellFighter: 14,
   leftoverWellGap: 0,
   leftoverWellKicker: 11,
   /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
@@ -135,10 +141,11 @@ export function cockpitLogVsTab(kind = 'leftover') {
 
 /**
  * Leftover 360 geometry after kill (loot well) or Fall back (no pile).
- * leftover-station is height-capped to the hub. Unpaid leftover collapses
- * Acc / Knife / styles and spends that height on leftover-loot so leftover is a
- * room, not a 90px overflow:hidden drawer. lootH is leftover-loot (header +
- * portraits), not leftover-actions. Unpaid leftover keeps a readable kill-log
+ * leftover-station is height-capped to the hub. Unpaid leftover keeps Acc /
+ * Knife / styles (Melvor loot lives with the fight) and spends leftover-loot
+ * empty floor on that chrome so leftover is still a room, not a 90px
+ * overflow:hidden drawer. lootH is leftover-loot (header + portraits), not
+ * leftover-actions. Unpaid leftover keeps a readable kill-log
  * (≥ leftoverWellLogWrap) by compacting leftover chrome — leftover-loot stays
  * ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56. leftover-live hides
  * craft-nav so leftover-loot inherits that 44px as empty floor. .cockpit-fill
@@ -160,6 +167,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const tileMinH = C.leftoverTileMinH ?? 103;
   const glyphH = C.leftoverGlyph ?? 56;
   const lootPad = C.leftoverLootPad ?? 6;
+  const lootInnerGap = C.leftoverLootInnerGap ?? 6;
   const actionsMin = C.leftoverActionsMin ?? (wellMin + actionsGap + C.hunt);
 
   if (loot) {
@@ -169,16 +177,20 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     const wellFighterH = C.leftoverWellFighter ?? fighterH;
     const wellGap = C.leftoverWellGap ?? 0;
     const kickerH = C.leftoverWellKicker ?? C.kicker;
+    const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
+    const kitH = C.leftoverWellKit ?? C.hand;
     const logBottom = box.logBottom;
     const logTop = logBottom - wrapH;
     let y = stationTop;
     y += kickerH + wellGap;
     y += wellFighterH + wellGap;
     y += wellFighterH + wellGap;
+    y += accH + wellGap;
     y += oilH + wellGap;
     const eatTop = y;
     const eatBottom = y + C.eat;
     y = eatBottom + wellGap;
+    y += kitH + wellGap;
     const wellTop = y;
     const wellBottom = logTop - wellGap;
     const wellH = wellBottom - wellTop;
@@ -187,7 +199,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     const lootBottom = lootTop + lootH;
     const takeTop = lootTop + lootPad;
     const takeBottom = takeTop + headH;
-    const tileTop = takeBottom + actionsGap;
+    const tileTop = takeBottom + lootInnerGap;
     const tileBottom = tileTop + tileMinH;
     const glyphTop = tileTop + 8;
     const glyphBottom = glyphTop + glyphH;
@@ -1093,20 +1105,18 @@ function leftoverStation(ctx, st, paint) {
     max: foe.max,
     fillClass: 'hp-foe',
   }));
-  // Unpaid leftover spends Acc / Knife / styles on the loot well. Kit returns
-  // after Take all so Hunt-this-foe can still change stance before the next pull.
-  if (!unpaid) {
-    const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
-    wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
-  }
+  // Leftover is still a mode: Acc / Knife / styles stay while unpaid loot
+  // waits. Take all pays the well; it is not the Acc-restore trigger.
+  const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
+  wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
   const sips = combat.oilSipsRemaining(ctx.state);
   const dry = sips <= 0;
   wrap.append(leftoverOilRow(ctx, st, paint, { sips, dry }));
   wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
-  if (!unpaid) {
-    wrap.append(handChip(ctx, st, paint));
-    wrap.append(styleRow(ctx, st, paint));
-  }
+  const kit = el('div', { class: 'leftover-kit' });
+  kit.append(handChip(ctx, st, paint));
+  kit.append(styleRow(ctx, st, paint));
+  wrap.append(kit);
   wrap.append(leftoverActionsRow(ctx, st, paint));
   wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
   wrap.append(logPanel(leftoverLog(st), { lines: 4 }));

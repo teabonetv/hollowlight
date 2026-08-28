@@ -409,9 +409,13 @@ test('hub after kill still shows compact fight chrome', () => {
   const text = leftover.textContent ?? '';
   assert.match(text, /You/);
   assert.ok(leftover.classList.contains('leftover-well'), 'unpaid leftover is a loot well');
-  assert.equal(leftover.querySelector('.acc-station'), null, 'Acc collapses while unpaid loot waits');
-  assert.equal(leftover.querySelector('.hand-chip'), null, 'Knife/Unarmed collapse while unpaid loot waits');
-  assert.equal(leftover.querySelector('.style-row'), null, 'styles collapse while unpaid loot waits');
+  assert.ok(leftover.querySelector('.acc-station'), 'Acc stays while unpaid loot waits');
+  assert.ok(leftover.querySelector('.hand-chip'), 'Knife/Unarmed stay while unpaid loot waits');
+  assert.ok(leftover.querySelector('.style-row'), 'styles stay while unpaid loot waits');
+  assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
+  assert.match(leftover.querySelector('.style-row')?.textContent ?? '', /Strike/);
+  assert.match(leftover.querySelector('.style-row')?.textContent ?? '', /Shot/);
+  assert.match(leftover.querySelector('.style-row')?.textContent ?? '', /Rite/);
   assert.match(leftover.querySelector('.loot-well-meter')?.textContent ?? '', /Hollow \d+\/\d+/);
   assert.match(text, /sip|Need oil/);
   assert.match(text, /Lantern-loaf \+14 · 8|Eat|No food/);
@@ -466,11 +470,10 @@ test('leftover Acc moves when Knife is unequipped or style shifts to Rite', () =
   killMoth(state);
   const ctx = makeCtx(state);
   const scr = renderSkillDetail(ctx, 'combat');
-  const take = scr.node.querySelector('.leftover-take');
-  assert.ok(take, 'unpaid leftover starts as a well');
-  take.click();
-  assert.equal(scr.node.querySelector('.leftover-well'), null);
-  assert.ok(scr.node.querySelector('.leftover-station')?.querySelector('.acc-station'));
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover?.classList.contains('leftover-well'), 'unpaid leftover starts as a well');
+  assert.ok(leftover.querySelector('.leftover-take'), 'Take all is present');
+  assert.ok(leftover.querySelector('.acc-station'), 'Acc does not wait on Take all');
   const accOf = () => {
     const line = scr.node.querySelector('.leftover-station')?.querySelector('.acc-station')?.textContent ?? '';
     const m = line.match(/Acc (\d+)% · (\d+)–(\d+)/);
@@ -589,10 +592,10 @@ function assertLeftoverCockpit(leftover, { foe = /Pale Moth/, kicker }) {
   const unpaid = leftover.classList.contains('leftover-well') || leftover.querySelector('.leftover-loot');
   if (unpaid) {
     assert.match(leftover.querySelector('.loot-well-meter')?.textContent ?? text, /Hollow \d+\/\d+/);
-    assert.equal(leftover.querySelector('.hand-chip'), null);
-  } else {
-    assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
   }
+  assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
+  assert.ok(leftover.querySelector('.acc-station'));
+  assert.ok(leftover.querySelector('.style-row'));
   assert.ok(leftover.querySelector('.combat-log'));
   assert.ok(leftover.querySelectorAll('.log-line').length >= 1);
   assert.ok(leftover.querySelectorAll('.log-line').length <= 4);
@@ -1419,9 +1422,9 @@ test('leftover unpaid is a well: portraits, stack counts, Hollow pressure, tab c
   const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover);
   assert.ok(leftover.classList.contains('leftover-well'), 'leftover unpaid mounts a well');
-  assert.equal(leftover.querySelector('.acc-station'), null);
-  assert.equal(leftover.querySelector('.hand-chip'), null);
-  assert.equal(leftover.querySelector('.style-row'), null);
+  assert.ok(leftover.querySelector('.acc-station'), 'Acc stays on leftover unpaid');
+  assert.ok(leftover.querySelector('.hand-chip'), 'Knife/Unarmed stay on leftover unpaid');
+  assert.ok(leftover.querySelector('.style-row'), 'styles stay on leftover unpaid');
   const meter = leftover.querySelector('.loot-well-meter')?.textContent ?? '';
   assert.equal(meter, `Hollow ${used}/${cap}`);
   assert.match(meter, /Hollow \d+\/12|Hollow \d+\/\d+/);
@@ -1477,7 +1480,7 @@ test('leftover unpaid is a well: portraits, stack counts, Hollow pressure, tab c
   assert.ok(liveKeep.trayBottom <= 577 - COMBAT_360.tabClearance);
 });
 
-test('leftover well Take all is a no-op the second time; kit chrome returns after pay', () => {
+test('leftover well Take all is a no-op the second time; Acc was never gated on pay', () => {
   const state = createState({ rngSeed: 4 });
   assert.ok(killMoth(state));
   const lumen0 = state.lumen;
@@ -1486,6 +1489,9 @@ test('leftover well Take all is a no-op the second time; kit chrome returns afte
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover.classList.contains('leftover-well'));
+  assert.ok(leftover.querySelector('.acc-station'), 'Acc is on unpaid leftover before Take all');
+  assert.ok(leftover.querySelector('.hand-chip'));
+  assert.ok(leftover.querySelector('.style-row'));
   leftover.querySelector('.leftover-take').click();
   assert.deepEqual(state.combat.lootTray, []);
   assert.equal(state.lumen, lumen0 + traySum(held, 'lumen'));
@@ -1493,7 +1499,7 @@ test('leftover well Take all is a no-op the second time; kit chrome returns afte
   const after = scr.node.querySelector('.leftover-station');
   assert.ok(after);
   assert.equal(after.classList.contains('leftover-well'), false);
-  assert.ok(after.querySelector('.acc-station'), 'kit Acc returns after Take all');
+  assert.ok(after.querySelector('.acc-station'), 'Acc stays after Take all');
   assert.ok(after.querySelector('.hand-chip'));
   assert.ok(after.querySelector('.style-row'));
   assert.equal(after.querySelector('.leftover-loot'), null);
@@ -1513,6 +1519,8 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.ok(C.leftoverWellMin >= C.leftoverTileMinH,
     `leftover-loot min ${C.leftoverWellMin} cannot be shorter than tile ${C.leftoverTileMinH}`);
   assert.equal(C.leftoverActionsMin, C.leftoverWellMin + C.leftoverActionsGap + C.hunt);
+  assert.equal(C.leftoverWellAcc, 22, 'leftover unpaid Acc stays a compact chip');
+  assert.equal(C.leftoverWellKit, 44, 'leftover unpaid kit band stays a 44px tap row');
   assert.equal(C.fightLoot, 32, 'live unpaid tray stays 32px');
   assert.equal(C.fightKeep, 32);
   assert.ok(C.leftoverWellLogWrap >= 36, `leftover log wrap ${C.leftoverWellLogWrap} must stay readable`);
@@ -1569,6 +1577,8 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   const logMax = wellLog.flatMap((m) => [...m[1].matchAll(/max-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
   assert.ok(logMin.some((h) => h >= 36), `leftover-well log-wrap min-height ${logMin.join(',')} cannot ship a 10px sliver`);
   assert.ok(logMax.every((h) => h >= 36), `leftover-well log-wrap max-height ${logMax.join(',')} cannot cap under 36px`);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-kit\s*\{[^}]*max-height:\s*44px/);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.acc-station\s*\{[^}]*max-height:\s*22px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
   const live = fightLogVsTab({ loot: true });
@@ -1631,5 +1641,79 @@ test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and h
   assert.equal(live.keepH, 32, 'live Keep hunting stays 32px');
   assert.equal(live.lootH, 32, 'live unpaid tray stays 32px');
   assert.ok(live.trayBottom <= 577 - COMBAT_360.tabClearance);
+});
+
+function assertLeftoverUnpaidChrome(host) {
+  const leftover = host.querySelector?.('.leftover-station') ?? host;
+  assert.ok(leftover?.classList.contains('leftover-well'), 'leftover unpaid is a well');
+  const acc = leftover.querySelector('.acc-station');
+  assert.ok(acc, 'leftover unpaid keeps Acc');
+  assert.match(acc.textContent ?? '', /Acc \d+% · \d+–\d+/);
+  const hand = leftover.querySelector('.hand-chip');
+  assert.ok(hand, 'leftover unpaid keeps Knife/Unarmed');
+  assert.match(hand.textContent ?? '', /Knife|Unarmed/);
+  const styles = leftover.querySelector('.style-row');
+  assert.ok(styles, 'leftover unpaid keeps Strike/Shot/Rite');
+  assert.match(styles.textContent ?? '', /Strike/);
+  assert.match(styles.textContent ?? '', /Shot/);
+  assert.match(styles.textContent ?? '', /Rite/);
+  return leftover;
+}
+
+test('leftover unpaid keeps Acc, kit, and styles without Take all', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  assert.ok((state.combat.lootTray ?? []).some((e) => e.granted === false));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = assertLeftoverUnpaidChrome(scr.node);
+  assert.ok(leftover.querySelector('.leftover-take'), 'Take all is still the pay door');
+  assert.ok(leftover.querySelector('.leftover-loot'));
+  const box = leftoverLogVsTab({ loot: true });
+  assert.ok(box.lootH >= COMBAT_360.leftoverWellMin, `leftover-loot ${box.lootH}`);
+  assert.ok(box.lootH <= 227, `leftover-loot ${box.lootH} must not grow past the live empty floor to fake Acc`);
+  assert.ok(box.wrapH >= 36);
+  assert.ok(box.logBottom <= 569);
+  assert.ok(box.anotherBottom <= 577 - COMBAT_360.tabClearance);
+  assert.ok(box.fits);
+});
+
+test('leftover unpaid Acc and kit remain after a second unpaid kill', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const firstPile = (state.combat.lootTray ?? []).length;
+  assert.ok(firstPile >= 1);
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assertLeftoverUnpaidChrome(scr.node);
+  const hunt = scr.node.querySelector('.leftover-hunt');
+  assert.ok(hunt);
+  hunt.click();
+  assert.equal(state.combat.fighting, true);
+  assert.ok(killMoth(state));
+  assert.ok((state.combat.lootTray ?? []).length >= firstPile);
+  scr.update();
+  const leftover = assertLeftoverUnpaidChrome(scr.node);
+  assert.ok(leftover.querySelector('.leftover-take'), 'second unpaid kill still holds Take all');
+  assert.equal(state.combat.lootTray.every((e) => e.granted === false), true);
+});
+
+test('Take all is not the Acc-restore trigger on leftover unpaid', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const lumen0 = state.lumen;
+  const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const before = assertLeftoverUnpaidChrome(scr.node);
+  const accBefore = before.querySelector('.acc-station')?.textContent ?? '';
+  before.querySelector('.leftover-take').click();
+  assert.deepEqual(state.combat.lootTray, []);
+  assert.ok(state.lumen >= lumen0 + traySum(held, 'lumen'));
+  const after = scr.node.querySelector('.leftover-station');
+  assert.ok(after);
+  assert.equal(after.classList.contains('leftover-well'), false);
+  assert.ok(after.querySelector('.acc-station'), 'Acc remains after pay');
+  assert.match(after.querySelector('.acc-station')?.textContent ?? '', /Acc \d+%/);
+  assert.ok(accBefore.length > 0);
+  combat.takeAllLootTray(state);
+  assert.deepEqual(state.combat.lootTray, []);
 });
 
