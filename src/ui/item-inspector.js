@@ -28,6 +28,22 @@ export function inspectorStackStatsLine(state, itemId) {
 }
 
 /**
+ * Held-count line. An unpaid tray drop is still in the well, not the bank —
+ * "4 in the bank" while +1 sits ungranted is a lie.
+ */
+export function inspectorHeldLine({ unpaid = false, trayQty = 0, bankQty = 0 } = {}) {
+  if (unpaid) return `${formatNumber(trayQty)} in the tray · ungranted`;
+  return `${formatNumber(bankQty)} in the bank`;
+}
+
+export function inspectorWorthLine({ unpaid = false, qty = 0, unit = 0 } = {}) {
+  const n = Math.max(0, Number(qty) || 0);
+  const price = formatNumber(n * (Number(unit) || 0));
+  if (unpaid) return `drop worth ✦${price} at today’s stall`;
+  return `stack worth ✦${price} at today’s stall`;
+}
+
+/**
  * 360×640 phone inspect sheet budget. Must stay in lockstep with styles.css:
  * `.sheet-panel` is 36vh docked to the bottom (covers `--tab-h` / tab top 577);
  * compact lore is two lines; Sell/Pin/Lock are a flex-none action row.
@@ -111,6 +127,8 @@ function itemMeta(item) {
 export function createItemInspector(ctx, itemId, {
   confirmWindowMs = SELL_CONFIRM_WINDOW_MS,
   onEmpty,
+  unpaid = false,
+  trayQty = 0,
 } = {}) {
   const item = ITEMS_BY_ID[itemId];
   if (!item) return null;
@@ -137,12 +155,40 @@ export function createItemInspector(ctx, itemId, {
     statsLine.textContent = inspectorStackStatsLine(ctx.state, itemId);
   }
 
+  function paintUnpaid() {
+    const dropQty = Math.max(0, Number(trayQty) || 0);
+    const unit = unitPrice();
+    qtyLabel.textContent = inspectorHeldLine({ unpaid: true, trayQty: dropQty });
+    worthLabel.textContent = inspectorWorthLine({ unpaid: true, qty: dropQty, unit });
+    priceLaw.textContent = inspectorPriceLawLine(item, unit);
+    paintStats();
+    sell1Btn.textContent = 'Sell 1';
+    sell1Btn.disabled = true;
+    sell1Btn.setAttribute('aria-disabled', 'true');
+    sell1Btn.setAttribute('title', 'Ungranted — Take all first');
+    clear(sellActions);
+    sellActions.style.display = 'none';
+    sellQtyInput.disabled = true;
+    sellCustomBtn.disabled = true;
+    sellCustomRow.style.display = 'none';
+    keep1Btn.style.display = 'none';
+    keep1Btn.disabled = true;
+    clearSellConfirm(itemId);
+    confirmBtn.className = 'btn btn-ghost btn-wide btn-disabled sell-all-btn';
+    confirmBtn.textContent = 'Ungranted — Take all first';
+    confirmBtn.setAttribute('aria-disabled', 'true');
+  }
+
   function paintButtons() {
+    if (unpaid) {
+      paintUnpaid();
+      return;
+    }
     const qty = ownedQty();
     const unit = unitPrice();
     const held = locked();
-    qtyLabel.textContent = `${formatNumber(qty)} in the bank`;
-    worthLabel.textContent = `stack worth ✦${formatNumber(qty * unit)} at today’s stall`;
+    qtyLabel.textContent = inspectorHeldLine({ bankQty: qty });
+    worthLabel.textContent = inspectorWorthLine({ qty, unit });
     priceLaw.textContent = inspectorPriceLawLine(item, unit);
     paintStats();
 
@@ -200,6 +246,7 @@ export function createItemInspector(ctx, itemId, {
   }
 
   function doSell(qtyRequested) {
+    if (unpaid) return;
     const res = ctx.sell(itemId, qtyRequested);
     if (!res.ok) { ctx.toast(res.error ?? 'Could not sell.', 'warn'); paintButtons(); return; }
     clearSellConfirm(itemId);
@@ -246,6 +293,7 @@ export function createItemInspector(ctx, itemId, {
   }
 
   confirmBtn.addEventListener('click', () => {
+    if (unpaid) return;
     const qty = ownedQty();
     if (qty <= 0) return;
     if (needsSellConfirm(qty, item) && !awaitingConfirm()) {
@@ -268,8 +316,13 @@ export function createItemInspector(ctx, itemId, {
     if (!ctx.togglePin) { pinBtn.style.display = 'none'; return; }
     pinBtn.style.display = '';
     pinBtn.textContent = isPinned(ctx.state, itemId) ? 'Unpin' : 'Pin';
+    pinBtn.disabled = !!unpaid;
+    pinBtn.setAttribute('aria-disabled', unpaid ? 'true' : 'false');
+    if (unpaid) pinBtn.setAttribute('title', 'Ungranted — Take all first');
+    else pinBtn.removeAttribute('title');
   }
   pinBtn.addEventListener('click', () => {
+    if (unpaid) return;
     ctx.togglePin?.(itemId);
     paintPin();
   });
@@ -278,8 +331,13 @@ export function createItemInspector(ctx, itemId, {
     lockBtn.style.display = '';
     lockBtn.textContent = isLocked(ctx.state, itemId) ? 'Unlock' : 'Lock';
     lockBtn.setAttribute('aria-pressed', isLocked(ctx.state, itemId) ? 'true' : 'false');
+    lockBtn.disabled = !!unpaid;
+    lockBtn.setAttribute('aria-disabled', unpaid ? 'true' : 'false');
+    if (unpaid) lockBtn.setAttribute('title', 'Ungranted — Take all first');
+    else lockBtn.removeAttribute('title');
   }
   lockBtn.addEventListener('click', () => {
+    if (unpaid) return;
     ctx.toggleLock?.(itemId);
     paintLock();
     paintButtons();
@@ -291,12 +349,19 @@ export function createItemInspector(ctx, itemId, {
     const qty = ownedQty();
     const sparks = sparksFor(item);
     offerBtn.style.display = '';
+    if (unpaid) {
+      offerBtn.disabled = true;
+      offerBtn.textContent = 'Ungranted — Take all first';
+      offerBtn.setAttribute('aria-disabled', 'true');
+      return;
+    }
     offerBtn.disabled = qty < 1;
     offerBtn.textContent = qty < 1
       ? 'Nothing to offer'
       : `Offer 1 for ${sparks} Radiance spark${sparks === 1 ? '' : 's'}`;
   }
   offerBtn.addEventListener('click', () => {
+    if (unpaid) return;
     const res = ctx.offer?.(itemId, 1);
     if (!res?.ok) { ctx.toast(res?.error ?? 'Could not offer.', 'warn'); return; }
     ctx.toast(`Offered ${item.name} — +${res.sparks} Radiance.`, 'success');
@@ -327,7 +392,10 @@ export function createItemInspector(ctx, itemId, {
     'aria-label': 'Stack actions',
   }, sell1Btn, pinBtn, lockBtn);
 
-  const node = el('div', { class: 'item-inspector-body' },
+  const node = el('div', {
+    class: `item-inspector-body${unpaid ? ' item-inspector-unpaid' : ''}`,
+    'data-inspect-origin': unpaid ? 'tray' : 'bank',
+  },
     compactLine,
     lore,
     actions);

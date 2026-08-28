@@ -60,12 +60,14 @@ export const COMBAT_360 = {
   loot: 44,
   /**
    * Leftover unpaid leftover-loot box (not leftover-actions). Header 44 +
-   * pad 12 + gap 6 + 103px portrait tile (56px glyph + name + qty). Acc /
-   * leftover-kit stay on unpaid leftover — loot lives with the fight.
-   * leftover-well packs Knife + styles into one 44px band so leftover-loot
-   * can spend its empty floor (live critic 184 vs leftover 167) instead of
-   * collapsing chrome. Hunt another is a sibling under leftover-actions —
-   * not inside leftover-loot — so leftover-loot can match the live well.
+   * pad 12 + gap 6 + 103px bank-item portrait (56px glyph + name + qty).
+   * Soul / lumen sit as compact wallet in the well head — not 103px
+   * loot-tiles. Acc / leftover-kit stay on unpaid leftover. leftover-well
+   * packs Knife + styles into one 44px band so leftover-loot can spend its
+   * empty floor (live critic 184 vs leftover 167) instead of collapsing
+   * chrome. Empty well ghosts the hollow pack (n slots), not a gold
+   * rectangle. Hunt another is a sibling under leftover-actions — not
+   * inside leftover-loot — so leftover-loot can match the live well.
    * S1s 140 was leftover-actions; leftover-loot then lost the flex race
    * to 90px. Do not grow this toward Melvor's 400px drawer.
    */
@@ -413,7 +415,8 @@ export function fightLogVsTab({ loot = false } = {}) {
 /**
  * Eat + Hunt-this-foe on one 360 row. Food is a loaf chip (glyph + two-line
  * Lantern-loaf / +14 · n), not an ellipsized fake <select>. Well header is
- * Hollow meter + Take all; Hunt another is full-width under the well.
+ * Hollow meter + wallet chips + Take all; Hunt another is full-width under
+ * the well.
  */
 export function leftoverHuntRowVs360() {
   const C = COMBAT_360;
@@ -1343,28 +1346,40 @@ function trayFingerprint(entries) {
   return entries.map((e) => `${e.kind}:${e.id ?? ''}:${e.qty}`).join('|');
 }
 
-/** Noun + portrait for a tray row. Souls/Lumen are wallet drops, not bank items. */
-function trayTileSpec(entry) {
+function trayWalletEntries(entries) {
+  return (entries ?? []).filter((e) => e.kind === 'soul' || e.kind === 'lumen');
+}
+
+function trayItemEntries(entries) {
+  return (entries ?? []).filter((e) => e.kind === 'item');
+}
+
+function walletChip(entry) {
   if (entry.kind === 'soul') {
-    return {
-      kind: 'soul',
-      id: 'soul',
-      glyph: 'spark',
-      name: formatNoun(entry.qty, 'soul'),
-      qtyLabel: `×${formatNumber(entry.qty)}`,
-      aria: formatNoun(entry.qty, 'soul'),
-    };
+    const label = formatNoun(entry.qty, 'soul');
+    return el('span', {
+      class: 'loot-wallet-chip loot-wallet-soul',
+      'data-loot-kind': 'soul',
+      'aria-label': `${label} unpaid`,
+    }, label);
   }
-  if (entry.kind === 'lumen') {
-    return {
-      kind: 'lumen',
-      id: 'lumen',
-      glyph: 'star',
-      name: 'Lumen',
-      qtyLabel: `✦${formatNumber(entry.qty)}`,
-      aria: `✦${formatNumber(entry.qty)} Lumen`,
-    };
-  }
+  const label = `✦${formatNumber(entry.qty)}`;
+  return el('span', {
+    class: 'loot-wallet-chip loot-wallet-lumen',
+    'data-loot-kind': 'lumen',
+    'aria-label': `${label} Lumen unpaid`,
+  }, label);
+}
+
+function lootWalletLine(entries) {
+  if (!entries.length) return null;
+  const line = el('span', { class: 'loot-wallet' });
+  for (const e of entries) line.append(walletChip(e));
+  return line;
+}
+
+/** Named 56px portrait for a bank-item tray row. Wallet never uses this. */
+function trayTileSpec(entry) {
   const item = entry.id ? ITEMS_BY_ID[entry.id] : null;
   const name = item?.name ?? entry.name ?? entry.id ?? 'Loot';
   return {
@@ -1373,16 +1388,16 @@ function trayTileSpec(entry) {
     glyph: itemGlyph(item),
     name,
     qtyLabel: `×${formatNumber(entry.qty)}`,
-    aria: `${name} ×${formatNumber(entry.qty)}`,
+    aria: `${name} ×${formatNumber(entry.qty)} unpaid`,
   };
 }
 
 function lootTile(entry, ctx) {
   const spec = trayTileSpec(entry);
-  const inspectable = spec.kind === 'item' && spec.id && ITEMS_BY_ID[spec.id];
+  const inspectable = spec.id && ITEMS_BY_ID[spec.id];
   const attrs = {
-    class: `loot-tile loot-${spec.kind}${inspectable ? ' loot-inspectable' : ''} glyph-${spec.glyph}`,
-    'data-loot-kind': spec.kind,
+    class: `loot-tile loot-item${inspectable ? ' loot-inspectable' : ''} glyph-${spec.glyph}`,
+    'data-loot-kind': 'item',
     'data-loot-id': spec.id ?? '',
     'aria-label': spec.aria,
   };
@@ -1403,14 +1418,29 @@ function lootTile(entry, ctx) {
 
 function inspectLootItem(ctx, spec, entry) {
   if (!spec?.id) return;
-  if (ctx.openSellSheet) ctx.openSellSheet(spec.id);
-  else if (ctx.inspectLoot) ctx.inspectLoot(spec.id, { name: spec.name, qty: entry?.qty });
+  const opts = {
+    unpaid: entry?.granted === false,
+    trayQty: entry?.qty ?? 0,
+  };
+  if (ctx.openSellSheet) ctx.openSellSheet(spec.id, opts);
+  else if (ctx.inspectLoot) ctx.inspectLoot(spec.id, { name: spec.name, qty: opts.trayQty, unpaid: opts.unpaid });
   else ctx.toast?.(`${spec.name} ${spec.qtyLabel}`, 'info');
 }
 
-function lootTileRow(entries, ctx) {
-  const grid = el('div', { class: 'leftover-loot-chips loot-tray-grid' });
-  for (const e of entries) grid.append(lootTile(e, ctx));
+function lootGhostSlot() {
+  return el('div', {
+    class: 'loot-ghost',
+    'aria-hidden': 'true',
+    'data-loot-kind': 'ghost',
+  });
+}
+
+function lootItemGrid(items, ctx, ghostCount) {
+  const grid = el('div', {
+    class: `leftover-loot-chips loot-tray-grid${ghostCount > 0 ? ' is-ghost-pack' : ''}`,
+  });
+  for (const e of items) grid.append(lootTile(e, ctx));
+  for (let i = 0; i < ghostCount; i++) grid.append(lootGhostSlot());
   return grid;
 }
 
@@ -1447,10 +1477,12 @@ function mountLootWell(ctx, st, paint) {
   return row;
 }
 
-/** Same well live and leftover: Hollow meter, 56px glyph tiles, Take all. */
+/** Same well live and leftover: Hollow meter, wallet chips, 56px item tiles, Take all. */
 function fillLootWell(row, ctx, st, paint) {
   const leftover = isLeftover(st);
   const pending = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
+  const items = trayItemEntries(pending);
+  const wallet = trayWalletEntries(pending);
   const showChrome = !leftover || pending.length > 0;
   row.classList.toggle('is-empty', pending.length === 0);
   row.classList.toggle('leftover-loot', showChrome);
@@ -1464,12 +1496,13 @@ function fillLootWell(row, ctx, st, paint) {
     return;
   }
   const meter = hollowPressureCopy(ctx.state);
+  const ghostCount = items.length === 0 ? lanternRoom(ctx.state) : 0;
   row.removeAttribute('hidden');
   row.removeAttribute('aria-hidden');
   row.setAttribute('aria-label', pending.length
     ? `Loot to collect · ${meter}`
     : `Loot well · ${meter}`);
-  const fp = `${trayFingerprint(pending)}|${meter}|empty:${pending.length === 0}`;
+  const fp = `${trayFingerprint(pending)}|${meter}|empty:${pending.length === 0}|ghosts:${ghostCount}`;
   if (row.dataset?.lootFp === fp
     && row.querySelector('.leftover-take')
     && row.querySelector('.loot-well-meter')
@@ -1484,12 +1517,12 @@ function fillLootWell(row, ctx, st, paint) {
     take.setAttribute('aria-disabled', 'true');
     take.classList.add('btn-disabled');
   }
-  head.append(
-    el('span', { class: 'loot-well-meter' }, meter),
-    take,
-  );
+  head.append(el('span', { class: 'loot-well-meter' }, meter));
+  const walletLine = lootWalletLine(wallet);
+  if (walletLine) head.append(walletLine);
+  head.append(take);
   row.append(head);
-  row.append(lootTileRow(pending, ctx));
+  row.append(lootItemGrid(items, ctx, ghostCount));
 }
 
 function leftoverLog(st) {
