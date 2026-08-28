@@ -386,6 +386,9 @@ function boot() {
     paintTabChrome(ui.tab);
     renderScreen();
     screenRoot.scrollTop = 0;
+    for (const n of screenRoot.children) {
+      if (typeof n.scrollTop === 'number') n.scrollTop = 0;
+    }
     writeUiRoute();
   }
 

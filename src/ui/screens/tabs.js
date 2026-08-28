@@ -23,6 +23,55 @@ import { renderBankScreen } from './bank.js';
 export { renderBankScreen };
 export { renderJournalScreen } from './meta.js';
 
+/**
+ * 360×640 Camp first fold. Lantern + Hearthway Hollow + one flavor line
+ * + Waiting for you must sit above --tab-h (tab top 577). The 6-cell
+ * ledger lives below the fold. Lockstep with styles.css `.camp` rules.
+ */
+export const CAMP_360 = {
+  viewportH: 640,
+  tabbarH: 63, // --tab-h 62 + 1px border → tab top 577
+  topbarH: 157, // 360 wrapped Known/Hollow HUD (measured)
+  screenPadTop: 12,
+  campPadTop: 8,
+  campGap: 8,
+  sigilH: 52,
+  titleH: 30, // 26px at line-height 1.15
+  flavorH: 18, // one 13px line
+  sectionTitleH: 34, // 12+2 margin + 20px display
+  sectionSubH: 24,
+  wantRowH: 52, // title + detail, min-height 44
+  wantGap: 4,
+  wantCount: 3,
+};
+
+/** Waiting-for-you heading and three want rows vs the 360 tab bar. */
+export function campFirstFoldVsTab() {
+  const C = CAMP_360;
+  const tabTop = C.viewportH - C.tabbarH;
+  let y = C.topbarH + C.screenPadTop + C.campPadTop;
+  y += C.sigilH + C.campGap;
+  y += C.titleH + C.campGap;
+  y += C.flavorH + C.campGap;
+  const waitingTop = y;
+  y += C.sectionTitleH;
+  y += C.sectionSubH;
+  const wants = [];
+  for (let i = 0; i < C.wantCount; i++) {
+    const top = y;
+    const bottom = top + C.wantRowH;
+    wants.push({ top, bottom, index: i + 1 });
+    y = bottom + (i < C.wantCount - 1 ? C.wantGap : 0);
+  }
+  return {
+    tabTop,
+    waitingTop,
+    wants,
+    wantsBottom: y,
+    fits: waitingTop < tabTop && wants.every((w) => w.bottom < tabTop),
+  };
+}
+
 function campCycles(state) {
   return Object.values(state.actions.completed).reduce((a, b) => a + b, 0);
 }
@@ -31,7 +80,6 @@ export function renderCampScreen(ctx) {
   const { state } = ctx;
   ctx.ensureDailies?.();
   const wants = nextWants(state);
-  const title = state.cosmetics?.activeTitle;
 
   const lumenVal = el('span', { class: 'stat-value' });
   const radianceVal = el('span', { class: 'stat-value' });
@@ -52,18 +100,9 @@ export function renderCampScreen(ctx) {
   const root = el('section', { class: 'screen camp' },
     el('div', { class: 'sigil-wrap', 'aria-hidden': 'true' }, el('div', { class: 'sigil' })),
     el('h1', { class: 'camp-title' }, 'Hearthway Hollow'),
-    title ? el('p', { class: 'camp-title-worn' }, title) : null,
     el('p', { class: 'camp-flavor' },
-      'The last ember of the Hollow sleeps in your lantern. Feed it, and carry its light down the pilgrim road.'),
-    el('div', { class: 'stat-grid' },
-      el('div', { class: 'stat-cell stat-complete' }, completeVal, el('span', { class: 'stat-label' }, 'Completion')),
-      el('div', { class: 'stat-cell' }, lumenVal, el('span', { class: 'stat-label' }, 'Lumen')),
-      el('div', { class: 'stat-cell' }, radianceVal, el('span', { class: 'stat-label' }, 'Radiance')),
-      el('div', { class: 'stat-cell' }, flameVal, el('span', { class: 'stat-label' }, 'Flame units')),
-      el('div', { class: 'stat-cell' }, timeVal, el('span', { class: 'stat-label' }, 'Time by the flame')),
-      el('div', { class: 'stat-cell' }, cyclesVal, el('span', { class: 'stat-label' }, 'Cycles worked')),
-    ),
-    el('h2', { class: 'section-title' }, 'Waiting for you'),
+      'The last ember of the Hollow sleeps in your lantern.'),
+    el('h2', { class: 'section-title', 'data-camp-fold': 'waiting' }, 'Waiting for you'),
     el('p', { class: 'section-sub muted' }, 'Three things to want next — always.'),
     el('div', { class: 'want-list camp-wants' },
       wants.length
@@ -90,6 +129,15 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'section-sub muted' }, 'Spend what the road gives you. The camp gives it back.'),
     emptyBanner,
     el('div', { class: 'track-list' }, trackRefs.map((r) => r.node)),
+    // Ledger reprints header chips; keep it below the 360 first fold.
+    el('div', { class: 'stat-grid', 'data-camp-fold': 'ledger' },
+      el('div', { class: 'stat-cell stat-complete' }, completeVal, el('span', { class: 'stat-label' }, 'Completion')),
+      el('div', { class: 'stat-cell' }, lumenVal, el('span', { class: 'stat-label' }, 'Lumen')),
+      el('div', { class: 'stat-cell' }, radianceVal, el('span', { class: 'stat-label' }, 'Radiance')),
+      el('div', { class: 'stat-cell' }, flameVal, el('span', { class: 'stat-label' }, 'Flame units')),
+      el('div', { class: 'stat-cell' }, timeVal, el('span', { class: 'stat-label' }, 'Time by the flame')),
+      el('div', { class: 'stat-cell' }, cyclesVal, el('span', { class: 'stat-label' }, 'Cycles worked')),
+    ),
     el('p', { class: 'footnote muted' },
       'Sell what you gather at the Bank; spend it here. Offline progress keeps working while you rest — up to 12 hours, honestly counted.'));
 
