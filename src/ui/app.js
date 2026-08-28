@@ -22,8 +22,8 @@ import { createRng } from '../core/rng.js';
 import { createTickLoop, TICK_MS } from '../core/tick-loop.js';
 import { formatDuration, formatNoun, formatNumber } from '../core/format.js';
 import {
-  SAVE_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
-  storageGet, storageSet,
+  SAVE_KEY, UI_KEY, serializeSave, deserializeSave, SaveError, adoptedSavedAt,
+  storageGet, storageSet, confirmedProgressReset,
 } from '../core/save.js';
 import {
   computeOfflineProgress, OFFLINE_MIN_AWAY_MS, previewOfflineClaim,
@@ -63,7 +63,6 @@ import { shouldRebuildScreen } from './live-paint.js';
 const AUTOSAVE_MS = 30_000;
 /** Hold live ticks after Claim so HUD stays on recap numbers for a beat. */
 export const RECAP_THAW_MS = 800;
-const UI_KEY = 'hollowlight.ui';
 const UI_TABS = new Set(['camp', 'skills', 'bank', 'map', 'journal']);
 const SELL_QTY_MODES = new Set(['1', '10', 'keep1', 'dump']);
 const PACK_FULL_TOAST_MS = 8000;
@@ -95,6 +94,11 @@ function boot() {
   let recapOpen = false;
   let recapHold = false;
   let thawTimer = 0;
+  // After a confirmed wipe, persist must no-op: pagehide/autosave would
+  // otherwise write the old in-memory game back over the cleared keys.
+  let progressWiped = false;
+  let autosaveTimer = 0;
+  let detachSaveWriters = () => {};
 
   function runnerFrozen() {
     return recapOpen || recapHold;
@@ -120,6 +124,7 @@ function boot() {
 
   // ── save / load / adopt ────────────────────────────────────────
   function persist({ stamp = true } = {}) {
+    if (progressWiped) return;
     game.rngState = rng.getState();
     // Recap owns the save until Claim: autosave / hide / pagehide must
     // not rewrite savedAt to now while the modal is still unclaimed.
@@ -325,6 +330,7 @@ function boot() {
   }
 
   function writeUiRoute() {
+    if (progressWiped) return;
     try {
       window.localStorage.setItem(UI_KEY, JSON.stringify({
         tab: ui.tab,
@@ -701,20 +707,15 @@ function boot() {
       }
     },
     resetGame() {
-      try { window.localStorage.removeItem(SAVE_KEY); } catch {}
-      try { window.localStorage.removeItem(UI_KEY); } catch {}
-      ui.tab = 'camp';
-      ui.skillId = null;
-      ui.lastSkillId = 'emberkeeping';
-      ui.campView = null;
-      ui.bankTab = DEFAULT_BANK_TAB;
-      ui.sellMode = false;
-      ui.sellQtyMode = '1';
-      adopt(freshGame());
-      paintTabChrome('camp');
-      writeUiRoute();
-      persist();
-      toaster.push('A new flame is kindled.', 'success');
+      // Two-tap confirm already happened. Block every save writer, unhook
+      // pagehide/hide/autosave, then destroy keys and reload a genuine
+      // createState boot. Clear-then-reload without the persist block is
+      // not a wipe — unload rewrites hollowlight.save from memory.
+      confirmedProgressReset(window.localStorage, {
+        beginReset: () => { progressWiped = true; },
+        detachWriters: () => detachSaveWriters(),
+        reload: () => { window.location.reload(); },
+      });
     },
   };
 
@@ -799,7 +800,8 @@ function boot() {
   hudKnown?.addEventListener('click', () => openFoundLog());
   hudHollow?.addEventListener('click', () => openBank('owned'));
 
-  document.addEventListener('visibilitychange', () => {
+  function persistOnPageHide() { persist(); }
+  function onVisibilityChange() {
     if (document.hidden) {
       loop.stop();
       // Stamp the hide moment with the LIVE runner state (F1d Fix 1): the
@@ -815,9 +817,19 @@ function boot() {
       persist();
       if (!runnerFrozen()) loop.start();
     }
-  });
-  window.addEventListener('pagehide', persist);
-  setInterval(persist, AUTOSAVE_MS);
+  }
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  window.addEventListener('pagehide', persistOnPageHide);
+  autosaveTimer = setInterval(persist, AUTOSAVE_MS);
+  detachSaveWriters = () => {
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+    window.removeEventListener('pagehide', persistOnPageHide);
+    if (autosaveTimer) {
+      clearInterval(autosaveTimer);
+      autosaveTimer = 0;
+    }
+    try { loop.stop(); } catch { /* loop may not have started */ }
+  };
 
   // ── go ─────────────────────────────────────────────────────────
   const firstBoot = loadOrInit();

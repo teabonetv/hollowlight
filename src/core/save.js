@@ -18,6 +18,8 @@ import { hydrateState } from '../game/hydrate.js';
 import { createCombatState } from '../game/systems/combat.js';
 
 export const SAVE_KEY = 'hollowlight.save';
+/** Tab/route chrome. Wiped with the save so a reset cannot restore locks or a stale tab. */
+export const UI_KEY = 'hollowlight.ui';
 export const SAVE_VERSION = 5;
 
 function unionCosmetics(state) {
@@ -184,4 +186,52 @@ export function storageSet(storage, json, key = SAVE_KEY) {
   } catch {
     return false; // quota/private-mode failures must never crash gameplay
   }
+}
+
+export function storageRemove(storage, key) {
+  try {
+    storage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function collectLiveProgressKeys(storage) {
+  const keys = new Set([SAVE_KEY, UI_KEY]);
+  try {
+    if (typeof storage.length === 'number' && typeof storage.key === 'function') {
+      for (let i = 0; i < storage.length; i++) {
+        const k = storage.key(i);
+        if (typeof k === 'string' && k.startsWith('hollowlight.')) keys.add(k);
+      }
+    }
+  } catch { /* private mode / exotic backends */ }
+  return keys;
+}
+
+/**
+ * Drop every live Hollowlight progress key. Used by Settings → Reset all
+ * progress so the next boot is a true createState envelope.
+ */
+export function wipeLiveProgress(storage) {
+  for (const key of collectLiveProgressKeys(storage)) storageRemove(storage, key);
+}
+
+/**
+ * Confirmed Danger-control wipe. Callers MUST `beginReset` (block persist)
+ * and `detachWriters` (pagehide / hide / autosave) BEFORE storage is
+ * cleared. `localStorage.clear()` then `location.reload()` is not a wipe:
+ * unload re-saves the in-memory game and the player comes back on the
+ * starter HUD with the old envelope.
+ */
+export function confirmedProgressReset(storage, {
+  beginReset,
+  detachWriters,
+  reload,
+} = {}) {
+  beginReset?.();
+  try { detachWriters?.(); } catch { /* exotic test DOM */ }
+  wipeLiveProgress(storage);
+  try { reload?.(); } catch { /* tests stub location */ }
 }

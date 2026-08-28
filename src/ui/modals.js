@@ -346,12 +346,14 @@ export function showSettingsModal(mount, ctx) {
 
   const importArea = el('textarea', { class: 'save-textarea', rows: 5, placeholder: 'Paste a Hollowlight save here…', 'aria-label': 'Import save data' });
 
-  const resetBtn = el('button', { class: 'btn btn-danger' }, 'Reset all progress');
+  const resetBtn = el('button', { type: 'button', class: 'btn btn-danger' }, 'Reset all progress');
   resetBtn.addEventListener('click', () => {
     if (!confirmReset) {
+      // Stay armed until the second tap or the modal closes. A short
+      // timeout used to expire the confirm so a second tap was a no-op
+      // (it just re-armed) and the save never wiped.
       confirmReset = true;
       resetBtn.textContent = 'Tap again — this snuffs your flame';
-      setTimeout(() => { confirmReset = false; resetBtn.textContent = 'Reset all progress'; }, 4000);
       return;
     }
     ctx.resetGame();
