@@ -813,6 +813,7 @@ function leftoverDoorToHuntList(state) {
   assert.equal(scr.node.querySelector('.leftover-station'), null);
   const list = scr.node.querySelector('.hunt-list');
   assert.ok(list, 'hunt list is back');
+  assert.ok(scr.node.querySelector('.craft-nav'), 'hunt list still shows Emberkeeping / Foraging / Combat');
   const cards = scr.node.querySelectorAll('.hunt-card');
   assert.ok(cards.length >= 2, 'more than one foe on the stretch');
   assert.ok(cards.some((c) => /Pale Moth/.test(c.textContent ?? '')));
@@ -1516,8 +1517,13 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.equal(C.fightKeep, 32);
   assert.ok(C.leftoverWellLogWrap >= 36, `leftover log wrap ${C.leftoverWellLogWrap} must stay readable`);
 
+  assert.ok(C.leftoverStationTop <= 117, `craft-nav still in leftover station top ${C.leftoverStationTop}`);
+  assert.ok(C.leftoverStationTop < 105 + C.screenPadTop + C.detailHead,
+    'leftover/fight station top must not include the 44px craft-nav row');
+
   const twoStacks = leftoverLogVsTab({ loot: true });
   assert.equal(twoStacks.tabTop, 577);
+  assert.equal(twoStacks.stationTop, C.leftoverStationTop);
   assert.ok(twoStacks.lootH >= C.leftoverWellMin,
     `leftover-loot ${twoStacks.lootH} vs leftoverWellMin ${C.leftoverWellMin} (must be leftover-loot, not leftover-actions)`);
   assert.ok(twoStacks.lootH >= C.leftoverTileMinH,
@@ -1569,5 +1575,61 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.equal(live.lootH, 32);
   assert.equal(live.keepH, 32);
   assert.ok(live.trayBottom <= 577 - C.tabClearance);
+});
+
+test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and hunt list still show it', () => {
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  assert.match(css, /\.screen\.fight-live \.detail-head,\s*\n\.screen\.leftover-live \.detail-head\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.screen\.fight-live \.craft-nav,\s*\n\.screen\.leftover-live \.craft-nav\s*\{[^}]*display:\s*none/);
+  assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.leftover-loot\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellMin}px`));
+  assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.log-wrap\\s*\\{[^}]*min-height:\\s*${COMBAT_360.leftoverWellLogWrap}px`));
+  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
+  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*max-height:\s*32px/);
+
+  const ember = renderSkillDetail(makeCtx(createState({ rngSeed: 2 })), 'emberkeeping');
+  assert.equal(ember.node.classList.contains('leftover-live'), false);
+  assert.equal(ember.node.classList.contains('fight-live'), false);
+  const emberNav = ember.node.querySelector('.craft-nav');
+  assert.ok(emberNav, 'Emberkeeping keeps craft pills');
+  assert.match(emberNav.textContent ?? '', /Emberkeeping/);
+  assert.match(emberNav.textContent ?? '', /Foraging/);
+  assert.match(emberNav.textContent ?? '', /Combat/);
+
+  const forage = renderSkillDetail(makeCtx(createState({ rngSeed: 2 })), 'foraging');
+  assert.ok(forage.node.querySelector('.craft-nav'), 'Foraging keeps craft pills');
+
+  const lobby = renderSkillDetail(makeCtx(createState({ rngSeed: 2 })), 'combat');
+  assert.equal(lobby.node.classList.contains('leftover-live'), false);
+  assert.equal(lobby.node.classList.contains('fight-live'), false);
+  assert.ok(lobby.node.querySelector('.hunt-list'), 'combat hunt list');
+  assert.ok(lobby.node.querySelector('.craft-nav'), 'combat hunt list keeps craft pills');
+
+  const leftoverState = createState({ rngSeed: 4 });
+  assert.ok(killMoth(leftoverState));
+  const leftover = renderSkillDetail(makeCtx(leftoverState), 'combat');
+  assert.ok(leftover.node.classList.contains('leftover-live'));
+  assert.equal(leftover.node.classList.contains('fight-live'), false);
+  leftover.node.querySelector('.leftover-another').click();
+  leftover.update();
+  assert.equal(leftover.node.classList.contains('leftover-live'), false);
+  assert.ok(leftover.node.querySelector('.hunt-list'), 'Hunt another returns to the zone list');
+  assert.ok(leftover.node.querySelector('.craft-nav'), 'Hunt another restores craft pills on the lobby');
+
+  const fightState = createState({ rngSeed: 4 });
+  combat.startFight(fightState, 'pale-moth', { encounterSeed: 1 });
+  const fight = renderSkillDetail(makeCtx(fightState), 'combat');
+  assert.ok(fight.node.classList.contains('fight-live'));
+  assert.equal(fight.node.classList.contains('leftover-live'), false);
+
+  const box = leftoverLogVsTab({ loot: true });
+  assert.ok(box.lootH >= COMBAT_360.leftoverWellMin, `leftover-loot ${box.lootH}`);
+  assert.ok(box.wrapH >= 36, `leftover log-wrap ${box.wrapH}`);
+  assert.ok(box.logBottom <= 569, `leftover log bottom ${box.logBottom}`);
+  assert.ok(box.anotherBottom <= 577 - COMBAT_360.tabClearance, `Hunt another ${box.anotherBottom}`);
+  assert.ok(box.fits);
+  const live = fightLogVsTab({ loot: true });
+  assert.equal(live.keepH, 32, 'live Keep hunting stays 32px');
+  assert.equal(live.lootH, 32, 'live unpaid tray stays 32px');
+  assert.ok(live.trayBottom <= 577 - COMBAT_360.tabClearance);
 });
 

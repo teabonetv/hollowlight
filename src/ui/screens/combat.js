@@ -18,7 +18,8 @@ import * as combat from '../../game/systems/combat.js';
 
 /**
  * 360×640 fight / leftover budget. Must stay in lockstep with combat.css:
- * topbar ≈52, --tab-h 62, fight-live #screen pad 8, detail-head 44, 44px taps.
+ * topbar ≈52, --tab-h 62, fight-live #screen pad 8, 44px taps.
+ * leftover-live / fight-live hide .craft-nav (Emberkeeping / Foraging / Combat).
  */
 export const COMBAT_360 = {
   viewportH: 640,
@@ -37,7 +38,7 @@ export const COMBAT_360 = {
   lobbyHead: 50,
   gap: 3,
   leftoverGap: 1,
-  leftoverStationTop: 161, // 360 wrapped topbar 105 + pad 8 + detail-head 44 + gap 4
+  leftoverStationTop: 117, // 360 wrapped topbar 105 + pad 8 + gap 4; craft-nav hidden
   kicker: 14,
   fighter: 26,
   leftoverFighter: 22,
@@ -70,7 +71,7 @@ export const COMBAT_360 = {
   /**
    * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
    * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
-   * leftover chrome (fighters / craft-tab gap / leftover-live pad), not the log.
+   * leftover chrome (fighters / hidden craft-nav / leftover-live pad), not the log.
    */
   leftoverWellLogWrap: 36,
   leftoverWellFighter: 16,
@@ -139,8 +140,9 @@ export function cockpitLogVsTab(kind = 'leftover') {
  * room, not a 90px overflow:hidden drawer. lootH is leftover-loot (header +
  * portraits), not leftover-actions. Unpaid leftover keeps a readable kill-log
  * (≥ leftoverWellLogWrap) by compacting leftover chrome — leftover-loot stays
- * ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56. .cockpit-fill is
- * display:none in well mode so its gaps cannot tax the portraits.
+ * ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56. leftover-live hides
+ * craft-nav so leftover-loot inherits that 44px as empty floor. .cockpit-fill
+ * is display:none in well mode so its gaps cannot tax the portraits.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
  * No-loot leftover-actions stays a 44px Hunt another row.
  */
@@ -295,6 +297,8 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
  * the log; Eat / Fall back stay on the eat row, all above tab 577 with ≥8px gap.
  * v49: leftover-loot 44px on the live pull measured 543–587. v54: compact 32px
  * tray measured 550.6–582.6 (craft-nav + keep 44) — 5.6px under the tab.
+ * S1v hides craft-nav on fight-live; that height goes to .cockpit-fill, not
+ * the 32px keep / unpaid tray.
  */
 export function fightLogVsTab({ loot = false } = {}) {
   const C = COMBAT_360;

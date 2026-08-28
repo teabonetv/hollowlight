@@ -68,22 +68,16 @@
 .screen.leftover-live .xp-block,
 .screen.fight-live .fight-xp-chip,
 .screen.leftover-live .fight-xp-chip { display: none; }
+/* S1v: craft-nav stays on Emberkeeping / Foraging / combat lobby.
+   leftover-live and fight-live hide the row; leftover-loot inherits the 44px. */
 .screen.fight-live .detail-head,
 .screen.leftover-live .detail-head {
-  align-items: center;
-  min-height: 44px;
-  max-height: 44px;
-  margin-bottom: 0;
-  flex: 0 0 auto;
-  overflow: hidden;
+  display: none;
 }
-.screen.fight-live .detail-head .craft-nav,
-.screen.leftover-live .detail-head .craft-nav {
-  padding-bottom: 0;
-  scrollbar-width: none;
+.screen.fight-live .craft-nav,
+.screen.leftover-live .craft-nav {
+  display: none;
 }
-.screen.fight-live .detail-head .craft-nav::-webkit-scrollbar,
-.screen.leftover-live .detail-head .craft-nav::-webkit-scrollbar { display: none; }
 .screen.fight-live .combat-root,
 .screen.leftover-live .combat-root {
   gap: 0;
@@ -484,6 +478,7 @@
 .leftover-station.leftover-well .bar.bar-lg { height: 4px; }
 .leftover-station.leftover-well .oil-line { font-size: 11px; line-height: 1.1; }
 .leftover-station.leftover-well .eat-row { gap: 0; }
+/* leftover-live hides the 44px craft-nav; leftover-actions/loot grow into it. */
 .leftover-station.leftover-well .leftover-actions {
   flex: 1 0 auto;
   flex-shrink: 0;
