@@ -22,6 +22,52 @@ import {
 
 const DESKTOP_INSPECTOR_MQ = '(min-width: 900px)';
 
+/**
+ * 360×640 Bank owned pack vs tab 577. Phone tabs are one scrolling row
+ * (`flex-wrap: nowrap` under 400px); tiles stay 96px. Lockstep with styles.css.
+ */
+export const BANK_OWNED_360 = {
+  viewportH: 640,
+  tabbarH: 63, // --tab-h 62 + 1px border → tab top 577
+  tabClearance: 8, // last fold block ≤ 569
+  topbarH: 157, // 360 wrapped Known/Hollow HUD
+  screenPadTop: 12,
+  workspaceGap: 10,
+  headH: 66, // 44px Sell Mode + 2px head gap + ~20px sub
+  tabH: 48, // 44px chips + 4px pad, nowrap under 400px
+  searchH: 44,
+  tileH: 96, // .bank-tile-dense — do not shrink
+  tileGap: 6,
+  screenScrollPad: 71, // --screen-scroll-pad = tab 63 + 8
+};
+
+/** First owned tile rows vs the 360 tab bar. No row may be bisected at 577. */
+export function ownedRowsVsTab({ rows = 2 } = {}) {
+  const C = BANK_OWNED_360;
+  const tabTop = C.viewportH - C.tabbarH;
+  const foldClear = tabTop - C.tabClearance;
+  let y = C.topbarH + C.screenPadTop;
+  y += C.headH + C.workspaceGap;
+  y += C.tabH + C.workspaceGap;
+  y += C.searchH;
+  const gridTop = y;
+  const line = [];
+  for (let i = 0; i < rows; i++) {
+    const top = gridTop + i * (C.tileH + C.tileGap);
+    const bottom = top + C.tileH;
+    line.push({ top, bottom, index: i + 1, cut: top < tabTop && bottom > tabTop });
+  }
+  return {
+    tabTop,
+    foldClear,
+    gridTop,
+    rows: line,
+    row2Bottom: line[1]?.bottom ?? line[0]?.bottom,
+    cutCount: line.filter((r) => r.cut).length,
+    fits: line.every((r) => !r.cut && (r.bottom <= foldClear || r.top >= tabTop)),
+  };
+}
+
 /** Phone-360 owned-grid geometry. CSS must match — names wrap, never ellipsize. */
 export const OWNED_NAME_LAYOUT = {
   phoneMaxWidth: 400,

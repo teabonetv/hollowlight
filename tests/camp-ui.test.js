@@ -292,19 +292,47 @@ test('360 Camp first fold is lantern + Hearthway Hollow + flavor + Waiting for y
 
 test('shared #screen padding-bottom equals the tab bar on every tab', () => {
   const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  const combat = readFileSync(new URL('../src/ui/combat.css', import.meta.url), 'utf8');
   assert.match(css, /--tab-h:\s*62px/);
   assert.match(css, /--tabbar-size:\s*calc\(\s*var\(--tab-h\)\s*\+\s*1px\s*\)/);
+  assert.match(css, /--screen-scroll-pad:\s*calc\(\s*var\(--tabbar-size\)\s*\+\s*8px\s*\)/);
   const screenBlock = css.match(/\/\* ── main scroll region[\s\S]*?#screen\s*\{([^}]+)\}/);
   assert.ok(screenBlock, '#screen shared chrome rule present');
   assert.match(screenBlock[1], /overflow:\s*hidden/, '#screen is a frame so padding is first-fold clearance');
   assert.match(screenBlock[1], /padding:\s*12px 16px calc\(var\(--tabbar-size\)/);
   const screenRule = css.match(/\.screen\s*\{[^}]*overflow-y:\s*auto/s);
   assert.ok(screenRule, 'screens scroll inside the padded frame');
+  assert.match(css, /\.screen\s*\{[^}]*padding-bottom:\s*var\(--screen-scroll-pad\)/s);
+  assert.match(css, /\.screen\s*\{[^}]*scroll-padding-bottom:\s*var\(--screen-scroll-pad\)/s);
+  assert.match(css, /\.screen\.fight-live,\s*\n\.screen\.leftover-live\s*\{[^}]*padding-bottom:\s*0/s);
+  assert.match(combat, /\.leftover-station\.leftover-well\s+\.leftover-loot\s*\{[^}]*min-height:\s*167px/s);
+  assert.match(combat, /\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*32px/s);
   assert.doesNotMatch(css, /\.camp[^{]*\{[^}]*--tabbar-size/s,
     'tab padding is shared chrome, not a Camp-only hack');
   assert.doesNotMatch(css, /\.bank-screen[^{]*\{[^}]*--tabbar-size/s);
   assert.doesNotMatch(css, /\.almanac[^{]*\{[^}]*--tabbar-size/s);
   assert.doesNotMatch(css, /\.repair-card[^{]*\{[^}]*--tabbar-size/s);
+});
+
+test('360 lantern kits on the fold: last on-fold Already-whole button sits above tab 577', () => {
+  const { LANTERN_360, lanternKitsVsTab } = tabs;
+  assert.equal(LANTERN_360.viewportH, 640);
+  assert.equal(LANTERN_360.tabbarH, 63);
+  const fold = lanternKitsVsTab();
+  assert.equal(fold.tabTop, 577);
+  assert.equal(fold.foldClear, 569);
+  assert.equal(fold.cutCount, 0, 'no kit button is bisected by the tab');
+  assert.ok(fold.lastOnFoldBottom <= 569,
+    `last on-fold kit button ${fold.lastOnFoldBottom} vs 569`);
+  assert.ok(fold.fits, `kit2 ${fold.kits[1].top}–${fold.kits[1].bottom} vs tab 577`);
+  const v62Kit2 = { top: 536, bottom: 580 };
+  assert.ok(v62Kit2.bottom > 577, 'v62 kit 2 sat on CAMP/SKILLS/BANK');
+  assert.ok(fold.kits[1].bottom <= 569, `kit 2 button ${fold.kits[1].bottom} vs 569`);
+  assert.equal(LANTERN_360.btnH, 44, 'do not shrink the kit tap');
+
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.repair-kits\s*\{[^}]*gap:\s*6px/s);
+  assert.match(css, /\.repair-row\s*\{[^}]*gap:\s*4px/s);
 });
 
 test('Wick patch applies when paid, or names the missing cost on the button', () => {

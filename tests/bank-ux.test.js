@@ -25,6 +25,7 @@ const {
   prefersDockedInspector, itemTileGlyph, itemTileChrome, itemTileStallPip,
   ownedNameFits, ownedNameClientWidth, OWNED_NAME_LAYOUT,
   UNKNOWN_ITEM_MARK, STILL_IN_THE_DARK,
+  ownedRowsVsTab, BANK_OWNED_360,
 } = await import('../src/ui/screens/bank.js');
 const { inspectorPriceLawLine, inspectorStackStatsLine, inspectSheetActionsVs360, INSPECT_SHEET_360 } =
   await import('../src/ui/item-inspector.js');
@@ -818,6 +819,31 @@ test('Food tab stays on the starter row after dump; HUD chips and tab chips wrap
   assert.match(html, /Hollow 0\/12/);
   assert.match(css, /\.screen\.log-items\s*\{[^}]*gap:\s*4px/s);
   assert.match(css, /\.screen\.log-items \.section-title\s*\{[^}]*margin-top:\s*0/s);
+});
+
+test('360 Bank owned first fold: no tile row is cut in half by tab 577', () => {
+  assert.equal(BANK_OWNED_360.viewportH, 640);
+  assert.equal(BANK_OWNED_360.tabbarH, 63);
+  assert.equal(BANK_OWNED_360.tileH, 96, 'do not shrink owned tiles');
+  assert.equal(BANK_OWNED_360.screenScrollPad, 71);
+  const fold = ownedRowsVsTab({ rows: 2 });
+  assert.equal(fold.tabTop, 577);
+  assert.equal(fold.foldClear, 569);
+  assert.equal(fold.rows.length, 2);
+  assert.equal(fold.cutCount, 0, 'v62 row 2 549–645 was bisected by the tab');
+  assert.ok(fold.row2Bottom <= 569, `row 2 bottom ${fold.row2Bottom} vs 569`);
+  assert.ok(fold.fits, `row1 ${fold.rows[0].bottom} row2 ${fold.row2Bottom} vs tab 577`);
+  for (const row of fold.rows) {
+    assert.ok(!row.cut, `owned row ${row.index} ${row.top}–${row.bottom} must not straddle 577`);
+  }
+  const v62Row2 = { top: 549, bottom: 645 };
+  assert.ok(v62Row2.top < 577 && v62Row2.bottom > 577, 'v62 letter 3: row 2 sat under CAMP/SKILLS/BANK');
+
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.bank-grid-owned\s*\{[^}]*padding-bottom:\s*var\(--screen-scroll-pad\)/s);
+  assert.match(css, /\.bank-tabs\s*\{[^}]*flex-wrap:\s*wrap/s);
+  assert.match(css, /@media \(max-width:\s*400px\)\s*\{[^}]*\.bank-tabs\s*\{[^}]*flex-wrap:\s*nowrap/s);
+  assert.match(css, /\.bank-tile-dense\s*\{[^}]*min-height:\s*96px/s);
 });
 
 test('bankTab all opens Catalogue with named found and mystery unfound tiles, not Camp', () => {

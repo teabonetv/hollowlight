@@ -23,6 +23,49 @@ import { statsRows } from '../../game/systems/stats.js';
 import { formatNumber, formatDuration } from '../../core/format.js';
 
 /**
+ * 360×640 Almanac EMBERS first daily card vs tab 577.
+ * v62: Gather 20 items card bottom 600, In progress 541–585 (cut by the tab).
+ * Lockstep with styles.css `.screen.almanac` gap 10 + `.daily-card` pad/gap.
+ */
+export const EMBER_360 = {
+  viewportH: 640,
+  tabbarH: 63,
+  tabClearance: 8,
+  topbarH: 157,
+  screenPadTop: 12,
+  screenGap: 10, // .screen.almanac
+  headH: 58,
+  navH: 48, // 44px tabs + 4px pad
+  blurbH: 31,
+  cardToClaim: 155, // padding + title + hint + xp + gaps → claim top
+  claimH: 44,
+};
+
+/** First daily-ember claim CTA vs the 360 tab bar. */
+export function emberClaimVsTab() {
+  const C = EMBER_360;
+  const tabTop = C.viewportH - C.tabbarH;
+  const foldClear = tabTop - C.tabClearance;
+  let y = C.topbarH + C.screenPadTop;
+  y += C.headH + C.screenGap;
+  y += C.navH + C.screenGap;
+  y += C.blurbH + C.screenGap;
+  const cardTop = y;
+  const claimTop = cardTop + C.cardToClaim;
+  const claimBottom = claimTop + C.claimH;
+  const cardBottom = claimBottom + 10; // .daily-card padding-bottom
+  return {
+    tabTop,
+    foldClear,
+    cardTop,
+    cardBottom,
+    claimTop,
+    claimBottom,
+    fits: claimBottom <= foldClear,
+  };
+}
+
+/**
  * 360×640 Almanac Items (Known door). Chrome must leave two full
  * Still-in-the-dark rows above --tab-h (tab top 577).
  * Lockstep with styles.css `.screen.log-items` rules.
