@@ -47,6 +47,10 @@ export const COMBAT_360 = {
   oil: 14,
   oilBuy: 44,
   eat: 44,
+  /** Leftover/live food chip: loaf glyph 28 + gap + "Lantern-loaf" two-line. */
+  eatChipMin: 108,
+  /** Hunt Fog-rat / Hunt Pale Moth sitting after Eat on the 44px eat-row. */
+  leftoverHuntMin: 88,
   hand: 44,
   styles: 44,
   keep: 44,
@@ -362,14 +366,20 @@ export function fightLogVsTab({ loot = false } = {}) {
   };
 }
 
-/** Eat + Hunt-this-foe on one 360 row; well header is Hollow meter + Take all; Hunt another is full-width under the well. */
+/**
+ * Eat + Hunt-this-foe on one 360 row. Food is a loaf chip (glyph + two-line
+ * Lantern-loaf / +14 · n), not an ellipsized fake <select>. Well header is
+ * Hollow meter + Take all; Hunt another is full-width under the well.
+ */
 export function leftoverHuntRowVs360() {
   const C = COMBAT_360;
   const viewportW = C.viewportW ?? 360;
   const padX = C.screenPadX ?? 16;
   const contentW = viewportW - padX * 2;
   const gap = 6;
-  const eatUsed = C.eat + C.hunt + gap * 2;
+  const chipMin = C.eatChipMin ?? 108;
+  const huntW = C.leftoverHuntMin ?? 88;
+  const eatUsed = chipMin + C.eat + huntW + gap * 2;
   const wellHeadUsed = 110 + (C.leftoverWellHead ?? C.loot) + gap;
   const actionsUsed = C.hunt;
   const anotherRight = padX + contentW;
@@ -584,6 +594,46 @@ function fillLogBox(box, log, lines) {
   }
 }
 
+function eatPickParts(id, n) {
+  const food = FOOD[id];
+  const heal = combat.foodHeal(id);
+  const glyph = itemGlyph(ITEMS_BY_ID[id]);
+  return {
+    food,
+    heal,
+    glyph,
+    name: food?.name ?? id,
+    meta: `+${heal} · ${n}`,
+  };
+}
+
+/** Loaf chip: glyph + two-line name / heal·qty. Never a native <select>. */
+function fillEatPick(pick, id, n) {
+  if (!pick || !id) return;
+  const { glyph, name, meta } = eatPickParts(id, n);
+  let glyphEl = pick.querySelector('.eat-glyph');
+  let nameEl = pick.querySelector('.eat-food-name');
+  let metaEl = pick.querySelector('.eat-food-meta');
+  if (!glyphEl || !nameEl || !metaEl) {
+    clear(pick);
+    glyphEl = el('span', {
+      class: `eat-glyph bank-glyph bank-glyph-fill glyph-${glyph}`,
+      html: filledIcon(glyph),
+      'aria-hidden': 'true',
+    });
+    nameEl = el('span', { class: 'eat-food-name' }, `${name} `);
+    metaEl = el('span', { class: 'eat-food-meta' }, meta);
+    pick.append(glyphEl, el('span', { class: 'eat-copy' }, nameEl, metaEl));
+  } else {
+    glyphEl.className = `eat-glyph bank-glyph bank-glyph-fill glyph-${glyph}`;
+    glyphEl.innerHTML = filledIcon(glyph);
+    nameEl.textContent = `${name} `;
+    metaEl.textContent = meta;
+  }
+  pick.setAttribute('data-food-id', id);
+  pick.setAttribute('data-food-count', String(n));
+}
+
 function syncEatRow(row, ctx, st) {
   if (!row) return;
   const btn = row.querySelector('.eat-btn');
@@ -596,12 +646,7 @@ function syncEatRow(row, ctx, st) {
   }
   const id = combat.selectedFoodId(ctx.state);
   const pick = row.querySelector('.eat-pick');
-  if (id && pick) {
-    const n = bankCount(ctx.state.bank, id);
-    const food = FOOD[id];
-    const heal = combat.foodHeal(id);
-    pick.textContent = `${food.name} +${heal} · ${n}`;
-  }
+  if (id && pick) fillEatPick(pick, id, bankCount(ctx.state.bank, id));
 }
 
 function weaponToggleLabel(weapon) {
@@ -1033,10 +1078,9 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
   const heal = combat.foodHeal(id);
   const full = st.playerHp >= st.playerMaxHp;
   const owned = combat.ownedFoodIds(ctx.state);
-  const label = `${food.name} +${heal} · ${n}`;
   const slot = el('div', { class: 'eat-slot' });
-  if (owned.length > 1) {
-    slot.append(el('button', {
+  const pick = owned.length > 1
+    ? el('button', {
       class: 'btn btn-ghost eat-pick',
       type: 'button',
       'aria-label': `Cycle food, ${food.name} +${heal}`,
@@ -1045,10 +1089,10 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
         else combat.cycleFood(ctx.state);
         paint();
       },
-    }, label));
-  } else {
-    slot.append(el('span', { class: 'eat-pick eat-pick-solo' }, label));
-  }
+    })
+    : el('span', { class: 'eat-pick eat-pick-solo' });
+  fillEatPick(pick, id, n);
+  slot.append(pick);
   slot.append(el('button', {
     class: `btn eat-btn ${full ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
     type: 'button',
