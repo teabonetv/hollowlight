@@ -565,6 +565,63 @@ test('eat-pick is not armed when only one food is owned', () => {
   assert.equal(eatBtn.classList.contains('btn-disabled'), false);
 });
 
+function assertLoafChip(host, { count = 8, tag = null } = {}) {
+  assert.equal(host.querySelector('select'), null, 'food slot is not a native <select>');
+  const pick = host.querySelector('.eat-pick');
+  assert.ok(pick, 'eat-pick chip');
+  assert.notEqual(pick.tagName, 'SELECT');
+  if (tag) assert.equal(pick.tagName, tag);
+  const text = pick.textContent ?? '';
+  const title = pick.getAttribute('title') ?? '';
+  assert.match(text, /Lantern-loaf/, 'name is in eat-pick text, not a title attr');
+  assert.equal(/Lantern-loaf/.test(title) && !/Lantern-loaf/.test(text), false);
+  assert.match(text, new RegExp(String(count)), 'remaining count is in eat-pick text');
+  assert.match(pick.querySelector('.eat-food-name')?.textContent ?? '', /Lantern-loaf/);
+  assert.match(pick.querySelector('.eat-food-meta')?.textContent ?? '', new RegExp(`\\+14 · ${count}`));
+  const glyph = pick.querySelector('.eat-glyph');
+  assert.ok(glyph, 'loaf glyph on the chip');
+  assert.ok(glyph.classList.contains('glyph-loaf'));
+  assert.match(glyph.innerHTML ?? '', /<svg/i);
+  assert.ok(host.querySelector('.eat-btn'), 'Eat stays the tap');
+  return pick;
+}
+
+test('leftover unpaid eat-pick is a lantern-loaf chip with count, not a truncated select', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killMoth(state));
+  const n = state.bank['lantern-loaf'] ?? 0;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover?.classList.contains('leftover-well'));
+  assertLoafChip(leftover, { count: n, tag: 'BUTTON' });
+  assert.ok(leftover.querySelector('.eat-btn'));
+  assert.ok(leftover.querySelector('.leftover-hunt'));
+  assert.ok(leftover.querySelector('.acc-station'), 'Acc still present');
+  assert.ok(leftover.querySelector('.leftover-kit') || leftover.querySelector('.hand-chip'));
+  const box = leftoverLogVsTab({ loot: true });
+  assert.ok(box.lootH >= COMBAT_360.leftoverWellMin, `leftover-loot ${box.lootH}`);
+  assert.ok(box.wrapH >= 36);
+  assert.ok(box.logBottom <= 569);
+  assert.ok(box.fits);
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  assert.match(css, /\.screen\.fight-live \.craft-nav,\s*\n\.screen\.leftover-live \.craft-nav\s*\{[^}]*display:\s*none/);
+  assert.doesNotMatch(css, /\.eat-pick\s*\{[^}]*text-overflow:\s*ellipsis/);
+  assert.doesNotMatch(css, /\.leftover-station \.eat-pick\s*\{[^}]*text-overflow:\s*ellipsis/);
+  assert.doesNotMatch(css, /\.leftover-station \.eat-pick\s*\{[^}]*white-space:\s*nowrap/);
+});
+
+test('live Hunt eat-pick is a lantern-loaf chip with count, not a truncated select', () => {
+  const state = createState({ rngSeed: 4 });
+  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  const n = state.bank['lantern-loaf'] ?? 0;
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  assert.ok(scr.node.classList.contains('fight-live'));
+  const fight = scr.node.querySelector('.combat-fight');
+  assertLoafChip(fight, { count: n, tag: 'BUTTON' });
+  assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
+  assert.equal(fight.querySelector('select'), null);
+});
+
 test('leftover hub is leftover-live and has no duplicate souls chips', () => {
   const state = createState({ rngSeed: 4 });
   killMoth(state);

@@ -196,18 +196,59 @@
   font-size: 13px;
   white-space: nowrap;
 }
+/* Loaf chip: glyph + two-line name / heal·qty. Not a fake <select>. */
 .eat-pick {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   flex: 1 1 auto;
-  min-width: 0;
+  min-width: 108px;
   min-height: 44px;
   justify-content: flex-start;
   text-align: left;
   font-size: 13px;
-  padding: 8px 10px;
+  padding: 4px 8px;
+  color: var(--text);
+  overflow: visible;
+  white-space: normal;
+}
+.eat-pick .eat-glyph {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 6px;
+}
+.eat-pick .eat-glyph svg {
+  width: 22px;
+  height: 22px;
+}
+.eat-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 0;
+  line-height: 1.15;
+}
+.eat-food-name {
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1.15;
   color: var(--text);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
+}
+.eat-food-meta {
+  font-size: 12px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--gold-hi);
+  white-space: nowrap;
+  overflow: visible;
 }
 .eat-pick.btn-ghost { border-color: var(--line-soft); }
 .eat-pick.btn-primary,
@@ -219,11 +260,11 @@
 .eat-pick-solo {
   display: flex;
   align-items: center;
-  border: 1px solid transparent;
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-sm);
-  background: none;
+  background: rgba(7, 9, 13, 0.45);
   min-height: 44px;
-  padding: 8px 4px 8px 2px;
+  padding: 4px 8px;
 }
 .eat-empty { margin: 0; }
 .leftover-station {
@@ -253,11 +294,23 @@
 }
 .leftover-station .oil-line { font-size: 12px; line-height: 1.2; }
 .leftover-station .eat-pick {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: 12.5px;
-  padding: 8px 8px;
+  font-size: 12px;
+  padding: 4px 6px;
+  overflow: visible;
+  white-space: normal;
+}
+.leftover-station .eat-food-name { font-size: 12px; }
+.leftover-station .eat-food-meta { font-size: 11.5px; }
+.leftover-station .eat-pick .eat-glyph {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  min-width: 26px;
+  min-height: 26px;
+}
+.leftover-station .eat-pick .eat-glyph svg {
+  width: 20px;
+  height: 20px;
 }
 .leftover-station .eat-slot {
   max-width: 100%;
