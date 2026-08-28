@@ -26,7 +26,8 @@ const {
   ownedNameFits, ownedNameClientWidth, OWNED_NAME_LAYOUT,
   UNKNOWN_ITEM_MARK, STILL_IN_THE_DARK,
 } = await import('../src/ui/screens/bank.js');
-const { inspectorPriceLawLine, inspectorStackStatsLine } = await import('../src/ui/item-inspector.js');
+const { inspectorPriceLawLine, inspectorStackStatsLine, inspectSheetActionsVs360, INSPECT_SHEET_360 } =
+  await import('../src/ui/item-inspector.js');
 const { liveSellUnit, addSellPressure } = await import('../src/game/systems/store.js');
 const { formatHollowChip, formatKnownChip, paintHud } = await import('../src/ui/hud.js');
 const { readFileSync } = await import('node:fs');
@@ -311,6 +312,8 @@ test('phone inspect is a bottom sheet; settings stay a centered modal', () => {
     state: s,
     sell: () => ({ ok: false }),
     toast() {},
+    togglePin() {},
+    toggleLock() {},
   }, 'tinderscrap');
   const sheet = sheetMount.querySelector('.sheet-overlay');
   const sheetPanel = sheetMount.querySelector('.sheet-panel');
@@ -324,17 +327,37 @@ test('phone inspect is a bottom sheet; settings stay a centered modal', () => {
   assert.match(panelKids[1].textContent ?? '', /Tinderscrap/, 'first paint: name');
   const inspector = sheetPanel.querySelector('.item-inspector-body');
   assert.ok(inspector);
-  assert.match(inspector.children[0].textContent ?? '', /catalog ✦1 · stall today ✦1/, 'first paint: catalog line');
-  assert.match(inspector.children[0].textContent ?? '', /Fair Trade \/ stall pressure/);
-  assert.match(inspector.children[1].textContent ?? '', /Sell 1/, 'first paint: Sell 1');
-  assert.match(inspector.children[1].textContent ?? '', /Sell All/, 'first paint: Sell All');
-  const lore = inspector.querySelector('.sell-flavor')?.textContent ?? '';
-  assert.match(lore, /Shaved splinters/);
-  const inspectorText = inspector.children.map?.((c) => c.textContent).join('\n')
-    ?? inspector.textContent;
-  const sellAt = inspectorText.indexOf('Sell 1');
-  const loreAt = inspectorText.indexOf('Shaved splinters');
-  assert.ok(sellAt >= 0 && loreAt > sellAt, 'lore sits below sell controls');
+  const compact = inspector.querySelector('.sell-compact');
+  assert.ok(compact, 'phone fold is compact count + stack worth');
+  assert.equal(inspector.children[0], compact);
+  assert.match(compact.textContent ?? '', /30 in the bank/);
+  assert.match(compact.textContent ?? '', /stack worth ✦30 at today’s stall/);
+  assert.doesNotMatch(compact.textContent ?? '', /catalog ✦/, 'price law is not in the compact fold');
+  assert.doesNotMatch(compact.textContent ?? '', /times found/, 'times-found is not in the compact fold');
+  assert.equal(compact.querySelectorAll('br').length, 1, 'compact lore is two lines');
+
+  const actions = inspector.querySelector('.inspector-actions');
+  assert.ok(actions);
+  assert.equal(inspector.lastChild, actions, 'Sell/Pin/Lock stick to the sheet foot');
+  assert.match(actions.querySelector('.sell-1-btn')?.textContent ?? '', /Sell 1/);
+  assert.match(actions.querySelector('.sell-pin-btn')?.textContent ?? '', /^Pin$/);
+  assert.match(actions.querySelector('.sell-lock-btn')?.textContent ?? '', /^Lock$/);
+  const actionBtns = actions.querySelectorAll('button');
+  assert.equal(actionBtns.length, 3);
+
+  const lore = inspector.querySelector('.item-inspector-lore');
+  assert.ok(lore);
+  assert.match(lore.textContent ?? '', /catalog ✦1 · stall today ✦1/, 'extra catalog scrolls in lore');
+  assert.match(lore.textContent ?? '', /Fair Trade \/ stall pressure/);
+  assert.match(lore.textContent ?? '', /times found 30/);
+  assert.match(lore.textContent ?? '', /Sell All/, 'Sell All lives in scrollable lore');
+  const flavor = lore.querySelector('.sell-flavor')?.textContent ?? '';
+  assert.match(flavor, /Shaved splinters/);
+  const compactAt = inspector.textContent.indexOf('30 in the bank');
+  const sellAt = inspector.textContent.indexOf('Sell 1');
+  const loreAt = inspector.textContent.indexOf('Shaved splinters');
+  assert.ok(compactAt >= 0 && loreAt > compactAt, 'extra lore sits below compact count');
+  assert.ok(sellAt > loreAt, 'sticky Sell/Pin/Lock sit below extra lore');
 
   const settingsMount = globalThis.document.createElement('div');
   modals.showSettingsModal(settingsMount, {
@@ -351,6 +374,30 @@ test('phone inspect is a bottom sheet; settings stay a centered modal', () => {
   assert.equal(settingsMount.querySelector('.sheet-panel'), null);
 
   globalThis.window = prev;
+});
+
+test('360 inspect sheet keeps Sell/Pin/Lock in the viewport; lore is two compact lines', () => {
+  const box = inspectSheetActionsVs360();
+  assert.equal(box.viewportH, INSPECT_SHEET_360.viewportH);
+  assert.equal(box.viewportW, 360);
+  assert.equal(box.compactLines, 2);
+  assert.equal(box.actionMin, 44);
+  assert.ok(box.coversTab, 'sheet covers the tab bar');
+  assert.ok(box.panelTop < box.tabTop, `panel top ${box.panelTop} must cover tab ${box.tabTop}`);
+  assert.equal(box.panelBottom, 640);
+  assert.ok(box.sellBottom <= 640, `Sell 1 bottom ${box.sellBottom} must be in the 360 viewport`);
+  assert.ok(box.pinBottom <= 640, `Pin bottom ${box.pinBottom} must be in the 360 viewport`);
+  assert.ok(box.lockBottom <= 640, `Lock bottom ${box.lockBottom} must be in the 360 viewport`);
+  assert.ok(box.actionBottom - box.actionTop >= 44, 'action taps are ≥44px');
+  assert.ok(box.compactBottom <= box.actionTop, 'compact lore does not cover the action row');
+  assert.ok(box.loreBottom <= box.actionTop, 'scrolling lore stays above sticky actions');
+
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.sheet-panel\s*\{[^}]*height:\s*36vh/s);
+  assert.match(css, /\.sheet-panel \.inspector-actions\s*,\s*\n\.sheet-panel \.sell-compact|\.sheet-panel \.sell-compact,\s*\n\.sheet-panel \.inspector-actions/);
+  assert.match(css, /\.sheet-panel \.item-inspector-lore\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.match(css, /\.inspector-actions \.btn\s*\{[^}]*min-height:\s*44px/s);
+  assert.match(css, /\.sheet-overlay\s*\{[^}]*z-index:\s*50/s);
 });
 
 test('Sell Mode and qty survive a feat-unlocking grid sell remount', () => {
