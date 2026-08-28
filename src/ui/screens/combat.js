@@ -54,14 +54,21 @@ export const COMBAT_360 = {
   hunt: 44,
   loot: 44,
   /**
-   * Leftover unpaid well min-height (header 44 + portrait floor 56 + Hunt another 44).
-   * Acc / hand / styles collapse so this room can exist above tab 577.
+   * Leftover unpaid leftover-loot box (not leftover-actions). Header 44 +
+   * pad 12 + gap 6 + 103px portrait tile (56px glyph + name + qty). Acc /
+   * Knife / styles collapse so this room can exist above tab 577. S1s 140
+   * was leftover-actions; leftover-loot then lost the flex race to 90px.
    */
-  leftoverWellMin: 140,
+  leftoverWellMin: 167,
   leftoverTileMinW: 56,
-  leftoverTileMinH: 80,
+  leftoverTileMinH: 103,
   leftoverGlyph: 56,
   leftoverWellHead: 44,
+  leftoverLootPad: 6,
+  leftoverActionsGap: 6,
+  leftoverActionsMin: 217,
+  /** Unpaid leftover steals log so leftover-loot can hold portraits. */
+  leftoverWellLogWrap: 38,
   /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
   fightLoot: 32,
   fightGap: 2,
@@ -121,9 +128,11 @@ export function cockpitLogVsTab(kind = 'leftover') {
 /**
  * Leftover 360 geometry after kill (loot well) or Fall back (no pile).
  * leftover-station is height-capped to the hub. Unpaid leftover collapses
- * Acc / Knife / styles and spends that height on a loot well so leftover is a
- * room, not a 44px filmstrip. .cockpit-fill still exists (flex 0 in well mode)
- * so oil buy / logWrap.bottom cannot shove into the tab.
+ * Acc / Knife / styles and spends that height on leftover-loot so leftover is a
+ * room, not a 90px overflow:hidden drawer. lootH is leftover-loot (header +
+ * portraits), not leftover-actions. Unpaid leftover steals log wrap so
+ * leftover-loot ≥ leftoverWellMin ≥ leftoverTileMinH. .cockpit-fill is
+ * display:none in well mode so its gaps cannot tax the portraits.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
  * No-loot leftover-actions stays a 44px Hunt another row.
  */
@@ -135,14 +144,20 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const fighterH = C.leftoverFighter ?? C.fighter;
   const gap = C.leftoverGap ?? C.gap;
   const clearance = C.tabClearance ?? 8;
-  const wellMin = C.leftoverWellMin ?? 140;
+  const wellMin = C.leftoverWellMin ?? 167;
   const headH = C.leftoverWellHead ?? C.hunt;
+  const actionsGap = C.leftoverActionsGap ?? 6;
+  const tileMinH = C.leftoverTileMinH ?? 103;
+  const glyphH = C.leftoverGlyph ?? 56;
+  const lootPad = C.leftoverLootPad ?? 6;
+  const actionsMin = C.leftoverActionsMin ?? (wellMin + actionsGap + C.hunt);
 
   if (loot) {
-    const chromeBlocks = 6; // kicker, 2 fighters, oil, eat, well
-    const chrome = C.kicker + 2 * fighterH + oilH + C.eat;
-    const chromeGaps = gap * (chromeBlocks - 1);
-    const wellH = (box.logTop - stationTop) - chrome - chromeGaps;
+    // leftover-well log is shorter so leftover-loot can hold 56px portraits.
+    // cockpit-fill is display:none; leftover-actions sits above the log.
+    const wrapH = C.leftoverWellLogWrap ?? 38;
+    const logBottom = box.logBottom;
+    const logTop = logBottom - wrapH;
     let y = stationTop;
     y += C.kicker + gap;
     y += fighterH + gap;
@@ -152,18 +167,42 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     const eatBottom = y + C.eat;
     y = eatBottom + gap;
     const wellTop = y;
-    const wellBottom = wellTop + wellH;
-    const takeTop = wellTop;
-    const takeBottom = wellTop + headH;
+    const wellBottom = logTop - gap;
+    const wellH = wellBottom - wellTop;
+    const lootTop = wellTop;
+    const lootH = wellH - C.hunt - actionsGap;
+    const lootBottom = lootTop + lootH;
+    const takeTop = lootTop + lootPad;
+    const takeBottom = takeTop + headH;
+    const tileTop = takeBottom + actionsGap;
+    const tileBottom = tileTop + tileMinH;
+    const glyphTop = tileTop + 8;
+    const glyphBottom = glyphTop + glyphH;
     const anotherTop = wellBottom - C.hunt;
     const anotherBottom = wellBottom;
     const wellClears = wellBottom <= box.tabTop - clearance
       && anotherBottom <= box.tabTop - clearance
-      && takeBottom <= box.tabTop - clearance;
+      && takeBottom <= box.tabTop - clearance
+      && lootBottom <= box.tabTop - clearance;
+    const portraitsFit = lootH >= wellMin
+      && lootH >= tileMinH
+      && tileBottom <= lootBottom
+      && glyphBottom <= lootBottom
+      && glyphH >= 56;
     return {
       ...box,
+      wrapH,
+      logTop,
       loot,
-      lootH: wellH,
+      lootH,
+      lootTop,
+      lootBottom,
+      tileTop,
+      tileBottom,
+      tileH: tileMinH,
+      glyphH,
+      glyphTop,
+      glyphBottom,
       oilBuy,
       oilH,
       fillH: wellH,
@@ -172,6 +211,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
       wellTop,
       wellBottom,
       wellGap: box.tabTop - wellBottom,
+      actionsMin,
       stationTop,
       stationBottom: box.logBottom,
       eatTop,
@@ -181,8 +221,9 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
       anotherTop,
       anotherBottom,
       clearance,
-      fits: box.fits && wellH >= wellMin && box.logBottom < box.tabTop
-        && eatBottom < box.tabTop && wellClears,
+      // Unpaid leftover may clip the log (known remainder). Portraits must not.
+      fits: portraitsFit && wellClears && logBottom < box.tabTop
+        && eatBottom < box.tabTop && wellH >= actionsMin,
     };
   }
 
@@ -209,6 +250,12 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     ...box,
     loot,
     lootH: 0,
+    lootTop: null,
+    lootBottom: null,
+    tileTop: null,
+    tileBottom: null,
+    tileH: 0,
+    glyphH: 0,
     oilBuy,
     oilH,
     fillH,
@@ -217,6 +264,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     wellTop: null,
     wellBottom: null,
     wellGap: null,
+    actionsMin,
     stationTop,
     stationBottom: box.logBottom,
     eatTop,

@@ -416,8 +416,9 @@
   min-width: 56px;
   max-width: 88px;
   height: auto;
-  min-height: 80px;
+  min-height: 103px;
   padding: 8px 6px 6px;
+  overflow: visible;
 }
 .leftover-station.leftover-well .loot-tile .loot-glyph,
 .leftover-station.leftover-well .loot-tile .bank-glyph {
@@ -467,8 +468,9 @@
   min-width: 0;
 }
 .leftover-station.leftover-well .leftover-actions {
-  flex: 1 1 0;
-  min-height: 140px;
+  flex: 1 0 auto;
+  flex-shrink: 0;
+  min-height: 217px;
   max-height: none;
   flex-direction: column;
   align-items: stretch;
@@ -476,8 +478,9 @@
   gap: 6px;
 }
 .leftover-station.leftover-well .leftover-loot {
-  flex: 1 1 0;
-  min-height: 80px;
+  flex: 1 0 auto;
+  flex-shrink: 0;
+  min-height: 167px;
   max-height: none;
   flex-direction: column;
   flex-wrap: nowrap;
@@ -492,7 +495,7 @@
 .leftover-station.leftover-well .loot-tray-grid,
 .leftover-station.leftover-well .leftover-loot-chips {
   flex: 1 1 auto;
-  min-height: 56px;
+  min-height: 103px;
   max-height: none;
   flex-wrap: wrap;
   align-content: flex-start;
@@ -503,15 +506,20 @@
 }
 .leftover-station.leftover-well .leftover-another {
   width: 100%;
+  flex-shrink: 0;
 }
 .leftover-station.leftover-well .cockpit-fill {
+  display: none;
   flex: 0 0 0;
   min-height: 0;
   height: 0;
 }
-/* Log stays pinned; auto margin must not steal the well's flex room. */
+/* Steal leftover log so leftover-loot can hold 56px portraits. Live 32px tray stays. */
 .leftover-station.leftover-well .log-wrap {
   margin-top: 0;
+  flex: 0 1 38px;
+  min-height: 0;
+  max-height: 38px;
 }
 .fight-loot {
   flex: 0 0 auto;
