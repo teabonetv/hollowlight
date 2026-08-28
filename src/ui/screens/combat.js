@@ -87,8 +87,11 @@ export const COMBAT_360 = {
   leftoverWellFighter: 14,
   leftoverWellGap: 0,
   leftoverWellKicker: 11,
-  /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
-  fightLoot: 32,
+  /**
+   * Live unpaid well — same leftover-loot room as post-kill (56px glyphs),
+   * not the v54 32px chip strip under Keep hunting.
+   */
+  fightLoot: 167,
   fightGap: 2,
   fightFighter: 34, // head + bar-lg 12, not leftover's 22
   fightAcc: 28, // live cockpit pad 2 + chip 26; leftover stays leftoverAcc
@@ -309,26 +312,102 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
 }
 
 /**
- * Live 360 fight geometry. Compact unpaid tray (not leftover 44px) sits above
- * the log; Eat / Fall back stay on the eat row, all above tab 577 with ≥8px gap.
- * v49: leftover-loot 44px on the live pull measured 543–587. v54: compact 32px
- * tray measured 550.6–582.6 (craft-nav + keep 44) — 5.6px under the tab.
- * S1v hides craft-nav on fight-live; that height goes to .cockpit-fill, not
- * the 32px keep / unpaid tray.
+ * Live 360 fight geometry. Unpaid loot is the leftover well (56px glyphs,
+ * Hollow, Take all) sitting on the living fight — not a 32px chip strip.
+ * Keep hunting stays; it is not the loot furniture. Eat / Fall back stay
+ * above tab 577; well bottom ≤ tab−8. Unpaid live borrows leftover-well
+ * compact chrome (fighters / Acc / packed kit / 36px log) so the well can
+ * stay ≥ leftoverWellMin instead of collapsing to a strip to 'fit'.
  */
 export function fightLogVsTab({ loot = false } = {}) {
   const C = COMBAT_360;
-  const box = cockpitLogVsTab('fight');
+  const clearance = C.tabClearance ?? 8;
+  const keepH = C.fightKeep ?? C.keep;
   const stationTop = C.leftoverStationTop;
+
+  if (loot) {
+    const wrapH = C.leftoverWellLogWrap ?? 36;
+    const box = cockpitLogVsTab('fight');
+    const logBottom = box.logBottom;
+    const logTop = logBottom - wrapH;
+    const wellGap = C.leftoverWellGap ?? 0;
+    const fighterH = C.leftoverWellFighter ?? C.fighter;
+    const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
+    const oilH = C.oil;
+    const kitH = C.leftoverWellKit ?? C.hand;
+    const wellMin = C.leftoverWellMin ?? 167;
+    const tileMinH = C.leftoverTileMinH ?? 103;
+    const glyphH = C.leftoverGlyph ?? 56;
+    const lootPad = C.leftoverLootPad ?? 6;
+    const lootInnerGap = C.leftoverLootInnerGap ?? 6;
+    const headH = C.leftoverWellHead ?? C.hunt;
+    let y = stationTop;
+    y += fighterH + wellGap;
+    y += fighterH + wellGap;
+    y += accH + wellGap;
+    y += oilH + wellGap;
+    const eatTop = y;
+    const eatBottom = y + C.eat;
+    y = eatBottom + wellGap;
+    y += kitH + wellGap;
+    y += keepH + wellGap;
+    const lootTop = y;
+    const lootBottom = logTop - wellGap;
+    const lootH = lootBottom - lootTop;
+    const takeTop = lootTop + lootPad;
+    const takeBottom = takeTop + headH;
+    const tileTop = takeBottom + lootInnerGap;
+    const tileBottom = tileTop + tileMinH;
+    const glyphTop = tileTop + 8;
+    const glyphBottom = glyphTop + glyphH;
+    const trayClears = lootBottom <= box.tabTop - clearance;
+    const portraitsFit = lootH >= wellMin
+      && lootH >= tileMinH
+      && tileBottom <= lootBottom
+      && glyphBottom <= lootBottom
+      && glyphH >= 56;
+    return {
+      ...box,
+      wrapH,
+      logTop,
+      loot: true,
+      lootH,
+      keepH,
+      clearance,
+      fillH: lootH,
+      wellH: lootH,
+      wellMin,
+      wellTop: lootTop,
+      wellBottom: lootBottom,
+      wellGap: box.tabTop - lootBottom,
+      stationTop,
+      stationBottom: logBottom,
+      eatTop,
+      eatBottom,
+      fleeBottom: eatBottom,
+      trayTop: lootTop,
+      trayBottom: lootBottom,
+      trayGap: box.tabTop - lootBottom,
+      tileTop,
+      tileBottom,
+      tileH: tileMinH,
+      glyphH,
+      glyphTop,
+      glyphBottom,
+      takeTop,
+      takeBottom,
+      fits: portraitsFit && trayClears && logBottom <= box.tabTop - clearance
+        && eatBottom < box.tabTop && wrapH >= 36,
+    };
+  }
+
+  const box = cockpitLogVsTab('fight');
   const gap = C.fightGap ?? C.gap;
   const fighterH = C.fightFighter ?? C.fighter;
   const accH = C.fightAcc ?? C.acc;
   const oilH = C.fightOil ?? C.oil;
-  const keepH = C.fightKeep ?? C.keep;
-  const clearance = C.tabClearance ?? 8;
-  const lootH = loot ? (C.fightLoot ?? C.loot) : 0;
-  const chromeBlocks = 8 + (loot ? 1 : 0);
-  const chrome = 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + keepH + lootH;
+  const chromeBlocks = 8;
+  const chrome = 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + keepH;
   const chromeGaps = gap * (chromeBlocks - 1);
   const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
   let y = stationTop;
@@ -342,13 +421,10 @@ export function fightLogVsTab({ loot = false } = {}) {
   y += C.hand + gap;
   y += C.styles + gap;
   y += keepH + gap;
-  const trayTop = loot ? y : null;
-  const trayBottom = loot ? y + lootH : null;
-  const trayClears = trayBottom == null || trayBottom <= box.tabTop - clearance;
   return {
     ...box,
-    loot,
-    lootH,
+    loot: false,
+    lootH: 0,
     keepH,
     clearance,
     fillH,
@@ -357,12 +433,11 @@ export function fightLogVsTab({ loot = false } = {}) {
     eatTop,
     eatBottom,
     fleeBottom: eatBottom,
-    trayTop,
-    trayBottom,
-    trayGap: trayBottom == null ? null : box.tabTop - trayBottom,
+    trayTop: null,
+    trayBottom: null,
+    trayGap: null,
     fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop
-      && eatBottom < box.tabTop
-      && trayClears,
+      && eatBottom < box.tabTop,
   };
 }
 
@@ -429,10 +504,14 @@ export function resetHuntScrollers(root) {
   try { take(root?.querySelectorAll?.('.zone-chips')); } catch { /* shim */ }
 }
 
+function inCockpit(st) {
+  return !!st.fighting || !!st.lastStation;
+}
+
 export function renderCombatPanel(ctx) {
   combat.ensureCombat(ctx.state);
   const root = el('div', { class: 'combat-root' });
-  let wasFighting = false;
+  let wasCockpit = false;
   let fightView = null;
 
   function syncScreenFlags() {
@@ -447,33 +526,37 @@ export function renderCombatPanel(ctx) {
 
   function paint() {
     const st = combat.combatStatus(ctx.state);
-    const enteringFight = !!st.fighting && !wasFighting;
-    const leavingFight = !st.fighting && wasFighting;
+    const entering = inCockpit(st) && !wasCockpit;
+    const leaving = !inCockpit(st) && wasCockpit;
     clear(root);
     fightView = null;
     // Do not resumeCombat() here — reload pause must stay visible until Resume.
-    if (st.fighting) {
+    // leftover-as-mode: lastStation stays on the fight cockpit. Killing must
+    // not remount Acc / kit / loaf into a leftover room.
+    if (inCockpit(st)) {
       fightView = mountFight(ctx, st, paint);
       root.append(fightView.node);
     } else {
-      root.append(buildHub(ctx, st, paint));
+      root.append(buildLobby(ctx, st, paint));
     }
-    if (enteringFight || leavingFight) resetHuntScrollers(root);
-    wasFighting = !!st.fighting;
+    if (entering || leaving) resetHuntScrollers(root);
+    wasCockpit = inCockpit(st);
     syncScreenFlags();
   }
 
   function refreshFight() {
     const st = combat.combatStatus(ctx.state);
-    if (!st.fighting || !fightView) {
+    if (!inCockpit(st) || !fightView) {
       paint();
       return;
     }
-    if (!!st.paused !== !!fightView.paused) {
+    if (st.fighting && !!st.paused !== !!fightView.paused) {
       paint();
       return;
     }
     fightView.sync(st);
+    wasCockpit = true;
+    syncScreenFlags();
   }
 
   paint();
@@ -481,21 +564,11 @@ export function renderCombatPanel(ctx) {
   return {
     node: root,
     update() {
-      const fighting = !!ctx.state.combat?.fighting;
-      if (fighting && wasFighting) refreshFight();
-      else if (fighting || wasFighting) paint();
+      const st = combat.combatStatus(ctx.state);
+      if (fightView && inCockpit(st)) refreshFight();
+      else if (inCockpit(st) || wasCockpit) paint();
     },
   };
-}
-
-function buildHub(ctx, st, paint) {
-  const leftover = leftoverStation(ctx, st, paint);
-  if (leftover) {
-    const wrap = el('div', { class: 'combat-hub leftover-hub' });
-    wrap.append(leftover);
-    return wrap;
-  }
-  return buildLobby(ctx, st, paint);
 }
 
 function buildLobby(ctx, st, paint) {
@@ -954,8 +1027,40 @@ function styleRow(ctx, st, paint) {
   return styles;
 }
 
+function isLeftover(st) {
+  return !st.fighting && !!st.lastStation;
+}
+
+function huntTargetFrom(st) {
+  if (st.lastStation?.enemyId) return st.lastStation;
+  if (st.foe?.id) return { enemyId: st.foe.id, enemyName: st.foe.name };
+  return null;
+}
+
+function foeVitals(st) {
+  if (isLeftover(st)) return combat.leftoverFoeVitals(st.lastStation);
+  return {
+    name: st.foe?.name ?? 'Foe',
+    hp: st.foe?.hp ?? 0,
+    max: st.foe?.maxHp ?? 1,
+  };
+}
+
+function cockpitKit(ctx, st) {
+  if (st.fighting) return st.cockpit;
+  const vs = st.lastStation?.enemyId ? ENEMIES_BY_ID[st.lastStation.enemyId] : null;
+  return combat.fightCockpit(ctx.state, vs) ?? st.cockpit;
+}
+
+function setHidden(node, hide) {
+  if (!node) return;
+  if (hide) node.setAttribute('hidden', '');
+  else node.removeAttribute('hidden');
+}
+
 function mountFight(ctx, st, paint) {
   const wrap = buildFight(ctx, st, paint);
+  const kicker = wrap.querySelector('.leftover-kicker');
   const fighters = wrap.querySelectorAll('.fighter');
   const you = fighters[0];
   const foeBlock = fighters[1];
@@ -963,36 +1068,76 @@ function mountFight(ctx, st, paint) {
   const acc = wrap.querySelector('.acc-station');
   const oil = wrap.querySelector('.oil-line');
   const eat = wrap.querySelector('.eat-row');
-  const tray = wrap.querySelector('.fight-loot');
+  const keep = wrap.querySelector('.combat-keep');
+  const keepBox = keep?.querySelector('input');
+  const actions = wrap.querySelector('.leftover-actions');
+  const tray = wrap.querySelector('.fight-loot') ?? wrap.querySelector('.leftover-loot');
+  const another = wrap.querySelector('.leftover-another');
+  const hunt = wrap.querySelector('.leftover-hunt');
+  const flee = wrap.querySelector('.flee-btn');
+  const held = wrap.querySelector('.encounter-held');
   const logBox = wrap.querySelector('.combat-log');
+
+  function applyMode(next) {
+    const leftover = isLeftover(next);
+    const unpaid = leftoverHasUngranted(next, ctx);
+    wrap.classList.toggle('leftover-station', leftover);
+    wrap.classList.toggle('leftover-well', unpaid);
+    if (leftover) {
+      wrap.setAttribute('aria-label', unpaid ? 'Loot to collect' : 'After the hunt');
+    } else {
+      wrap.removeAttribute('aria-label');
+    }
+    if (kicker) {
+      kicker.textContent = leftover ? combat.leftoverKicker(next.lastStation) : '';
+      setHidden(kicker, !leftover);
+    }
+    setHidden(keep, leftover);
+    setHidden(flee, leftover);
+    setHidden(hunt, !leftover);
+    setHidden(another, !leftover);
+    setHidden(actions, !(leftover || unpaid));
+    setHidden(held, leftover || !next.paused);
+    if (keepBox) keepBox.checked = !!next.autoContinue;
+  }
+
+  applyMode(st);
 
   return {
     node: wrap,
     paused: !!st.paused,
     sync(next) {
+      applyMode(next);
+      const leftover = isLeftover(next);
+      const foe = foeVitals(next);
       syncFighter(you, next.playerHp, next.playerMaxHp);
-      syncFighter(foeBlock, next.foe?.hp ?? 0, next.foe?.maxHp ?? 1);
-      if (foeTitle) foeTitle.textContent = next.foe?.name ?? 'Foe';
-      syncAccStation(acc, next.cockpit, {
+      syncFighter(foeBlock, foe.hp, foe.max);
+      if (foeTitle) foeTitle.textContent = foe.name;
+      syncAccStation(acc, cockpitKit(ctx, next), leftover ? {} : {
         you: next.playerNextMs,
         they: next.foe?.nextActMs ?? 0,
       });
-      if (oil) {
-        oil.textContent = lanternCopy(next, ctx.state);
-        oil.className = `oil-line ${next.lanternFed ? 'muted' : 'danger'}`;
-      }
+      syncOil(oil, ctx, next, paint);
       syncEatRow(eat, ctx, next);
-      if (tray) fillFightLoot(tray, ctx, next, paint);
-      fillLogBox(logBox, next.log, 12);
+      syncLeftoverHunt(hunt, ctx, next);
+      if (tray) fillLootWell(tray, ctx, next, paint);
+      fillLogBox(logBox, leftover ? leftoverLog(next) : next.log, leftover ? 4 : 12);
     },
   };
 }
 
 function buildFight(ctx, st, paint) {
-  const foe = st.foe;
-  const wrap = el('div', { class: 'combat-fight' });
+  const leftover = isLeftover(st);
+  const unpaid = leftoverHasUngranted(st, ctx);
+  const foe = foeVitals(st);
+  const wrap = el('div', {
+    class: `combat-fight${leftover ? ' leftover-station' : ''}${unpaid ? ' leftover-well' : ''}`.trim(),
+  });
+  if (leftover) {
+    wrap.setAttribute('aria-label', unpaid ? 'Loot to collect' : 'After the hunt');
+  }
 
-  if (st.paused) {
+  if (st.paused && st.fighting) {
     wrap.append(el('div', { class: 'encounter-held' },
       el('p', { class: 'encounter-held-copy' }, 'Encounter held — same seed.'),
       el('button', {
@@ -1005,6 +1150,11 @@ function buildFight(ctx, st, paint) {
       }, 'Resume')));
   }
 
+  const kicker = el('p', { class: 'leftover-kicker' },
+    leftover ? combat.leftoverKicker(st.lastStation) : '');
+  setHidden(kicker, !leftover);
+  wrap.append(kicker);
+
   wrap.append(fighterBlock({
     title: 'You',
     hp: st.playerHp,
@@ -1013,25 +1163,24 @@ function buildFight(ctx, st, paint) {
   }));
 
   wrap.append(fighterBlock({
-    title: foe?.name ?? 'Foe',
-    hp: foe?.hp ?? 0,
-    max: foe?.maxHp ?? 1,
+    title: foe.name,
+    hp: foe.hp,
+    max: foe.max,
     fillClass: 'hp-foe',
   }));
 
-  wrap.append(accStation(st.cockpit, '', {
+  wrap.append(accStation(cockpitKit(ctx, st), '', leftover ? {} : {
     you: st.playerNextMs,
-    they: foe?.nextActMs ?? 0,
+    they: st.foe?.nextActMs ?? 0,
   }));
 
-  wrap.append(el('p', { class: `oil-line ${st.lanternFed ? 'muted' : 'danger'}` },
-    lanternCopy(st, ctx.state)));
+  wrap.append(oilBlock(ctx, st, paint));
+  wrap.append(eatRow(ctx, st, paint));
 
-  wrap.append(eatRow(ctx, st, paint, { flee: true }));
-
-  wrap.append(handChip(ctx, st, paint));
-
-  wrap.append(styleRow(ctx, st, paint));
+  const kit = el('div', { class: 'leftover-kit' });
+  kit.append(handChip(ctx, st, paint));
+  kit.append(styleRow(ctx, st, paint));
+  wrap.append(kit);
 
   const keep = el('label', { class: 'auto-toggle combat-keep' });
   const input = el('input', { type: 'checkbox' });
@@ -1044,11 +1193,12 @@ function buildFight(ctx, st, paint) {
     else ctx.state.combat.autoContinue = next;
     paint();
   });
+  setHidden(keep, leftover);
   wrap.append(keep);
 
-  wrap.append(mountFightLoot(ctx, st, paint));
+  wrap.append(leftoverActionsRow(ctx, st, paint));
   wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
-  wrap.append(logPanel(st.log));
+  wrap.append(logPanel(leftover ? leftoverLog(st) : st.log, { lines: leftover ? 4 : 12 }));
   return wrap;
 }
 
@@ -1062,15 +1212,24 @@ function fighterBlock({ title, hp, max, fillClass, compact = false }) {
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
 }
 
-function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {}) {
+function eatRow(ctx, st, paint) {
+  const leftover = isLeftover(st);
+  const hunt = huntTargetFrom(st);
+  const dry = leftover && combat.oilSipsRemaining(ctx.state) <= 0;
   const row = el('div', { class: 'eat-row' });
   const id = combat.selectedFoodId(ctx.state);
   if (!id) {
     row.append(el('p', { class: 'muted small eat-empty' }, 'No food in the pack.'));
     const tools = el('div', { class: 'eat-slot' });
-    if (flee) tools.append(fleeButton(ctx, paint));
-    if (hunt) tools.append(leftoverHunt(ctx, hunt, dry, paint));
-    if (tools.children.length) row.append(tools);
+    const flee = fleeButton(ctx, paint);
+    setHidden(flee, leftover);
+    tools.append(flee);
+    if (hunt) {
+      const btn = leftoverHunt(ctx, paint);
+      setHidden(btn, !leftover);
+      tools.append(btn);
+    }
+    row.append(tools);
     return row;
   }
   const n = bankCount(ctx.state.bank, id);
@@ -1109,8 +1268,14 @@ function eatRow(ctx, st, paint, { flee = false, hunt = null, dry = false } = {})
       paint();
     },
   }, 'Eat'));
-  if (flee) slot.append(fleeButton(ctx, paint));
-  if (hunt) slot.append(leftoverHunt(ctx, hunt, dry, paint));
+  const flee = fleeButton(ctx, paint);
+  setHidden(flee, leftover);
+  slot.append(flee);
+  if (hunt) {
+    const btn = leftoverHunt(ctx, paint);
+    setHidden(btn, !leftover);
+    slot.append(btn);
+  }
   row.append(slot);
   return row;
 }
@@ -1127,44 +1292,45 @@ function leftoverHasUngranted(st, ctx) {
   return ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []).length > 0;
 }
 
-function leftoverStation(ctx, st, paint) {
-  const last = st.lastStation;
-  if (!last) return null;
-  const unpaid = leftoverHasUngranted(st, ctx);
-  const wrap = el('article', {
-    class: `combat-fight leftover-station${unpaid ? ' leftover-well' : ''}`,
-    'aria-label': unpaid ? 'Loot to collect' : 'After the hunt',
-  });
-  wrap.append(el('p', { class: 'leftover-kicker' }, combat.leftoverKicker(last)));
-  wrap.append(fighterBlock({
-    title: 'You',
-    hp: st.playerHp,
-    max: st.playerMaxHp,
-    fillClass: 'hp-you',
-  }));
-  const foe = combat.leftoverFoeVitals(last);
-  wrap.append(fighterBlock({
-    title: foe.name,
-    hp: foe.hp,
-    max: foe.max,
-    fillClass: 'hp-foe',
-  }));
-  // Leftover is still a mode: Acc / Knife / styles stay while unpaid loot
-  // waits. Take all pays the well; it is not the Acc-restore trigger.
-  const vs = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
-  wrap.append(accStation(combat.fightCockpit(ctx.state, vs) ?? st.cockpit));
+function oilBlock(ctx, st, paint) {
+  const leftover = isLeftover(st);
   const sips = combat.oilSipsRemaining(ctx.state);
   const dry = sips <= 0;
-  wrap.append(leftoverOilRow(ctx, st, paint, { sips, dry }));
-  wrap.append(eatRow(ctx, st, paint, { hunt: last, dry }));
-  const kit = el('div', { class: 'leftover-kit' });
-  kit.append(handChip(ctx, st, paint));
-  kit.append(styleRow(ctx, st, paint));
-  wrap.append(kit);
-  wrap.append(leftoverActionsRow(ctx, st, paint));
-  wrap.append(el('div', { class: 'cockpit-fill', 'aria-hidden': 'true' }));
-  wrap.append(logPanel(leftoverLog(st), { lines: 4 }));
-  return wrap;
+  if (leftover) return leftoverOilRow(ctx, st, paint, { sips, dry });
+  return el('div', { class: `oil-line ${st.lanternFed ? 'muted' : 'danger'}` },
+    lanternCopy(st, ctx.state));
+}
+
+function syncOil(oil, ctx, st, paint) {
+  if (!oil) return;
+  const leftover = isLeftover(st);
+  const sips = combat.oilSipsRemaining(ctx.state);
+  const dry = sips <= 0;
+  if (leftover && dry) {
+    oil.className = 'oil-line danger leftover-dry leftover-oil-row';
+    if (!oil.querySelector('.leftover-oil-buy')) {
+      clear(oil);
+      oil.append(el('span', { class: 'leftover-dry-copy' }, 'Need oil'));
+      oil.append(el('button', {
+        class: 'btn leftover-oil-buy',
+        type: 'button',
+        onclick: () => {
+          let res;
+          if (ctx.storeBuy) res = ctx.storeBuy('wick-oil', 1);
+          else res = buyFromStore(ctx.state, 'wick-oil', 1);
+          if (!res?.ok) ctx.toast?.(res?.error ?? 'Could not buy wick-oil.', 'warn');
+          paint();
+        },
+      }, `Wick-oil ✦${formatNumber(liveBuyUnit(ctx.state, 'wick-oil'))}`));
+    }
+    return;
+  }
+  oil.className = leftover
+    ? 'oil-line muted'
+    : `oil-line ${st.lanternFed ? 'muted' : 'danger'}`;
+  oil.textContent = leftover
+    ? `${formatNoun(sips, 'lantern sip')} remaining`
+    : lanternCopy(st, ctx.state);
 }
 
 function leftoverOilRow(ctx, st, paint, { sips, dry }) {
@@ -1280,39 +1446,35 @@ function hollowPressureCopy(state) {
 function leftoverLootRow(ctx, st, paint) {
   const tray = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
   if (!tray.length) return null;
-  const meter = hollowPressureCopy(ctx.state);
-  const row = el('div', {
-    class: 'leftover-loot leftover-tray',
-    'aria-label': `Loot to collect · ${meter}`,
-  });
-  const head = el('div', { class: 'loot-well-head' });
-  head.append(
-    el('span', { class: 'loot-well-meter' }, meter),
-    takeAllBtn(ctx, paint),
-  );
-  row.append(head);
-  row.append(lootTileRow(tray));
+  const row = el('div', { class: 'fight-loot leftover-loot leftover-tray' });
+  fillLootWell(row, ctx, st, paint);
   return row;
 }
 
 function leftoverActionsRow(ctx, st, paint) {
+  const leftover = isLeftover(st);
+  const unpaid = leftoverHasUngranted(st, ctx);
   const row = el('div', { class: 'leftover-actions' });
-  const loot = leftoverLootRow(ctx, st, paint);
-  if (loot) row.append(loot);
-  row.append(leftoverAnother(ctx, paint));
+  setHidden(row, !(leftover || unpaid));
+  row.append(mountLootWell(ctx, st, paint));
+  const another = leftoverAnother(ctx, paint);
+  setHidden(another, !leftover);
+  row.append(another);
   return row;
 }
 
-function mountFightLoot(ctx, st, paint) {
+function mountLootWell(ctx, st, paint) {
   const row = el('div', { class: 'fight-loot leftover-tray' });
-  fillFightLoot(row, ctx, st, paint);
+  fillLootWell(row, ctx, st, paint);
   return row;
 }
 
-function fillFightLoot(row, ctx, st, paint) {
+/** Same well live and leftover: Hollow meter, 56px glyph tiles, Take all. */
+function fillLootWell(row, ctx, st, paint) {
   const pending = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
   row.classList.toggle('is-empty', pending.length === 0);
   row.classList.toggle('leftover-loot', pending.length > 0);
+  row.classList.add('fight-loot');
   if (!pending.length) {
     clear(row);
     if (row.dataset) row.dataset.lootFp = '';
@@ -1321,17 +1483,26 @@ function fillFightLoot(row, ctx, st, paint) {
     row.removeAttribute('aria-label');
     return;
   }
+  const meter = hollowPressureCopy(ctx.state);
   row.removeAttribute('hidden');
   row.removeAttribute('aria-hidden');
-  row.setAttribute('aria-label', 'Loot to collect');
-  const fp = trayFingerprint(pending);
-  if (row.dataset?.lootFp === fp && row.querySelector('.loot-tile') && row.querySelector('.leftover-take')) {
+  row.setAttribute('aria-label', `Loot to collect · ${meter}`);
+  const fp = `${trayFingerprint(pending)}|${meter}`;
+  if (row.dataset?.lootFp === fp
+    && row.querySelector('.loot-tile')
+    && row.querySelector('.leftover-take')
+    && row.querySelector('.loot-well-meter')) {
     return;
   }
   if (row.dataset) row.dataset.lootFp = fp;
   clear(row);
+  const head = el('div', { class: 'loot-well-head' });
+  head.append(
+    el('span', { class: 'loot-well-meter' }, meter),
+    takeAllBtn(ctx, paint),
+  );
+  row.append(head);
   row.append(lootTileRow(pending));
-  row.append(takeAllBtn(ctx, paint));
 }
 
 function leftoverLog(st) {
@@ -1340,25 +1511,48 @@ function leftoverLog(st) {
   return st.log ?? [];
 }
 
-function leftoverHunt(ctx, last, dry, paint) {
-  const enemy = last.enemyId ? ENEMIES_BY_ID[last.enemyId] : null;
-  const name = last.enemyName ?? enemy?.name ?? 'this foe';
+function leftoverHunt(ctx, paint) {
+  const target = huntTargetFrom(combat.combatStatus(ctx.state));
+  const name = target?.enemyName ?? (target?.enemyId ? ENEMIES_BY_ID[target.enemyId]?.name : null) ?? 'this foe';
+  const leftover = isLeftover(combat.combatStatus(ctx.state));
+  const dry = leftover && combat.oilSipsRemaining(ctx.state) <= 0;
   return el('button', {
     class: `btn leftover-hunt ${dry ? 'btn-ghost btn-disabled' : 'btn-primary'}`,
     type: 'button',
     disabled: dry ? true : undefined,
     'aria-disabled': dry ? 'true' : 'false',
     onclick: () => {
-      if (!last.enemyId) return;
-      if (dry) {
+      const last = ctx.state.combat.lastStation;
+      const enemyId = last?.enemyId ?? ctx.state.combat.foe?.id;
+      if (!enemyId) return;
+      if (ctx.state.combat.fighting) return;
+      if (combat.oilSipsRemaining(ctx.state) <= 0) {
         ctx.toast?.('The lantern is dry — buy wick-oil at the stall before a stretch.', 'warn');
         return;
       }
-      const res = ctx.startFight(last.enemyId);
+      const res = ctx.startFight(enemyId);
       if (!res.ok) ctx.toast(res.error, 'warn');
       paint();
     },
   }, `Hunt ${name}`);
+}
+
+function syncLeftoverHunt(btn, ctx, st) {
+  if (!btn) return;
+  const leftover = isLeftover(st);
+  const target = huntTargetFrom(st);
+  const enemy = target?.enemyId ? ENEMIES_BY_ID[target.enemyId] : null;
+  const name = target?.enemyName ?? enemy?.name ?? 'this foe';
+  btn.textContent = `Hunt ${name}`;
+  const dry = leftover && combat.oilSipsRemaining(ctx.state) <= 0;
+  btn.disabled = !!dry;
+  if (dry) btn.setAttribute('disabled', '');
+  else btn.removeAttribute('disabled');
+  btn.setAttribute('aria-disabled', dry ? 'true' : 'false');
+  btn.classList.toggle('btn-ghost', dry);
+  btn.classList.toggle('btn-disabled', dry);
+  btn.classList.toggle('btn-primary', !dry);
+  setHidden(btn, !leftover);
 }
 
 function leftoverAnother(ctx, paint) {
