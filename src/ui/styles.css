@@ -46,19 +46,18 @@ body {
 #app {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   grid-template-areas:
     "top"
-    "main"
-    "nav";
+    "main";
   height: 100vh;
   height: 100dvh;
   max-width: 520px;
   margin-inline: auto;
+  position: relative;
 }
 .topbar { grid-area: top; }
 #screen { grid-area: main; min-height: 0; }
-.tabbar { grid-area: nav; }
 #toasts, #modal-root {
   grid-area: top;
   height: 0;
@@ -97,6 +96,9 @@ body {
       "nav main";
   }
   .tabbar {
+    position: static;
+    grid-area: nav;
+    align-self: stretch;
     grid-template-columns: 1fr;
     align-content: start;
     border-top: 0;
@@ -121,7 +123,13 @@ body {
   }
   #screen {
     min-width: 0;
+    overflow-y: auto;
     padding: 22px 28px calc(24px + env(safe-area-inset-bottom)) 28px;
+  }
+  #screen > .screen:not(.fight-live):not(.leftover-live) {
+    overflow: visible;
+    flex: none;
+    min-height: auto;
   }
   .screen-title {
     overflow-wrap: anywhere;
@@ -250,18 +258,30 @@ button.pill:active {
 
 /* ── main scroll region ────────────────────────────────────── */
 #screen {
-  flex: 1;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   overscroll-behavior: contain;
-  /* Shared chrome: pad the tab bar on every tab so Bank/Almanac/Map
-     first folds are not trapped under CAMP/SKILLS/BANK/MAP/ALMANAC.
-     Fight-live / leftover-live override this in combat.css. */
-  padding: 18px 16px calc(var(--tabbar-size) + env(safe-area-inset-bottom, 0px));
-  scrollbar-width: thin;
-  scrollbar-color: var(--line) transparent;
+  /* Shared chrome: padding-bottom IS the tab bar. #screen is a frame,
+     not the scroller — otherwise padding only appears at scroll-end and
+     Bank tiles / Almanac ember cards / lantern kits stay trapped under
+     CAMP/SKILLS/BANK/MAP/ALMANAC on the first fold. Fight-live /
+     leftover-live override padding in combat.css. */
+  padding: 12px 16px calc(var(--tabbar-size) + env(safe-area-inset-bottom, 0px));
 }
 
-.screen { display: flex; flex-direction: column; gap: 16px; animation: rise 240ms ease-out; }
+.screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+  animation: rise 240ms ease-out;
+}
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
 
 .screen-head { display: flex; flex-direction: column; gap: 2px; }
@@ -281,11 +301,14 @@ button.pill:active {
 
 /* ── tab bar ───────────────────────────────────────────────── */
 .tabbar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   border-top: 1px solid var(--line-soft);
-  background: rgba(7, 9, 13, 0.94);
-  backdrop-filter: blur(6px);
+  background: var(--bg);
   padding-bottom: env(safe-area-inset-bottom);
   z-index: 5;
 }

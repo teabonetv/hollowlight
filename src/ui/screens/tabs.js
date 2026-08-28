@@ -32,7 +32,7 @@ export const CAMP_360 = {
   viewportH: 640,
   tabbarH: 63, // --tab-h 62 + 1px border → tab top 577
   topbarH: 157, // 360 wrapped Known/Hollow HUD (measured)
-  screenPadTop: 18,
+  screenPadTop: 12,
   campPadTop: 8,
   campGap: 8,
   sigilH: 52,

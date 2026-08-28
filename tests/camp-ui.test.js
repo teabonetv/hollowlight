@@ -296,9 +296,15 @@ test('shared #screen padding-bottom equals the tab bar on every tab', () => {
   assert.match(css, /--tabbar-size:\s*calc\(\s*var\(--tab-h\)\s*\+\s*1px\s*\)/);
   const screenBlock = css.match(/\/\* ── main scroll region[\s\S]*?#screen\s*\{([^}]+)\}/);
   assert.ok(screenBlock, '#screen shared chrome rule present');
-  assert.match(screenBlock[1], /padding:\s*18px 16px calc\(var\(--tabbar-size\)/);
+  assert.match(screenBlock[1], /overflow:\s*hidden/, '#screen is a frame so padding is first-fold clearance');
+  assert.match(screenBlock[1], /padding:\s*12px 16px calc\(var\(--tabbar-size\)/);
+  const screenRule = css.match(/\.screen\s*\{[^}]*overflow-y:\s*auto/s);
+  assert.ok(screenRule, 'screens scroll inside the padded frame');
   assert.doesNotMatch(css, /\.camp[^{]*\{[^}]*--tabbar-size/s,
     'tab padding is shared chrome, not a Camp-only hack');
+  assert.doesNotMatch(css, /\.bank-screen[^{]*\{[^}]*--tabbar-size/s);
+  assert.doesNotMatch(css, /\.almanac[^{]*\{[^}]*--tabbar-size/s);
+  assert.doesNotMatch(css, /\.repair-card[^{]*\{[^}]*--tabbar-size/s);
 });
 
 test('Wick patch applies when paid, or names the missing cost on the button', () => {
