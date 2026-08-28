@@ -71,15 +71,16 @@ export const COMBAT_360 = {
   leftoverGlyph: 56,
   leftoverWellHead: 44,
   leftoverLootPad: 6,
-  leftoverActionsGap: 6,
-  leftoverActionsMin: 217,
+  leftoverLootInnerGap: 6,
+  leftoverActionsGap: 0,
+  leftoverActionsMin: 211,
   /**
    * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
    * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
    * leftover chrome (fighters / hidden craft-nav / leftover-live pad), not the log.
    */
   leftoverWellLogWrap: 36,
-  leftoverWellFighter: 16,
+  leftoverWellFighter: 14,
   leftoverWellGap: 0,
   leftoverWellKicker: 11,
   /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
@@ -166,6 +167,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const tileMinH = C.leftoverTileMinH ?? 103;
   const glyphH = C.leftoverGlyph ?? 56;
   const lootPad = C.leftoverLootPad ?? 6;
+  const lootInnerGap = C.leftoverLootInnerGap ?? 6;
   const actionsMin = C.leftoverActionsMin ?? (wellMin + actionsGap + C.hunt);
 
   if (loot) {
@@ -197,7 +199,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     const lootBottom = lootTop + lootH;
     const takeTop = lootTop + lootPad;
     const takeBottom = takeTop + headH;
-    const tileTop = takeBottom + actionsGap;
+    const tileTop = takeBottom + lootInnerGap;
     const tileBottom = tileTop + tileMinH;
     const glyphTop = tileTop + 8;
     const glyphBottom = glyphTop + glyphH;

@@ -279,7 +279,7 @@
   flex-direction: row;
   align-items: stretch;
   gap: 4px;
-  flex: 0 0 auto;
+  flex: 0 0 44px;
   min-height: 44px;
   max-height: 44px;
 }
@@ -502,21 +502,37 @@
   font-size: 11px;
   line-height: 1;
   letter-spacing: 0.06em;
+  flex: 0 0 11px;
+  min-height: 0;
+  max-height: 11px;
+  overflow: hidden;
+}
+.leftover-station.leftover-well .fighter {
+  flex: 0 0 14px;
+  min-height: 0;
+  max-height: 14px;
+  overflow: hidden;
 }
 .leftover-station.leftover-well .fighter-head { line-height: 1; }
 .leftover-station.leftover-well .fighter-head strong,
 .leftover-station.leftover-well .fighter-hp { font-size: 11px; }
 .leftover-station.leftover-well .bar.bar-lg { height: 4px; }
 .leftover-station.leftover-well .oil-line { font-size: 11px; line-height: 1.1; }
+.leftover-station.leftover-well .oil-line:not(.leftover-oil-row) {
+  flex: 0 0 14px;
+  min-height: 0;
+  max-height: 14px;
+  overflow: hidden;
+}
 .leftover-station.leftover-well .eat-row {
   gap: 0;
-  flex: 0 0 auto;
+  flex: 0 0 44px;
   min-height: 44px;
   max-height: 44px;
 }
 .leftover-station.leftover-well .acc-station {
-  flex: 0 0 auto;
-  min-height: 22px;
+  flex: 0 0 22px;
+  min-height: 0;
   max-height: 22px;
   padding: 0 4px;
 }
@@ -527,32 +543,17 @@
   font-size: 10.5px;
   line-height: 1.1;
 }
-.leftover-station.leftover-well .fighter {
-  flex: 0 0 auto;
-  max-height: 16px;
-  overflow: hidden;
-}
-.leftover-station.leftover-well .leftover-kicker {
-  flex: 0 0 auto;
-  max-height: 11px;
-  overflow: hidden;
-}
-.leftover-station.leftover-well .oil-line:not(.leftover-oil-row) {
-  flex: 0 0 auto;
-  max-height: 14px;
-  overflow: hidden;
-}
 /* leftover-live hides the 44px craft-nav. Acc / leftover-kit take empty
    leftover-loot floor; leftover-actions still fills what remains. */
 .leftover-station.leftover-well .leftover-actions {
   flex: 1 0 auto;
   flex-shrink: 0;
-  min-height: 217px;
+  min-height: 211px;
   max-height: none;
   flex-direction: column;
   align-items: stretch;
   overflow: hidden;
-  gap: 6px;
+  gap: 0;
 }
 .leftover-station.leftover-well .leftover-loot {
   flex: 1 0 auto;
