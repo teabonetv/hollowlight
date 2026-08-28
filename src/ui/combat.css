@@ -60,6 +60,7 @@
   flex: 1 1 0;
   min-height: 0;
   max-height: 100%;
+  gap: 0;
 }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
@@ -105,6 +106,7 @@
   flex-direction: column;
   container-type: size;
 }
+#screen:has(.leftover-live) { padding-top: 2px; }
 #screen:has(.fight-live),
 #screen:has(.leftover-live) { overflow: hidden; }
 
@@ -285,8 +287,9 @@
 }
 .combat-fight:not(.leftover-station) .log-wrap {
   margin-top: auto;
-  min-height: 64px;
+  min-height: 0;
   max-height: 64px;
+  flex: 0 1 64px;
 }
 /* 100px: two wrapping .log-line (12px × 1.2 × 2 = 28.8) + two singles + pad/gaps. */
 .leftover-station .log-wrap {
@@ -467,6 +470,20 @@
   flex: 1 1 auto;
   min-width: 0;
 }
+.leftover-station.leftover-well {
+  gap: 0;
+}
+.leftover-station.leftover-well .leftover-kicker {
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+}
+.leftover-station.leftover-well .fighter-head { line-height: 1; }
+.leftover-station.leftover-well .fighter-head strong,
+.leftover-station.leftover-well .fighter-hp { font-size: 11px; }
+.leftover-station.leftover-well .bar.bar-lg { height: 4px; }
+.leftover-station.leftover-well .oil-line { font-size: 11px; line-height: 1.1; }
+.leftover-station.leftover-well .eat-row { gap: 0; }
 .leftover-station.leftover-well .leftover-actions {
   flex: 1 0 auto;
   flex-shrink: 0;
@@ -514,12 +531,12 @@
   min-height: 0;
   height: 0;
 }
-/* Steal leftover log so leftover-loot can hold 56px portraits. Live 32px tray stays. */
+/* Readable leftover kill-log: steal leftover chrome, not leftover-loot or the log. */
 .leftover-station.leftover-well .log-wrap {
   margin-top: 0;
-  flex: 0 1 38px;
-  min-height: 0;
-  max-height: 38px;
+  flex: 0 0 36px;
+  min-height: 36px;
+  max-height: 36px;
 }
 .fight-loot {
   flex: 0 0 auto;

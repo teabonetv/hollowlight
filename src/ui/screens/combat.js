@@ -67,8 +67,15 @@ export const COMBAT_360 = {
   leftoverLootPad: 6,
   leftoverActionsGap: 6,
   leftoverActionsMin: 217,
-  /** Unpaid leftover steals log so leftover-loot can hold portraits. */
-  leftoverWellLogWrap: 38,
+  /**
+   * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
+   * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
+   * leftover chrome (fighters / craft-tab gap / leftover-live pad), not the log.
+   */
+  leftoverWellLogWrap: 36,
+  leftoverWellFighter: 16,
+  leftoverWellGap: 0,
+  leftoverWellKicker: 11,
   /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
   fightLoot: 32,
   fightGap: 2,
@@ -130,8 +137,9 @@ export function cockpitLogVsTab(kind = 'leftover') {
  * leftover-station is height-capped to the hub. Unpaid leftover collapses
  * Acc / Knife / styles and spends that height on leftover-loot so leftover is a
  * room, not a 90px overflow:hidden drawer. lootH is leftover-loot (header +
- * portraits), not leftover-actions. Unpaid leftover steals log wrap so
- * leftover-loot ≥ leftoverWellMin ≥ leftoverTileMinH. .cockpit-fill is
+ * portraits), not leftover-actions. Unpaid leftover keeps a readable kill-log
+ * (≥ leftoverWellLogWrap) by compacting leftover chrome — leftover-loot stays
+ * ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56. .cockpit-fill is
  * display:none in well mode so its gaps cannot tax the portraits.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
  * No-loot leftover-actions stays a 44px Hunt another row.
@@ -153,21 +161,24 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const actionsMin = C.leftoverActionsMin ?? (wellMin + actionsGap + C.hunt);
 
   if (loot) {
-    // leftover-well log is shorter so leftover-loot can hold 56px portraits.
-    // cockpit-fill is display:none; leftover-actions sits above the log.
-    const wrapH = C.leftoverWellLogWrap ?? 38;
+    // leftover-well log stays readable; leftover-actions sits above it.
+    // cockpit-fill is display:none. Compact leftover fighters / kicker / gap.
+    const wrapH = C.leftoverWellLogWrap ?? 36;
+    const wellFighterH = C.leftoverWellFighter ?? fighterH;
+    const wellGap = C.leftoverWellGap ?? 0;
+    const kickerH = C.leftoverWellKicker ?? C.kicker;
     const logBottom = box.logBottom;
     const logTop = logBottom - wrapH;
     let y = stationTop;
-    y += C.kicker + gap;
-    y += fighterH + gap;
-    y += fighterH + gap;
-    y += oilH + gap;
+    y += kickerH + wellGap;
+    y += wellFighterH + wellGap;
+    y += wellFighterH + wellGap;
+    y += oilH + wellGap;
     const eatTop = y;
     const eatBottom = y + C.eat;
-    y = eatBottom + gap;
+    y = eatBottom + wellGap;
     const wellTop = y;
-    const wellBottom = logTop - gap;
+    const wellBottom = logTop - wellGap;
     const wellH = wellBottom - wellTop;
     const lootTop = wellTop;
     const lootH = wellH - C.hunt - actionsGap;
@@ -221,9 +232,9 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
       anotherTop,
       anotherBottom,
       clearance,
-      // Unpaid leftover may clip the log (known remainder). Portraits must not.
-      fits: portraitsFit && wellClears && logBottom < box.tabTop
-        && eatBottom < box.tabTop && wellH >= actionsMin,
+      // Portraits and a readable leftover kill-log both sit above tab−8.
+      fits: portraitsFit && wellClears && logBottom <= box.tabTop - clearance
+        && wrapH >= 36 && eatBottom < box.tabTop && wellH >= actionsMin,
     };
   }
 
