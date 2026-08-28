@@ -19,7 +19,7 @@ const runner = await import('../src/game/systems/action-runner.js');
 const { unlockPerk } = await import('../src/game/systems/radiance.js');
 const { ensureDailies, claimDaily } = await import('../src/game/systems/dailies.js');
 const { renderSkillDetail } = await import('../src/ui/screens/skills.js');
-const { renderAlmanacScreen } = await import('../src/ui/screens/meta.js');
+const { renderAlmanacScreen, emberClaimVsTab, EMBER_360 } = await import('../src/ui/screens/meta.js');
 const { showOfflineModal, openModal } = await import('../src/ui/modals.js');
 const { computeOfflineProgress, formatRecapLine } = await import('../src/core/offline.js');
 const { ACTIONS_BY_ID } = await import('../src/game/data/actions.js');
@@ -428,5 +428,23 @@ test('title select chrome is a 44px lantern-gold control', () => {
   const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
   assert.match(css, /\.title-select\s*\{[^}]*min-height:\s*44px/s);
   assert.doesNotMatch(css, /\.title-pick\s+button/);
+});
+
+test('360 Almanac EMBERS first daily card: claim CTA sits above tab 577', () => {
+  assert.equal(EMBER_360.viewportH, 640);
+  assert.equal(EMBER_360.tabbarH, 63);
+  const fold = emberClaimVsTab();
+  assert.equal(fold.tabTop, 577);
+  assert.equal(fold.foldClear, 569);
+  assert.ok(fold.claimBottom <= 569, `claim CTA ${fold.claimTop}–${fold.claimBottom} vs 569`);
+  assert.ok(fold.fits, `card ${fold.cardTop}–${fold.cardBottom} claim ${fold.claimBottom} vs tab 577`);
+  const v62 = { cardBottom: 600, claimTop: 541, claimBottom: 585 };
+  assert.ok(v62.claimBottom > 577, 'v62 In progress sat on CAMP/SKILLS/BANK');
+  assert.ok(fold.claimBottom < v62.claimBottom, 'ember card lifted off the tab');
+
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.screen\.almanac\s*\{[^}]*gap:\s*10px/s);
+  assert.match(css, /\.daily-card\s*\{[^}]*padding:\s*12px 12px 10px/s);
+  assert.match(css, /\.screen\s*\{[^}]*padding-bottom:\s*var\(--screen-scroll-pad\)/s);
 });
 

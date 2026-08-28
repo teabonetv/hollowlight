@@ -23,6 +23,8 @@
   --radius-sm: 9px;
   --tab-h: 62px;
   --tabbar-size: calc(var(--tab-h) + 1px); /* 63px → tab top 577 at vh=640 */
+  /* Inner .screen scrollers: last fold block clears the tab by 8px (63+8=71). */
+  --screen-scroll-pad: calc(var(--tabbar-size) + 8px);
   --font-display: Georgia, 'Times New Roman', serif;
   --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -278,9 +280,20 @@ button.pill:active {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* v62: #screen's 63px pad is the tab overlay; inner scrollers were pad 0
+     so Bank tiles / ember CTAs / lantern kits sat on tab top 577. */
+  padding-bottom: var(--screen-scroll-pad);
+  scroll-padding-bottom: var(--screen-scroll-pad);
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
   animation: rise 240ms ease-out;
+}
+/* Hunt leftover / live fight already clear the tab via their own cockpit
+   budget (leftover-loot 167, live tray 32). Do not steal that room. */
+.screen.fight-live,
+.screen.leftover-live {
+  padding-bottom: 0;
+  scroll-padding-bottom: 0;
 }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; } }
 
@@ -627,6 +640,9 @@ button.pill:active {
   /* 3-col under 400px so Rushwick Reed / Driwood Splinters wrap fully at 360. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+  /* Extra spacer under the grid so the last owned row can scroll fully
+     above tab 577. Do not shrink the 96px tiles. */
+  padding-bottom: var(--screen-scroll-pad);
 }
 @media (min-width: 400px) {
   .bank-grid-owned { grid-template-columns: repeat(4, minmax(0, 1fr)); }
@@ -1357,7 +1373,9 @@ html.reduced-motion *::after {
 }
 .cat-bar { grid-column: 1 / -1; }
 .cat-pct { color: var(--gold-hi); font-variant-numeric: tabular-nums; }
+.screen.almanac { gap: 10px; }
 .perk-list, .feat-list, .daily-list { display: flex; flex-direction: column; gap: 10px; }
+.daily-card { padding: 12px 12px 10px; gap: 8px; }
 .perk-owned { border-color: rgba(217, 164, 65, 0.4); }
 .perk-cap { box-shadow: 0 0 18px rgba(217, 164, 65, 0.12); }
 .perk-name, .feat-name { margin: 0; font-size: 16px; }
@@ -1613,6 +1631,12 @@ html.reduced-motion *::after {
   padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
 }
+@media (max-width: 400px) {
+  /* Three wrapped chip rows ate the 360 fold and bisected owned row 2
+     (549–645 vs tab 577). One scrolling row leaves both tile rows whole.
+     Base rule stays wrap so desktop / HUD wrap tests keep their regex. */
+  .bank-tabs { flex-wrap: nowrap; }
+}
 .bank-tab {
   appearance: none;
   flex: 0 0 auto;
@@ -1678,8 +1702,8 @@ html.reduced-motion *::after {
 .trade-card { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
 .trade-rare { border-color: rgba(217, 164, 65, 0.4); }
 .camp-starve { padding: 8px 0; }
-.repair-kits { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
-.repair-row { display: flex; flex-direction: column; gap: 6px; }
+.repair-kits { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.repair-row { display: flex; flex-direction: column; gap: 4px; }
 .bank-stall-host { width: 100%; }
 .bank-screen.bank-stall .bank-inspector { display: none; }
 

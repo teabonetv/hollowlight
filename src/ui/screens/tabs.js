@@ -24,6 +24,51 @@ export { renderBankScreen };
 export { renderJournalScreen } from './meta.js';
 
 /**
+ * 360×640 lantern kits when "The Lantern" is the fold (heading at the
+ * inner .screen top). Kit 2 sat 536–580 on tab 577 (v62). Compact kits
+ * so the last on-fold button (kit 2) is ≤ 569; kit 3 stays below the fold.
+ * Lockstep with styles.css `.repair-kits` / `.repair-row`.
+ */
+export const LANTERN_360 = {
+  viewportH: 640,
+  tabbarH: 63,
+  tabClearance: 8,
+  foldTop: 169, // topbar 157 + #screen pad 12
+  kit1Top: 401,
+  kitDelta: 119, // flavor + chips + 44px btn + kits gap 6 (was 127 at gap 10)
+  btnH: 44,
+  kitCount: 3,
+};
+
+/** Kit buttons vs tab 577 when The Lantern heading is the 360 fold. */
+export function lanternKitsVsTab() {
+  const C = LANTERN_360;
+  const tabTop = C.viewportH - C.tabbarH;
+  const foldClear = tabTop - C.tabClearance;
+  const kits = [];
+  for (let i = 0; i < C.kitCount; i++) {
+    const top = C.kit1Top + i * C.kitDelta;
+    const bottom = top + C.btnH;
+    kits.push({
+      index: i + 1,
+      top,
+      bottom,
+      cut: top < tabTop && bottom > tabTop,
+    });
+  }
+  const onFold = kits.filter((k) => k.bottom <= tabTop || k.top < tabTop);
+  const lastOnFold = onFold[onFold.length - 1] ?? kits[0];
+  return {
+    tabTop,
+    foldClear,
+    kits,
+    lastOnFoldBottom: lastOnFold.bottom,
+    cutCount: kits.filter((k) => k.cut).length,
+    fits: kits.every((k) => !k.cut) && lastOnFold.bottom <= foldClear,
+  };
+}
+
+/**
  * 360×640 Camp first fold. Lantern + Hearthway Hollow + one flavor line
  * + Waiting for you must sit above --tab-h (tab top 577). The 6-cell
  * ledger lives below the fold. Lockstep with styles.css `.camp` rules.
