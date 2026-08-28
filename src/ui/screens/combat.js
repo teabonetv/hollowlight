@@ -25,7 +25,9 @@ export const COMBAT_360 = {
   viewportW: 360,
   screenPadX: 16,
   topbarH: 52,
-    tabbarH: 63, // --tab-h 62 + 1px border → tab top 577 at vh=640
+  tabbarH: 63, // --tab-h 62 + 1px border → tab top 577 at vh=640
+  /** Live unpaid .fight-loot bottom must sit this far above tab top 577. */
+  tabClearance: 8,
   screenPadTop: 8,
   screenPadBottom: 8,
   lobbyPadTop: 18,
@@ -47,13 +49,15 @@ export const COMBAT_360 = {
   hand: 44,
   styles: 44,
   keep: 44,
+  /** Live Keep hunting — 44px keep + 32px tray sat 550.6–582.6 over tab 577 (v54). */
+  fightKeep: 32,
   hunt: 44,
   loot: 44,
-  /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49, 10px under tab 577). */
+  /** Live unpaid tray — leftover-loot 44px sat 543–587 (v49). v54 compact 32px sat 550.6–582.6. */
   fightLoot: 32,
   fightGap: 2,
   fightFighter: 34, // head + bar-lg 12, not leftover's 22
-  fightAcc: 32, // cockpit pad + 28px Acc chip
+  fightAcc: 28, // live cockpit pad 2 + chip 26; leftover stays leftoverAcc
   fightOil: 16,
   souls: 32,
   zoneChips: 44,
@@ -160,8 +164,9 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
 
 /**
  * Live 360 fight geometry. Compact unpaid tray (not leftover 44px) sits above
- * the log; Eat / Fall back stay on the eat row, all above tab 577.
- * v49 critic: leftover-loot 44px on the live pull measured top 543 / bottom 587.
+ * the log; Eat / Fall back stay on the eat row, all above tab 577 with ≥8px gap.
+ * v49: leftover-loot 44px on the live pull measured 543–587. v54: compact 32px
+ * tray measured 550.6–582.6 (craft-nav + keep 44) — 5.6px under the tab.
  */
 export function fightLogVsTab({ loot = false } = {}) {
   const C = COMBAT_360;
@@ -171,9 +176,11 @@ export function fightLogVsTab({ loot = false } = {}) {
   const fighterH = C.fightFighter ?? C.fighter;
   const accH = C.fightAcc ?? C.acc;
   const oilH = C.fightOil ?? C.oil;
+  const keepH = C.fightKeep ?? C.keep;
+  const clearance = C.tabClearance ?? 8;
   const lootH = loot ? (C.fightLoot ?? C.loot) : 0;
   const chromeBlocks = 8 + (loot ? 1 : 0);
-  const chrome = 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + C.keep + lootH;
+  const chrome = 2 * fighterH + accH + oilH + C.eat + C.hand + C.styles + keepH + lootH;
   const chromeGaps = gap * (chromeBlocks - 1);
   const fillH = (box.logTop - stationTop) - chrome - chromeGaps;
   let y = stationTop;
@@ -186,13 +193,16 @@ export function fightLogVsTab({ loot = false } = {}) {
   y = eatBottom + gap;
   y += C.hand + gap;
   y += C.styles + gap;
-  y += C.keep + gap;
+  y += keepH + gap;
   const trayTop = loot ? y : null;
   const trayBottom = loot ? y + lootH : null;
+  const trayClears = trayBottom == null || trayBottom <= box.tabTop - clearance;
   return {
     ...box,
     loot,
     lootH,
+    keepH,
+    clearance,
     fillH,
     stationTop,
     stationBottom: box.logBottom,
@@ -201,9 +211,10 @@ export function fightLogVsTab({ loot = false } = {}) {
     fleeBottom: eatBottom,
     trayTop,
     trayBottom,
+    trayGap: trayBottom == null ? null : box.tabTop - trayBottom,
     fits: box.fits && fillH >= 0 && box.logBottom < box.tabTop
       && eatBottom < box.tabTop
-      && (trayBottom == null || trayBottom < box.tabTop),
+      && trayClears,
   };
 }
 

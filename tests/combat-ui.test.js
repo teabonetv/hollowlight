@@ -1209,43 +1209,59 @@ test('live-fight tray + Eat + Fall back sit above tab 577', () => {
   assert.equal(empty.tabTop, 577);
   assert.equal(piled.tabTop, 577);
   assert.ok(empty.fits, `empty fill ${empty.fillH}`);
-  assert.ok(piled.fits, `tray fill ${piled.fillH} eat ${piled.eatBottom} tray ${piled.trayBottom}`);
+  assert.ok(piled.fits, `tray fill ${piled.fillH} eat ${piled.eatBottom} tray ${piled.trayBottom} gap ${piled.trayGap}`);
   assert.ok(piled.eatBottom < 577);
   assert.ok(piled.fleeBottom < 577);
-  assert.ok(piled.trayBottom < 577);
+  assert.ok(piled.trayBottom <= 577 - COMBAT_360.tabClearance,
+    `tray bottom ${piled.trayBottom} must clear tab 577 by ≥${COMBAT_360.tabClearance}px`);
   assert.equal(piled.logBottom, empty.logBottom, 'live tray must not move logWrap.bottom');
   assert.ok(piled.fillH >= 0);
 });
 
 test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay above', () => {
-  const criticTrayTop = 543;
-  const criticTrayBottom = 587;
+  const criticV49Top = 543;
+  const criticV49Bottom = 587;
+  const criticV54Top = 550.6;
+  const criticV54Bottom = 582.6;
   const tabTop = 577;
-  assert.equal(criticTrayBottom - criticTrayTop, 44, 'v49 measured leftover-loot 44px');
-  assert.ok(criticTrayBottom > tabTop, 'v49 letter 5: live tray 10px under the tab');
+  const clearance = COMBAT_360.tabClearance;
+  assert.equal(clearance, 8);
+  assert.equal(criticV49Bottom - criticV49Top, 44, 'v49 measured leftover-loot 44px');
+  assert.ok(criticV49Bottom > tabTop, 'v49 letter 5: live tray 10px under the tab');
+  assert.equal(Number((criticV54Bottom - criticV54Top).toFixed(1)), 32, 'v54 compact tray is 32px');
+  assert.ok(criticV54Bottom > tabTop, 'v54 live unpaid tray overlaps tab 577');
+  assert.ok(criticV54Bottom - tabTop > 5, 'v54 overlap is the 5.6px SKILLS miss');
+  assert.ok(criticV54Bottom > tabTop - clearance, 'v54 compact 32px from 550.6 misses the 8px gap');
 
   const fatLoot = COMBAT_360.loot;
   assert.equal(fatLoot, 44);
-  assert.ok(criticTrayTop + fatLoot > tabTop, 'uncapped 44px live tray cannot clear 577');
+  assert.ok(criticV49Top + fatLoot > tabTop, 'uncapped 44px live tray cannot clear 577');
 
   assert.equal(COMBAT_360.fightLoot, 32);
   assert.ok(COMBAT_360.fightLoot < fatLoot, 'live tray is compact vs leftover 44');
-  assert.ok(criticTrayTop + COMBAT_360.fightLoot < tabTop,
-    `compact ${COMBAT_360.fightLoot}px from critic top ${criticTrayTop} vs tab ${tabTop}`);
+  assert.equal(COMBAT_360.fightKeep, 32);
+  assert.ok(COMBAT_360.fightKeep < COMBAT_360.keep, 'live Keep hunting is compact vs 44');
+  const keepSaved = COMBAT_360.keep - COMBAT_360.fightKeep;
+  const accSaved = 32 - COMBAT_360.fightAcc; // v54 live Acc was cockpit 32-class; now 28
+  assert.ok(keepSaved + accSaved >= 16, 'keep+acc compact must cover the v54 13.6px miss');
+  assert.ok(criticV54Bottom - keepSaved - accSaved <= tabTop - clearance,
+    `v54 bottom ${criticV54Bottom} minus keep ${keepSaved}px acc ${accSaved}px must reach ≤${tabTop - clearance}`);
 
   const empty = fightLogVsTab({ loot: false });
   const piled = fightLogVsTab({ loot: true });
   assert.equal(piled.tabTop, tabTop);
   assert.equal(piled.lootH, 32);
-  assert.ok(piled.trayBottom < tabTop,
-    `360 live unpaid tray bottom ${piled.trayBottom} vs tab ${tabTop}`);
-  assert.ok(piled.trayBottom < criticTrayBottom, 'compact must beat the v49 587px bottom');
+  assert.equal(piled.keepH, 32);
+  assert.equal(piled.clearance, clearance);
+  assert.ok(piled.trayBottom <= tabTop - clearance,
+    `360 live unpaid tray bottom ${piled.trayBottom} vs tab ${tabTop} gap ${piled.trayGap}`);
+  assert.ok(piled.trayGap >= clearance, `tray gap ${piled.trayGap} < ${clearance}px`);
+  assert.ok(piled.trayBottom < criticV54Bottom, 'compact keep must beat the v54 582.6px bottom');
+  assert.ok(piled.trayBottom < criticV49Bottom, 'compact must beat the v49 587px bottom');
   assert.ok(piled.eatBottom < tabTop, `Eat ${piled.eatBottom} vs tab ${tabTop}`);
   assert.ok(piled.fleeBottom < tabTop, `Fall back ${piled.fleeBottom} vs tab ${tabTop}`);
   assert.ok(piled.fits, `fill ${piled.fillH} tray ${piled.trayTop}–${piled.trayBottom}`);
   assert.ok(piled.fillH >= 0);
-  assert.ok(piled.fillH - (fatLoot - COMBAT_360.fightLoot) < 0,
-    '44px leftover-loot on the live pull would go negative fill (v49 under the tab)');
   assert.equal(piled.logBottom, empty.logBottom);
 
   const leftover = leftoverLogVsTab({ loot: true });
@@ -1261,6 +1277,8 @@ test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay abo
   assert.match(css, /\.leftover-loot\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s*\{[^}]*max-height:\s*100%/);
+  assert.match(css, /\.screen\.fight-live,\s*\n\.screen\.leftover-live\s*\{[^}]*max-height:\s*100%/);
+  assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.log-wrap\s*\{[^}]*margin-top:\s*auto/);
   assert.match(css, /\.loot-tile\s*\{/);
   const liveTile = [...css.matchAll(/\.combat-fight:not\(\.leftover-station\)\s+\.fight-loot\s+\.loot-tile\s*\{([^}]+)\}/g)];
@@ -1348,7 +1366,8 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
 
   const piled = fightLogVsTab({ loot: true });
   assert.equal(piled.lootH, 32);
-  assert.ok(piled.trayBottom < 577);
+  assert.ok(piled.trayBottom <= 577 - COMBAT_360.tabClearance);
+  assert.ok(piled.trayGap >= COMBAT_360.tabClearance);
   assert.ok(piled.eatBottom < 577);
 });
 

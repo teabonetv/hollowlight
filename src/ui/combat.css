@@ -47,9 +47,10 @@
 .screen.fight-live,
 .screen.leftover-live {
   gap: 4px;
-  flex: 1 1 auto;
-  min-height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
   height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -60,7 +61,6 @@
   min-height: 0;
   max-height: 100%;
 }
-.screen.leftover-live .combat-root { flex: 1 1 0; }
 .screen.fight-live .detail-title,
 .screen.leftover-live .detail-title,
 .screen.fight-live .xp-block,
@@ -71,13 +71,22 @@
 .screen.leftover-live .detail-head {
   align-items: center;
   min-height: 44px;
+  max-height: 44px;
   margin-bottom: 0;
   flex: 0 0 auto;
+  overflow: hidden;
 }
+.screen.fight-live .detail-head .craft-nav,
+.screen.leftover-live .detail-head .craft-nav {
+  padding-bottom: 0;
+  scrollbar-width: none;
+}
+.screen.fight-live .detail-head .craft-nav::-webkit-scrollbar,
+.screen.leftover-live .detail-head .craft-nav::-webkit-scrollbar { display: none; }
 .screen.fight-live .combat-root,
 .screen.leftover-live .combat-root {
   gap: 0;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -423,12 +432,29 @@
   min-width: 0;
   max-width: 100%;
 }
+.combat-fight:not(.leftover-station) .fight-cockpit {
+  padding: 2px 6px;
+}
+.combat-fight:not(.leftover-station) .acc-station .chip {
+  min-height: 26px;
+  padding: 2px 4px;
+}
+.combat-fight:not(.leftover-station) .oil-line {
+  font-size: 12px;
+  line-height: 1.2;
+  flex: 0 0 auto;
+}
+.combat-fight:not(.leftover-station) .combat-keep {
+  min-height: 32px;
+  max-height: 32px;
+}
 .combat-fight:not(.leftover-station) .fight-loot.leftover-loot {
   min-height: 32px;
   max-height: 32px;
   gap: 4px;
   position: relative;
   z-index: 1;
+  flex-shrink: 0;
 }
 .combat-fight:not(.leftover-station) .fight-loot .leftover-loot-chips {
   min-height: 32px;
