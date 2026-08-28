@@ -465,8 +465,8 @@ function boot() {
       if (SELL_QTY_MODES.has(mode)) ui.sellQtyMode = mode;
       writeUiRoute();
     },
-    openSellSheet(itemId) {
-      const ref = showSellSheet(modalRoot, ctx, itemId);
+    openSellSheet(itemId, opts = {}) {
+      const ref = showSellSheet(modalRoot, ctx, itemId, opts);
       sheetRepaint = () => ref?.repaint?.();
       const orig = ref.close;
       ref.close = () => { sheetRepaint = null; orig(); };

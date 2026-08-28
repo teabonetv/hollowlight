@@ -29,12 +29,15 @@ const { buyFromStore } = await import('../src/game/systems/store.js');
 const { ITEMS } = await import('../src/game/data/items.js');
 const { uniqueStackCount, lanternRoom, canAcceptStack } = await import('../src/game/systems/bank.js');
 const { paintHud } = await import('../src/ui/hud.js');
+const { createItemInspector, inspectorHeldLine } = await import('../src/ui/item-inspector.js');
 
 function makeCtx(state) {
   const inspected = [];
+  const inspectedOpts = [];
   return {
     state,
     inspected,
+    inspectedOpts,
     toast() {},
     openSkill() {},
     openSkillsList() {},
@@ -53,9 +56,28 @@ function makeCtx(state) {
     dismissLastStation: () => combat.dismissLastStation(state),
     takeAllLootTray: () => combat.takeAllLootTray(state),
     storeBuy: (id, qty) => buyFromStore(state, id, qty),
-    openSellSheet(id) { inspected.push(id); },
-    inspectLoot(id) { inspected.push(id); },
+    openSellSheet(id, opts = {}) { inspected.push(id); inspectedOpts.push(opts); },
+    inspectLoot(id, opts = {}) { inspected.push(id); inspectedOpts.push(opts); },
+    sell: () => ({ ok: false }),
+    togglePin() {},
+    toggleLock() {},
   };
+}
+
+function trayItems(tray) {
+  return (tray ?? []).filter((e) => e.kind === 'item');
+}
+
+function trayWallet(tray) {
+  return (tray ?? []).filter((e) => e.kind === 'soul' || e.kind === 'lumen');
+}
+
+function ensureUnpaidItem(state, id = 'fogwort', qty = 1) {
+  const tray = state.combat.lootTray ?? (state.combat.lootTray = []);
+  if (!tray.some((e) => e.kind === 'item' && e.id === id && e.granted === false)) {
+    tray.push({ kind: 'item', id, qty, name: ITEMS.find((i) => i.id === id)?.name ?? id, granted: false });
+  }
+  return tray;
 }
 
 test('skills list marks combat live and five skills still future', () => {
@@ -954,7 +976,8 @@ test('leftover loot tray keeps prior chips after Hunt this foe and Take all pays
     if (row.kind === 'item') assert.match(pile2, new RegExp(row.name ?? row.id));
     if (row.kind === 'soul') assert.match(pile2, /soul/);
   }
-  const souls = after.querySelector('.leftover-loot-chips')?.textContent ?? pile2;
+  const souls = after.querySelector('.loot-wallet')?.textContent
+    ?? after.querySelector('.leftover-loot')?.textContent ?? pile2;
   assert.match(souls, /[2-9] souls|[2-9] soul/);
   const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   assert.equal(state.lumen, lumen0);
@@ -1143,6 +1166,7 @@ test('first live fight paints leftover-well chrome with an empty grid', () => {
   assert.match(fight.textContent ?? '', /Take all/);
   assert.ok(tray.querySelector('.loot-tray-grid'), 'empty grid furniture');
   assert.equal(tray.querySelectorAll('.loot-tile').length, 0);
+  assertGhostPack(tray, lanternRoom(state));
   const empty = leftoverLogVsTab({ loot: false });
   assert.ok(empty.fits);
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
@@ -1368,29 +1392,53 @@ test('360 live unpaid tray bottom sits above tab 577; Eat and Fall back stay abo
   assert.ok(tileMin.some((h) => h >= 103), `live well tile min-height ${tileMin.join(',')}`);
 });
 
-function assertLootFurniture(host, { minTiles = 1 } = {}) {
+function assertLootFurniture(host, { minItemTiles = 0, expectWallet = true } = {}) {
   const tray = host.querySelector('.leftover-loot') ?? host.querySelector('.fight-loot:not(.is-empty)');
   assert.ok(tray, 'loot tray is mounted');
   assert.equal(tray.querySelector('.chip-sep'), null, 'loot is furniture, not a · receipt');
-  assert.equal(tray.querySelectorAll('.chip').length, 0, 'no text chips in the tray');
-  const tiles = tray.querySelectorAll('.loot-tile');
-  assert.ok(tiles.length >= minTiles, `expected ≥${minTiles} loot portraits, got ${tiles.length}`);
-  for (const tile of tiles) {
-    const glyph = tile.querySelector('.loot-glyph');
-    assert.ok(glyph, '32px portrait glyph');
-    assert.match(glyph.innerHTML ?? '', /<svg/i);
-    assert.match(glyph.className, /bank-glyph/);
-    const name = (tile.querySelector('.loot-name')?.textContent ?? '').trim();
-    const qty = (tile.querySelector('.loot-qty')?.textContent ?? '').trim();
-    assert.ok(name.length > 0, 'tile shows a name');
-    assert.ok(qty.length > 0, 'tile shows a qty');
+  const grid = tray.querySelector('.loot-tray-grid');
+  assert.ok(grid, 'item grid is mounted');
+  assert.equal(grid.querySelectorAll('.chip').length, 0, 'item grid is not receipt chips');
+  const itemTiles = tray.querySelectorAll('.loot-tile.loot-item');
+  const allTiles = tray.querySelectorAll('.loot-tile');
+  assert.equal(allTiles.length, itemTiles.length, 'soul/lumen are not loot-tiles');
+  assert.equal(tray.querySelector('.loot-tile.loot-soul'), null, 'souls are wallet, not portraits');
+  assert.equal(tray.querySelector('.loot-tile.loot-lumen'), null, 'lumen is wallet, not portraits');
+  if (minItemTiles > 0) {
+    assert.ok(itemTiles.length >= minItemTiles, `expected ≥${minItemTiles} item portraits, got ${itemTiles.length}`);
+    for (const tile of itemTiles) {
+      const glyph = tile.querySelector('.loot-glyph');
+      assert.ok(glyph, '56px portrait glyph');
+      assert.match(glyph.innerHTML ?? '', /<svg/i);
+      assert.match(glyph.className, /bank-glyph/);
+      const name = (tile.querySelector('.loot-name')?.textContent ?? '').trim();
+      const qty = (tile.querySelector('.loot-qty')?.textContent ?? '').trim();
+      assert.ok(name.length > 0, 'tile shows a name');
+      assert.ok(qty.length > 0, 'tile shows a qty');
+    }
+  }
+  if (expectWallet) {
+    const wallet = tray.querySelector('.loot-wallet');
+    assert.ok(wallet, 'wallet sits in the well head');
+    assert.match(wallet.textContent ?? '', /soul|✦/);
+    assert.equal(wallet.classList.contains('loot-tile'), false);
   }
   assert.ok(tray.querySelector('.leftover-take'), 'Take all stays on the furniture');
   const meter = tray.querySelector('.loot-well-meter');
   assert.ok(meter, 'Hollow pressure sits on the well live and leftover');
   assert.match(meter.textContent ?? '', /Hollow \d+\/\d+/);
   assert.equal(/100/.test(meter.textContent ?? ''), false, 'Hollow is 12, not a Melvor 100-slot clone');
-  return { tray, tiles };
+  return { tray, tiles: itemTiles, itemTiles, wallet: tray.querySelector('.loot-wallet') };
+}
+
+function assertGhostPack(tray, cap) {
+  const grid = tray.querySelector('.loot-tray-grid');
+  assert.ok(grid, 'empty grid furniture');
+  assert.ok(grid.classList.contains('is-ghost-pack'), 'empty well ghosts the hollow pack');
+  const ghosts = tray.querySelectorAll('.loot-ghost');
+  assert.equal(ghosts.length, cap, `ghost hollow slots ${ghosts.length} vs cap ${cap}`);
+  assert.equal(tray.querySelectorAll('.loot-tile').length, 0, 'ghosts are not loot-tiles');
+  return ghosts;
 }
 
 test('leftover unpaid tray is loot furniture: glyph + name + qty, Take all still grants', () => {
@@ -1404,8 +1452,11 @@ test('leftover unpaid tray is loot furniture: glyph + name + qty, Take all still
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover.classList.contains('leftover-well'));
-  const { tiles } = assertLootFurniture(leftover, { minTiles: held.length });
-  assert.equal(tiles.length, held.length);
+  const { tiles } = assertLootFurniture(leftover, {
+    minItemTiles: trayItems(held).length,
+    expectWallet: trayWallet(held).length > 0,
+  });
+  assert.equal(tiles.length, trayItems(held).length);
   const pile = leftover.querySelector('.leftover-loot')?.textContent ?? '';
   assert.match(pile, /soul/);
   assert.match(pile, /✦/);
@@ -1435,11 +1486,14 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
   const fight = scr.node.querySelector('.combat-fight');
   assert.equal(fight.classList.contains('leftover-station'), false);
   assert.ok(fight.classList.contains('leftover-well'), 'live unpaid mounts the leftover well');
-  const { tray, tiles } = assertLootFurniture(fight, { minTiles: held.length });
+  const { tray, tiles } = assertLootFurniture(fight, {
+    minItemTiles: trayItems(held).length,
+    expectWallet: trayWallet(held).length > 0,
+  });
   assert.ok(tray.classList.contains('fight-loot'));
   assert.match(tray.getAttribute('aria-label') ?? '', /Loot to collect/i);
   assert.match(tray.querySelector('.loot-well-meter')?.textContent ?? '', /Hollow \d+\/\d+/);
-  assert.equal(tiles.length, held.length);
+  assert.equal(tiles.length, trayItems(held).length);
   assert.match(tray.textContent ?? '', /soul/);
   assert.match(tray.textContent ?? '', /✦/);
 
@@ -1449,6 +1503,9 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
   assert.equal(state.lumen, lumen0 + traySum(held, 'lumen'));
   assert.equal(state.souls, souls0 + traySum(held, 'soul'));
   assert.ok(scr.node.querySelector('.leftover-take'), 'empty live well keeps Take all after collect');
+  const emptyAfter = scr.node.querySelector('.leftover-loot') ?? scr.node.querySelector('.fight-loot');
+  assert.ok(emptyAfter?.classList.contains('is-empty'));
+  assertGhostPack(emptyAfter, lanternRoom(state));
   assert.ok(scr.node.querySelector('.eat-btn'));
   assert.ok(scr.node.querySelector('.flee-btn'));
 
@@ -1462,6 +1519,7 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
 test('live unpaid furniture tiles survive combat ticks without remounting Eat/Fall back', () => {
   const state = createState({ rngSeed: 4 });
   assert.ok(killMoth(state));
+  ensureUnpaidItem(state, 'pall-fang', 1);
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   scr.node.querySelector('.leftover-hunt').click();
   combat.resumeCombat(state);
@@ -1469,7 +1527,7 @@ test('live unpaid furniture tiles survive combat ticks without remounting Eat/Fa
   const fleeBtn = scr.node.querySelector('.flee-btn');
   const tray = scr.node.querySelector('.fight-loot');
   const take = tray.querySelector('.leftover-take');
-  const tile0 = tray.querySelector('.loot-tile');
+  const tile0 = tray.querySelector('.loot-tile.loot-item');
   assert.ok(eatBtn && fleeBtn && tray && take && tile0);
   for (let i = 0; i < 8; i++) {
     if (state.combat.foe) state.combat.foe.hp = Math.max(4, state.combat.foe.hp);
@@ -1479,7 +1537,9 @@ test('live unpaid furniture tiles survive combat ticks without remounting Eat/Fa
     assert.equal(scr.node.querySelector('.flee-btn'), fleeBtn);
     assert.equal(scr.node.querySelector('.fight-loot'), tray);
     assert.equal(tray.querySelector('.leftover-take'), take, 'Take all node survives ticks');
-    assert.equal(tray.querySelector('.loot-tile'), tile0, 'loot portrait survives ticks');
+    assert.equal(tray.querySelector('.loot-tile.loot-item'), tile0, 'loot portrait survives ticks');
+    assert.equal(tray.querySelector('.loot-tile.loot-soul'), null);
+    assert.equal(tray.querySelector('.loot-tile.loot-lumen'), null);
   }
 });
 
@@ -1505,8 +1565,9 @@ test('leftover unpaid is a well: portraits, stack counts, Hollow pressure, tab c
   assert.equal(meter, `Hollow ${used}/${cap}`);
   assert.match(meter, /Hollow \d+\/12|Hollow \d+\/\d+/);
   assert.equal(/100/.test(meter), false, 'Hollow is 12, not a Melvor 100-slot clone');
-  const { tiles } = assertLootFurniture(leftover, { minTiles: 4 });
-  assert.equal(tiles.length, 4);
+  const { tiles } = assertLootFurniture(leftover, { minItemTiles: 2, expectWallet: true });
+  assert.equal(tiles.length, 2);
+  assert.equal(leftover.querySelectorAll('.loot-tile').length, 2, 'wallet is not seated as loot-tiles');
   const pile = leftover.querySelector('.leftover-loot')?.textContent ?? '';
   assert.match(pile, /3 souls|3 soul/);
   assert.match(pile, /✦8|Lumen/);
@@ -1835,6 +1896,7 @@ test('360 live unpaid loot well height and tiles match the post-kill leftover we
 test('killing Fog-rat does not unmount Acc/kit/loaf or swap to a different loot layout', () => {
   const state = createState({ rngSeed: 4 });
   assert.ok(killFoe(state, 'fog-rat'));
+  ensureUnpaidItem(state, 'fogwort', 1);
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   const leftoverHunt = scr.node.querySelector('.leftover-hunt');
   assert.ok(leftoverHunt);
@@ -1855,7 +1917,9 @@ test('killing Fog-rat does not unmount Acc/kit/loaf or swap to a different loot 
   const meter = well?.querySelector('.loot-well-meter');
   assert.ok(acc && kit && hand && loaf && eat && flee && well && meter);
   assert.ok(well.querySelector('.leftover-take'));
-  assert.ok(well.querySelector('.loot-tile'));
+  assert.ok(well.querySelector('.loot-tile.loot-item'), 'Fogwort (or fixture item) stays a loot tile');
+  assert.equal(well.querySelector('.loot-tile.loot-soul'), null);
+  assert.equal(well.querySelector('.loot-tile.loot-lumen'), null);
   assert.match(loaf.textContent ?? '', /Lantern-loaf \+14/);
   assert.match(hand.textContent ?? '', /Knife|Wick-knife/);
   assert.match(fight.querySelector('.style-row')?.textContent ?? '', /Strike/);
@@ -1880,7 +1944,7 @@ test('killing Fog-rat does not unmount Acc/kit/loaf or swap to a different loot 
   assert.equal(after.querySelector('.eat-btn'), eat);
   assert.equal(after.querySelector('.leftover-loot'), well, 'loot well is the same furniture');
   assert.ok(well.querySelector('.leftover-take'));
-  assert.ok(well.querySelector('.loot-tile'));
+  assert.ok(well.querySelector('.loot-tile.loot-item'));
   assert.ok(well.querySelector('.loot-well-meter'));
   assert.ok(after.classList.contains('leftover-well'));
   assert.ok(after.classList.contains('leftover-station'));
@@ -1928,24 +1992,28 @@ test('first live Fog-rat paints Hollow + Take all + empty grid while the foe sti
   assert.ok(tray.querySelector('.leftover-take'));
   assert.ok(tray.querySelector('.loot-tray-grid'));
   assert.equal(tray.querySelectorAll('.loot-tile').length, 0);
+  assertGhostPack(tray, lanternRoom(state));
   assert.ok(fight.querySelector('.acc-station'));
   assert.ok(fight.querySelector('.eat-pick'));
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
   assert.ok(fight.querySelector('.combat-keep'));
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
   assert.match(css, /\.screen\.fight-live \.craft-nav,\s*\n\.screen\.leftover-live \.craft-nav\s*\{[^}]*display:\s*none/);
+  assert.match(css, /\.loot-ghost\s*\{/);
+  assert.match(css, /\.loot-tray-grid\.is-ghost-pack/);
+  assert.doesNotMatch(css, /\.loot-ghost\s*\{[^}]*min-height:\s*103px/);
   const emptyWell = fightLogVsTab({ loot: false });
   const piledWell = fightLogVsTab({ loot: true });
   assert.equal(emptyWell.lootH, piledWell.lootH, 'empty live well occupies the same leftover-loot room as piled');
   assert.ok(emptyWell.lootH >= COMBAT_360.leftoverWellMin, `empty live well ${emptyWell.lootH}`);
 });
 
-test('Fogwort loot tiles are named inspectable items; soul and lumen stay glyphs', () => {
+test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet, not portraits', () => {
   const state = createState({ rngSeed: 4 });
   assert.ok(killFoe(state, 'fog-rat'));
   state.combat.lootTray = [
-    { kind: 'soul', qty: 1, granted: false },
-    { kind: 'lumen', qty: 2, name: 'Lumen', granted: false },
+    { kind: 'soul', qty: 2, granted: false },
+    { kind: 'lumen', qty: 3, name: 'Lumen', granted: false },
     { kind: 'item', id: 'fogwort', qty: 1, name: 'Fogwort', granted: false },
   ];
   const ctx = makeCtx(state);
@@ -1958,14 +2026,17 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen stay glyphs
   assert.ok(itemTile.classList.contains('loot-inspectable'));
   assert.match(itemTile.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
   assert.match(itemTile.querySelector('.loot-qty')?.textContent ?? '', /×1|x1/i);
-  const soul = leftover.querySelector('.loot-tile.loot-soul');
-  const lumen = leftover.querySelector('.loot-tile.loot-lumen');
-  assert.ok(soul);
-  assert.ok(lumen);
-  assert.notEqual(soul.tagName, 'BUTTON');
-  assert.notEqual(lumen.tagName, 'BUTTON');
+  assert.equal(leftover.querySelector('.loot-tile.loot-soul'), null, 'souls are not 103px loot-tiles');
+  assert.equal(leftover.querySelector('.loot-tile.loot-lumen'), null, 'lumen is not a 103px loot-tile');
+  assert.equal(leftover.querySelectorAll('.loot-tile').length, 1);
+  const wallet = leftover.querySelector('.loot-wallet');
+  assert.ok(wallet, 'wallet sits in the well head');
+  assert.match(wallet.textContent ?? '', /2 souls|2 soul/);
+  assert.match(wallet.textContent ?? '', /✦3/);
   itemTile.click();
   assert.deepEqual(ctx.inspected, ['fogwort']);
+  assert.equal(ctx.inspectedOpts[0]?.unpaid, true);
+  assert.equal(ctx.inspectedOpts[0]?.trayQty, 1);
 
   leftover.querySelector('.leftover-hunt').click();
   assert.equal(state.combat.fighting, true);
@@ -1974,7 +2045,45 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen stay glyphs
   assert.ok(liveItem);
   assert.equal(liveItem.tagName, 'BUTTON');
   assert.match(liveItem.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
+  assert.equal(fight.querySelector('.loot-tile.loot-soul'), null);
+  assert.equal(fight.querySelector('.loot-tile.loot-lumen'), null);
   liveItem.click();
   assert.deepEqual(ctx.inspected, ['fogwort', 'fogwort']);
+  assert.equal(ctx.inspectedOpts[1]?.unpaid, true);
+  assert.equal(ctx.inspectedOpts[1]?.trayQty, 1);
+});
+
+test('unpaid Fogwort inspect shows tray qty / ungranted, not bank-held as if taken', () => {
+  const state = createState({ rngSeed: 4 });
+  state.bank.fogwort = 4;
+  const inspector = createItemInspector(makeCtx(state), 'fogwort', {
+    unpaid: true,
+    trayQty: 1,
+  });
+  assert.ok(inspector);
+  const text = inspector.node.textContent ?? '';
+  assert.match(text, /1 in the tray/);
+  assert.match(text, /ungranted/i);
+  assert.doesNotMatch(text, /4 in the bank/);
+  assert.equal(inspectorHeldLine({ unpaid: true, trayQty: 1, bankQty: 4 }), '1 in the tray · ungranted');
+  assert.equal(inspectorHeldLine({ bankQty: 4 }), '4 in the bank');
+  assert.ok(inspector.node.classList.contains('item-inspector-unpaid'));
+  assert.equal(inspector.node.getAttribute('data-inspect-origin'), 'tray');
+  const sell1 = inspector.node.querySelector('.sell-1-btn');
+  assert.ok(sell1);
+  assert.equal(sell1.disabled, true, 'sell stays closed until Take all');
+  assert.ok(sell1.classList.contains('btn-disabled'), 'Sell 1 must not look armed on an ungranted drop');
+  assert.equal(sell1.getAttribute('aria-disabled'), 'true');
+  const confirm = inspector.node.querySelector('.sell-all-btn');
+  assert.match(confirm?.textContent ?? '', /Ungranted|Take all/i);
+  assert.equal(confirm?.getAttribute('aria-disabled'), 'true');
+  inspector.node.querySelector('.sell-pin-btn')?.click();
+  inspector.node.querySelector('.sell-lock-btn')?.click();
+  sell1.click();
+  assert.equal(state.bank.fogwort, 4, 'ungranted inspect must not sell the banked stack');
+
+  const banked = createItemInspector(makeCtx(state), 'fogwort');
+  assert.match(banked.node.textContent ?? '', /4 in the bank/);
+  assert.doesNotMatch(banked.node.textContent ?? '', /in the tray/);
 });
 

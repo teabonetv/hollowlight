@@ -405,13 +405,19 @@ export function showSettingsModal(mount, ctx) {
  * unit paints “0 in the bank” and then closes — the sheet must never keep
  * showing the pre-sale stack (or an armed “Tap again”) after the goods are gone.
  */
-export function showSellSheet(mount, ctx, itemId, { confirmWindowMs = SELL_CONFIRM_WINDOW_MS } = {}) {
+export function showSellSheet(mount, ctx, itemId, {
+  confirmWindowMs = SELL_CONFIRM_WINDOW_MS,
+  unpaid = false,
+  trayQty = 0,
+} = {}) {
   const item = ITEMS_BY_ID[itemId];
   if (!item) return;
 
   let ref;
   const inspector = createItemInspector(ctx, itemId, {
     confirmWindowMs,
+    unpaid,
+    trayQty,
     onEmpty: () => ref?.close(),
   });
   if (!inspector) return;
