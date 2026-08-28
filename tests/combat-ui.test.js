@@ -2072,6 +2072,7 @@ test('unpaid Fogwort inspect shows tray qty / ungranted, not bank-held as if tak
   const sell1 = inspector.node.querySelector('.sell-1-btn');
   assert.ok(sell1);
   assert.equal(sell1.disabled, true, 'sell stays closed until Take all');
+  assert.ok(sell1.classList.contains('btn-disabled'), 'Sell 1 must not look armed on an ungranted drop');
   assert.equal(sell1.getAttribute('aria-disabled'), 'true');
   const confirm = inspector.node.querySelector('.sell-all-btn');
   assert.match(confirm?.textContent ?? '', /Ungranted|Take all/i);

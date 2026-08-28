@@ -164,6 +164,7 @@ export function createItemInspector(ctx, itemId, {
     paintStats();
     sell1Btn.textContent = 'Sell 1';
     sell1Btn.disabled = true;
+    sell1Btn.className = 'btn btn-ghost btn-disabled sell-1-btn';
     sell1Btn.setAttribute('aria-disabled', 'true');
     sell1Btn.setAttribute('title', 'Ungranted — Take all first');
     clear(sellActions);
