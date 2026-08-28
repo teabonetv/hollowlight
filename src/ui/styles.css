@@ -22,6 +22,7 @@
   --radius: 14px;
   --radius-sm: 9px;
   --tab-h: 62px;
+  --tabbar-size: calc(var(--tab-h) + 1px); /* 63px → tab top 577 at vh=640 */
   --font-display: Georgia, 'Times New Roman', serif;
   --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -252,7 +253,10 @@ button.pill:active {
   flex: 1;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 18px 16px calc(24px + env(safe-area-inset-bottom));
+  /* Shared chrome: pad the tab bar on every tab so Bank/Almanac/Map
+     first folds are not trapped under CAMP/SKILLS/BANK/MAP/ALMANAC.
+     Fight-live / leftover-live override this in combat.css. */
+  padding: 18px 16px calc(var(--tabbar-size) + env(safe-area-inset-bottom, 0px));
   scrollbar-width: thin;
   scrollbar-color: var(--line) transparent;
 }
@@ -521,7 +525,7 @@ button.pill:active {
 
 /* ── camp ──────────────────────────────────────────────────── */
 .camp { align-items: center; text-align: center; padding-top: 8px; gap: 8px; }
-.sigil-wrap { margin-bottom: 2px; }
+.sigil-wrap { margin-bottom: 0; }
 .sigil {
   width: 52px; height: 52px; border-radius: 50%;
   background: radial-gradient(circle at 50% 40%, #ffe9b0 0%, var(--gold) 45%, transparent 72%);
@@ -534,8 +538,23 @@ button.pill:active {
   0%, 100% { transform: scale(1); opacity: 0.85; }
   50% { transform: scale(1.07); opacity: 1; }
 }
-.camp-title { margin: 6px 0 0; font-family: var(--font-display); font-weight: 400; font-size: 26px; letter-spacing: 0.08em; color: var(--gold-hi); }
-.camp-flavor { margin: 4px 0 0; max-width: 34ch; color: var(--muted); font-style: italic; font-size: 13px; }
+.camp-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 26px;
+  line-height: 1.15;
+  letter-spacing: 0.08em;
+  color: var(--gold-hi);
+}
+.camp-flavor {
+  margin: 0 auto;
+  max-width: 100%;
+  color: var(--muted);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.35;
+}
 
 .stat-grid {
   display: grid;
@@ -1218,13 +1237,6 @@ html.reduced-motion *::after {
 /* ── S4 progression meta ───────────────────────────────────── */
 .pill.radiance { color: #d4c6f0; border-color: rgba(180, 160, 220, 0.4); }
 .wallet { flex-wrap: wrap; justify-content: flex-end; }
-.camp-title-worn {
-  margin: 4px 0 0;
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--gold);
-}
 .want-list { display: flex; flex-direction: column; gap: 4px; width: 100%; text-align: left; }
 .want-row {
   appearance: none;

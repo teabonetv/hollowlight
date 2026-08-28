@@ -3,6 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { FakeNode, FakeText } from './helpers/fake-node.mjs';
 
 globalThis.document = {
@@ -238,15 +239,66 @@ test('selling the last unit closes the sheet instead of showing an empty one', (
     'no lingering sheet after the stack empties');
 });
 
-test('360 CAMP puts Completion in the first stat cell, not below the fold', () => {
+test('360 Camp first fold is lantern + Hearthway Hollow + flavor + Waiting for you above tab 577', () => {
+  const { CAMP_360, campFirstFoldVsTab } = tabs;
+  assert.equal(CAMP_360.viewportH, 640);
+  assert.equal(CAMP_360.tabbarH, 63);
+  const fold = campFirstFoldVsTab();
+  assert.equal(fold.tabTop, 577);
+  assert.ok(fold.waitingTop < fold.tabTop, `Waiting for you top ${fold.waitingTop} vs tab 577`);
+  assert.equal(fold.wants.length, 3);
+  assert.ok(fold.wantsBottom < fold.tabTop,
+    `third want bottom ${fold.wantsBottom} vs tab ${fold.tabTop}`);
+  assert.ok(fold.fits, `waiting ${fold.waitingTop} wants ${fold.wantsBottom} vs tab 577`);
+  for (const row of fold.wants) {
+    assert.ok(row.bottom < 577, `want ${row.index} bottom ${row.bottom} vs tab 577`);
+  }
+
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /\.camp\s*\{[^}]*padding-top:\s*8px[^}]*gap:\s*8px/s);
+  assert.match(css, /\.sigil\s*\{[^}]*width:\s*52px/s);
+  assert.match(css, /\.camp-title\s*\{[^}]*line-height:\s*1\.15/s);
+
   const s = createState({ rngSeed: 1 });
+  s.cosmetics.activeTitle = 'Cataloguer';
   const scr = tabs.renderCampScreen(makeCtx(s));
-  const grid = scr.node.querySelector('.stat-grid');
+  assert.equal(scr.node.querySelector('.camp-title')?.textContent, 'Hearthway Hollow');
+  assert.equal(scr.node.querySelector('.camp-title-worn'), null,
+    'titles stay a dropdown — do not print Cataloguer as a Camp headline');
+  assert.doesNotMatch(scr.node.querySelector('.camp-title')?.textContent ?? '', /Cataloguer/i);
+  const waiting = scr.node.querySelector('[data-camp-fold="waiting"]');
+  const grid = scr.node.querySelector('[data-camp-fold="ledger"]')
+    ?? scr.node.querySelector('.stat-grid');
+  assert.ok(waiting, 'Waiting for you is on Camp');
+  assert.equal(waiting.textContent, 'Waiting for you');
+  assert.ok(grid, 'ledger still exists below the fold');
+  const kids = scr.node.children;
+  const waitingIdx = kids.indexOf(waiting);
+  const gridIdx = kids.indexOf(grid);
+  const tracksIdx = kids.indexOf(scr.node.querySelector('.track-list'));
+  assert.ok(waitingIdx >= 0 && waitingIdx < 6,
+    'Waiting for you is in the first-fold stack, not under the tab bar');
+  assert.ok(gridIdx > tracksIdx,
+    '6-cell completion/lumen/radiance grid is below the hearth, not the first viewport');
   const first = grid.children[0];
   assert.ok(first.classList.contains('stat-complete'));
   assert.match(first.textContent ?? '', /Completion/);
   assert.equal(first.querySelector('.stat-value')?.textContent, trueCompletion(s).label);
   assert.equal(first.querySelector('[data-true-complete="camp"]')?.textContent, trueCompletion(s).label);
+  assert.equal(scr.node.querySelectorAll('.want-row').length, 3);
+  assert.match(scr.node.querySelector('.camp-flavor')?.textContent ?? '', /last ember/i);
+  assert.doesNotMatch(scr.node.querySelector('.camp-flavor')?.textContent ?? '', /Feed it/);
+});
+
+test('shared #screen padding-bottom equals the tab bar on every tab', () => {
+  const css = readFileSync(new URL('../src/ui/styles.css', import.meta.url), 'utf8');
+  assert.match(css, /--tab-h:\s*62px/);
+  assert.match(css, /--tabbar-size:\s*calc\(\s*var\(--tab-h\)\s*\+\s*1px\s*\)/);
+  const screenBlock = css.match(/\/\* ── main scroll region[\s\S]*?#screen\s*\{([^}]+)\}/);
+  assert.ok(screenBlock, '#screen shared chrome rule present');
+  assert.match(screenBlock[1], /padding:\s*18px 16px calc\(var\(--tabbar-size\)/);
+  assert.doesNotMatch(css, /\.camp[^{]*\{[^}]*--tabbar-size/s,
+    'tab padding is shared chrome, not a Camp-only hack');
 });
 
 test('Wick patch applies when paid, or names the missing cost on the button', () => {
