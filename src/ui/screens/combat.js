@@ -1445,11 +1445,8 @@ function lootTile(entry, ctx) {
     'data-loot-id': spec.id ?? '',
     'aria-label': spec.aria,
   };
-  if (inspectable) {
-    attrs.type = 'button';
-    attrs.onclick = () => inspectLootItem(ctx, spec, entry);
-  }
-  return el(inspectable ? 'button' : 'div', attrs,
+  if (inspectable) attrs.type = 'button';
+  const tile = el(inspectable ? 'button' : 'div', attrs,
     el('span', {
       class: `loot-glyph bank-glyph bank-glyph-fill glyph-${spec.glyph}`,
       html: filledIcon(spec.glyph),
@@ -1458,6 +1455,10 @@ function lootTile(entry, ctx) {
     el('span', { class: 'loot-copy' },
       el('span', { class: 'loot-name' }, spec.name),
       el('span', { class: 'loot-qty' }, spec.qtyLabel)));
+  if (inspectable) {
+    tile.addEventListener('click', () => inspectLootItem(ctx, spec, entry, tile));
+  }
+  return tile;
 }
 
 /** Honest leftover tap — name the drop and point at Take all. Not a stall card. */
@@ -1465,10 +1466,55 @@ export function unpaidLootTapNote(name) {
   return `${name} is still in the tray. Take all to keep it.`;
 }
 
-function inspectLootItem(ctx, spec, entry) {
+function closestClass(node, cls) {
+  let n = node;
+  while (n) {
+    if (n.classList?.contains?.(cls)) return n;
+    n = n.parentNode;
+  }
+  return null;
+}
+
+function firstQuery(node, sel) {
+  try { return node?.querySelector?.(sel) ?? null; } catch { return null; }
+}
+
+/**
+ * Leftover unpaid tap must paint in leftover-live / leftover-loot.
+ * ctx.toast lands in #toasts (opacity 0 until rAF, above the HUD) — the
+ * leftover critic never sees that. Write the note on the well.
+ */
+function paintUnpaidLootNote(tile, spec) {
+  const note = unpaidLootTapNote(spec?.name ?? 'Loot');
+  if (tile?.classList) {
+    tile.classList.add('is-noted');
+    let hint = firstQuery(tile, '.loot-unpaid-hint');
+    if (!hint) {
+      hint = el('span', { class: 'loot-unpaid-hint' }, note);
+      tile.append(hint);
+    } else {
+      hint.textContent = note;
+    }
+  }
+  const well = closestClass(tile, 'leftover-loot');
+  const live = closestClass(tile, 'leftover-live') ?? closestClass(tile, 'fight-live');
+  const host = well ?? live;
+  if (!host) return note;
+  let banner = firstQuery(host, '.loot-unpaid-note');
+  if (!banner) {
+    banner = el('p', { class: 'loot-unpaid-note', role: 'status' }, note);
+    host.append(banner);
+  } else {
+    banner.textContent = note;
+  }
+  return note;
+}
+
+function inspectLootItem(ctx, spec, entry, tile) {
   if (!spec?.id) return;
   if (entry?.granted === false) {
-    ctx.toast?.(unpaidLootTapNote(spec.name), 'info');
+    const note = paintUnpaidLootNote(tile, spec);
+    ctx.toast?.(note, 'info');
     return;
   }
   if (ctx.openSellSheet) ctx.openSellSheet(spec.id);
