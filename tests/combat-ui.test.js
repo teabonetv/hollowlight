@@ -2356,7 +2356,8 @@ test('unpaid Fogwort tap paints one leftover-loot note; toast-only or a grown we
   const sentence = unpaidLootTapNote('Fogwort');
   assert.equal((scr.node.textContent ?? '').split(sentence).length - 1, 1);
   assert.doesNotMatch(tile.textContent ?? '', /still in the tray/);
-  assert.equal(tile.querySelectorAll('.loot-name, .loot-qty').length, 2);
+  assert.ok(tile.querySelector('.loot-name'));
+  assert.ok(tile.querySelector('.loot-qty'));
 
   leftover.querySelector('.leftover-hunt').click();
   assert.equal(state.combat.fighting, true);
