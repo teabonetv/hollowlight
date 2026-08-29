@@ -2207,7 +2207,8 @@ test('unpaid Fogwort tap is a tray note, not a stall; Take all then bank inspect
   assert.equal(leftover.querySelector('.item-inspector-body'), null);
   assert.equal(state.bank.fogwort ?? 0, bank0, 'ungranted tap must not bank or sell the drop');
 
-  const art = leftover.querySelector('.fighter-foe img');
+  const foe = leftover.querySelector('.fighter-foe');
+  const art = foe?.querySelector('.foe-tile')?.querySelector('img');
   assert.ok(art, 'Fog-rat cockpit PNG stays');
   assert.match(art.getAttribute('src') ?? '', /fog-rat\.png/);
   assert.ok(leftover.querySelector('.bar.bar-lg'));
