@@ -82,6 +82,34 @@ function ensureUnpaidItem(state, id = 'fogwort', qty = 1) {
   return tray;
 }
 
+/** Look lock: one leftover-loot note in the well chips. Toast-only fails. */
+function assertUnpaidWellNote(host, tile, ctx, { live = false } = {}) {
+  assert.equal(ctx.toasts.length, 0, 'unpaid tap must not HUD-toast');
+  assert.deepEqual(ctx.inspected, [], 'unpaid tap must not open a sell sheet');
+  const well = host.querySelector('.leftover-loot') ?? host.querySelector('.fight-loot');
+  assert.ok(well, 'leftover-loot well');
+  const note = well.querySelector('.loot-unpaid-note');
+  assert.ok(note, 'leftover-loot must show the unpaid note');
+  assert.equal(host.querySelectorAll('.loot-unpaid-note').length, 1);
+  assert.equal(well.querySelectorAll('.loot-unpaid-note').length, 1);
+  assert.equal(note.textContent, unpaidLootTapNote('Fogwort'));
+  assert.ok(well.contains(note), 'note sits on leftover-loot');
+  const chips = well.querySelector('.leftover-loot-chips') ?? well.querySelector('.loot-tray-grid');
+  assert.ok(chips, 'leftover-loot chips');
+  assert.ok(chips.contains(note), 'note is in leftover-loot-chips, not #toasts');
+  assert.equal(note.getAttribute('role'), null, 'role=status is mirrored into #toasts');
+  assert.equal(tile.querySelector('.loot-unpaid-hint'), null);
+  assert.doesNotMatch(tile.textContent ?? '', /still in the tray/, 'tile must not wrap the sentence');
+  assert.match(tile.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
+  assert.match(tile.querySelector('.loot-qty')?.textContent ?? '', /×1|x1/i);
+  assert.equal(host.querySelector('.sell-1-btn'), null);
+  assert.equal(host.querySelector('.sell-pin-btn'), null);
+  assert.equal(host.querySelector('.sell-lock-btn'), null);
+  if (!live) {
+    assert.ok(host.classList.contains('leftover-well'), 'leftover-as-mode holds');
+  }
+}
+
 test('skills list marks combat live and five skills still future', () => {
   const scr = renderSkillsScreen(makeCtx(createState({ rngSeed: 1 })));
   const rows = scr.node.querySelectorAll('.skill-row');
@@ -2146,19 +2174,9 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   assert.match(wallet.textContent ?? '', /2 souls|2 soul/);
   assert.match(wallet.textContent ?? '', /✦3/);
   itemTile.click();
-  assert.deepEqual(ctx.inspected, [], 'ungranted leftover tap must not open a sell sheet');
-  assert.equal(ctx.inspectedOpts.length, 0);
-  assert.equal(ctx.toasts.length, 0, 'unpaid leftover tap must not HUD-toast');
   assert.ok(scr.node.classList.contains('leftover-live'));
-  assert.equal(scr.node.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(leftover.querySelector('.leftover-loot')?.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(scr.node.querySelector('.loot-unpaid-note')?.textContent, unpaidLootTapNote('Fogwort'));
+  assertUnpaidWellNote(leftover, itemTile, ctx);
   assert.ok(itemTile.classList.contains('is-noted'));
-  assert.equal(itemTile.querySelector('.loot-unpaid-hint'), null);
-  assert.doesNotMatch(itemTile.textContent ?? '', /still in the tray/);
-  assert.equal(leftover.querySelector('.sell-1-btn'), null);
-  assert.equal(leftover.querySelector('.sell-pin-btn'), null);
-  assert.equal(leftover.querySelector('.sell-lock-btn'), null);
   assert.equal(leftover.querySelector('.item-inspector-body'), null);
 
   leftover.querySelector('.leftover-hunt').click();
@@ -2171,19 +2189,9 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   assert.equal(fight.querySelector('.loot-tile.loot-soul'), null);
   assert.equal(fight.querySelector('.loot-tile.loot-lumen'), null);
   liveItem.click();
-  assert.deepEqual(ctx.inspected, [], 'live unpaid tap must not open a sell sheet');
-  assert.equal(ctx.inspectedOpts.length, 0);
-  assert.equal(ctx.toasts.length, 0, 'live unpaid tap must not HUD-toast');
   assert.ok(scr.node.classList.contains('fight-live'));
-  assert.equal(scr.node.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(fight.querySelector('.leftover-loot')?.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(scr.node.querySelector('.loot-unpaid-note')?.textContent, unpaidLootTapNote('Fogwort'));
+  assertUnpaidWellNote(fight, liveItem, ctx, { live: true });
   assert.ok(liveItem.classList.contains('is-noted'));
-  assert.equal(liveItem.querySelector('.loot-unpaid-hint'), null);
-  assert.doesNotMatch(liveItem.textContent ?? '', /still in the tray/);
-  assert.equal(fight.querySelector('.sell-1-btn'), null);
-  assert.equal(fight.querySelector('.sell-pin-btn'), null);
-  assert.equal(fight.querySelector('.sell-lock-btn'), null);
 });
 
 test('unpaid Fogwort tap is a tray note, not a stall; Take all then bank inspect is real', () => {
@@ -2204,32 +2212,16 @@ test('unpaid Fogwort tap is a tray note, not a stall; Take all then bank inspect
   assert.ok(tile);
   assert.match(tile.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
   tile.click();
-  assert.deepEqual(ctx.inspected, [], 'unpaid Fogwort must not mount a sell sheet');
-  assert.equal(ctx.inspectedOpts.length, 0);
   assert.ok(scr.node.classList.contains('leftover-live'), 'leftover-as-mode leftover-live');
-  assert.equal(ctx.toasts.length, 0, 'unpaid Fogwort tap must not HUD-toast');
-  const well = leftover.querySelector('.leftover-loot');
-  const wellNote = well?.querySelector('.loot-unpaid-note');
-  assert.ok(wellNote, 'one leftover-loot note, not a HUD toast');
-  assert.equal(scr.node.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(well.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(wellNote.textContent, unpaidLootTapNote('Fogwort'));
-  assert.ok(well.contains(wellNote), 'note sits on leftover-loot');
+  assertUnpaidWellNote(leftover, tile, ctx);
   const sentence = unpaidLootTapNote('Fogwort');
   assert.equal((scr.node.textContent ?? '').split(sentence).length - 1, 1,
     'leftover-live must print the tray sentence once');
   assert.ok(tile.classList.contains('is-noted'), 'tapped tile keeps a visible ring');
-  assert.equal(tile.querySelector('.loot-unpaid-hint'), null);
-  assert.doesNotMatch(tile.textContent ?? '', /still in the tray/);
-  assert.match(tile.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
-  assert.match(tile.querySelector('.loot-qty')?.textContent ?? '', /×1|x1/i);
   const leftoverText = leftover.textContent ?? '';
   assert.doesNotMatch(leftoverText, /\bSell 1\b/);
   assert.doesNotMatch(leftoverText, /\bPin\b/);
   assert.doesNotMatch(leftoverText, /\bLock\b/);
-  assert.equal(leftover.querySelector('.sell-1-btn'), null);
-  assert.equal(leftover.querySelector('.sell-pin-btn'), null);
-  assert.equal(leftover.querySelector('.sell-lock-btn'), null);
   assert.equal(leftover.querySelector('.item-inspector-unpaid'), null);
   assert.equal(leftover.querySelector('.item-inspector-body'), null);
   assert.equal(state.bank.fogwort ?? 0, bank0, 'ungranted tap must not bank or sell the drop');
@@ -2312,25 +2304,11 @@ test('leftover unpaid Fogwort tap mounts leftover-live copy when the bank alread
   assert.equal(scr.node.querySelector('.loot-unpaid-note'), null);
 
   tile.click();
-  assert.deepEqual(ctx.inspected, [], 'no sell sheet');
-  assert.equal(ctx.inspectedOpts.length, 0);
-  assert.equal(ctx.toasts.length, 0, 'unpaid tap must not HUD-toast');
-  assert.equal(leftover.querySelector('.sell-1-btn'), null);
-  assert.equal(leftover.querySelector('.sell-pin-btn'), null);
-  assert.equal(leftover.querySelector('.sell-lock-btn'), null);
-  assert.equal(leftover.querySelector('.item-inspector-body'), null);
+  assertUnpaidWellNote(leftover, tile, ctx);
   const note = well.querySelector('.loot-unpaid-note');
-  assert.ok(note, 'one leftover-loot note');
-  assert.equal(scr.node.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(well.querySelectorAll('.loot-unpaid-note').length, 1);
-  assert.equal(note.getAttribute('role'), 'status');
-  assert.equal(note.textContent, unpaidLootTapNote('Fogwort'));
   assert.match(note.textContent, /still in the tray/);
   assert.match(note.textContent, /Take all/);
-  assert.ok(well.contains(note));
   assert.ok(tile.classList.contains('is-noted'));
-  assert.equal(tile.querySelector('.loot-unpaid-hint'), null);
-  assert.doesNotMatch(tile.textContent ?? '', /still in the tray/);
   assert.equal(state.bank.fogwort, 6, 'tap must not grant or sell the banked stack');
   assert.equal(wort.granted, false);
 
@@ -2349,12 +2327,69 @@ test('leftover unpaid Fogwort tap mounts leftover-live copy when the bank alread
   assert.ok(COMBAT_360.leftoverWellMin >= 184);
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
   assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-loot\s*\{[^}]*min-height:\s*184px/s);
-  assert.match(css, /\.loot-unpaid-note\s*\{[^}]*position:\s*absolute/s);
+  assert.doesNotMatch(css, /\.loot-unpaid-note\s*\{[^}]*position:\s*absolute/);
+  assert.doesNotMatch(css, /\.loot-unpaid-note\s*\{[^}]*position:\s*fixed/);
   assert.match(css, /\.loot-unpaid-note\s*\{[^}]*opacity:\s*1/s);
   assert.doesNotMatch(css, /\.loot-unpaid-hint\s*\{/);
   assert.doesNotMatch(css, /\.loot-ghost\s*\{/);
   assert.equal(SAVE_VERSION, 5);
   assert.equal(leftover.querySelectorAll('.loot-ghost').length, 0);
+});
+
+test('unpaid Fogwort tap paints one leftover-loot note; toast-only or a grown well fails', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killFoe(state, 'fog-rat'));
+  const ctx = makeCtx(state);
+  const scr = renderSkillDetail(ctx, 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover?.classList.contains('leftover-well'), 'leftover-as-mode holds');
+  const well = leftover.querySelector('.leftover-loot');
+  const tile = well.querySelector('.loot-tile.loot-item');
+  assert.ok(tile);
+  assert.equal(well.querySelector('.loot-unpaid-note'), null);
+  assert.equal(ctx.toasts.length, 0);
+
+  tile.click();
+  assertUnpaidWellNote(leftover, tile, ctx);
+  assert.ok(scr.node.classList.contains('leftover-live'));
+  assert.equal(document.getElementById('toasts'), null);
+  const sentence = unpaidLootTapNote('Fogwort');
+  assert.equal((scr.node.textContent ?? '').split(sentence).length - 1, 1);
+  assert.doesNotMatch(tile.textContent ?? '', /still in the tray/);
+  assert.ok(tile.querySelector('.loot-name'));
+  assert.ok(tile.querySelector('.loot-qty'));
+
+  leftover.querySelector('.leftover-hunt').click();
+  assert.equal(state.combat.fighting, true);
+  const fight = scr.node.querySelector('.combat-fight');
+  const liveTile = fight.querySelector('.leftover-loot')?.querySelector('.loot-tile.loot-item');
+  assert.ok(liveTile);
+  liveTile.click();
+  assertUnpaidWellNote(fight, liveTile, ctx, { live: true });
+
+  const js = readFileSync(join(here, '../src/ui/screens/combat.js'), 'utf8');
+  const unpaid = js.match(/if \(entry\?\.granted === false\) \{([^}]+)\}/);
+  assert.ok(unpaid, 'inspectLootItem unpaid branch');
+  assert.match(unpaid[1], /paintUnpaidLootNote/);
+  assert.doesNotMatch(unpaid[1], /toast/, 'unpaid tap must not ctx.toast');
+
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  assert.doesNotMatch(css, /\.loot-unpaid-note\s*\{[^}]*position:\s*absolute/);
+  assert.doesNotMatch(css, /\.loot-unpaid-note\s*\{[^}]*position:\s*fixed/);
+  assert.match(css, /\.loot-unpaid-note\s*\{[^}]*opacity:\s*1/s);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-loot\s*\{[^}]*min-height:\s*184px/s);
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.leftover-loot,\s*\n\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*184px/s);
+  assert.doesNotMatch(css, /\.loot-unpaid-hint\s*\{/);
+  assert.equal(COMBAT_360.leftoverWellMin, 184, 'leftover-loot floor stays 184');
+  assert.equal(COMBAT_360.fightLoot, 184);
+  const fell = leftoverLogVsTab({ loot: true });
+  const live = fightLogVsTab({ loot: true });
+  assert.ok(fell.lootH >= 184, `leftover-loot ${fell.lootH} dropped off 184`);
+  assert.ok(live.lootH >= 184, `live leftover-loot ${live.lootH} dropped off 184`);
+  assert.ok(fell.lootH < 280, `leftover-loot ${fell.lootH} grew off 184 toward Melvor 400`);
+  assert.ok(live.lootH < 280, `live leftover-loot ${live.lootH} grew off 184 toward Melvor 400`);
+  assert.equal(COMBAT_360.leftoverTileMinH, 103);
+  assert.equal(SAVE_VERSION, 5);
 });
 
 test('Fog-rat kill with a fixed seed always paints an ungranted Fogwort tile', () => {

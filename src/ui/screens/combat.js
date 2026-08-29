@@ -1456,7 +1456,9 @@ function lootTile(entry, ctx) {
       el('span', { class: 'loot-name' }, spec.name),
       el('span', { class: 'loot-qty' }, spec.qtyLabel)));
   if (inspectable) {
-    tile.addEventListener('click', () => inspectLootItem(ctx, spec, entry, tile));
+    tile.addEventListener('click', (ev) => {
+      inspectLootItem(ctx, spec, entry, ev.currentTarget ?? tile);
+    });
   }
   return tile;
 }
@@ -1480,20 +1482,33 @@ function firstQuery(node, sel) {
 }
 
 /**
- * One leftover-loot note. Tile keeps a gold ring only, no in-tile
- * paragraph. HUD toast is a third copy; inspectLootItem must not fire it.
+ * One leftover-loot note, in-flow on leftover-loot-chips (the 184px well
+ * the leftover critic photographs). Absolute + role=status painted a
+ * live-region sibling that sat at #toasts y=64 while leftover-loot
+ * stayed mute. No HUD toast. Tile stays Fogwort ×1.
  */
+function unpaidNoteHost(tile) {
+  const well = closestClass(tile, 'leftover-loot')
+    ?? closestClass(tile, 'leftover-tray')
+    ?? closestClass(tile, 'fight-loot');
+  if (!well) return { well: null, host: null };
+  const chips = firstQuery(well, '.leftover-loot-chips')
+    ?? firstQuery(well, '.loot-tray-grid');
+  return { well, host: chips ?? well };
+}
+
 function paintUnpaidLootNote(tile, spec) {
   const note = unpaidLootTapNote(spec?.name ?? 'Loot');
   if (tile?.classList) tile.classList.add('is-noted');
-  const well = closestClass(tile, 'leftover-loot');
-  if (!well) return note;
-  let banner = firstQuery(well, '.loot-unpaid-note');
+  const { well, host } = unpaidNoteHost(tile);
+  if (!host) return note;
+  let banner = firstQuery(well ?? host, '.loot-unpaid-note');
   if (!banner) {
-    banner = el('p', { class: 'loot-unpaid-note', role: 'status' }, note);
-    well.append(banner);
+    banner = el('p', { class: 'loot-unpaid-note' }, note);
+    host.append(banner);
   } else {
     banner.textContent = note;
+    if (banner.parentNode !== host) host.append(banner);
   }
   return note;
 }
