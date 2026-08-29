@@ -52,6 +52,29 @@ test('loot table rolls are deterministic for a given seed', () => {
   assert.ok(Array.isArray(c));
 });
 
+test('Fog-rat always drops Fogwort ×1; Pall-fang stays the extra roll', () => {
+  const rat = ENEMIES_BY_ID['fog-rat'];
+  const fog = rat.loot.find((r) => r.id === 'fogwort');
+  const fang = rat.loot.find((r) => r.id === 'pall-fang');
+  const lumen = rat.loot.find((r) => r.kind === 'lumen');
+  assert.equal(fog?.chance, 1);
+  assert.equal(fog?.min, 1);
+  assert.equal(fog?.max, 1);
+  assert.equal(fang?.chance, 0.08);
+  assert.equal(lumen?.chance, 1);
+  assert.equal(rat.souls, 1);
+  assert.equal(rat.loot.length, 3, 'do not invent Fog-rat items');
+  for (const seed of [1, 7, 11, 4242, 0xC0FFEE]) {
+    const drops = combat.rollLootTable(rat.loot, createRng(seed));
+    const wort = drops.find((d) => d.id === 'fogwort');
+    assert.ok(wort, `seed ${seed} must land Fogwort`);
+    assert.equal(wort.qty, 1);
+    assert.ok(drops.some((d) => d.kind === 'lumen'));
+  }
+  const moth = ENEMIES_BY_ID['pale-moth'];
+  assert.equal(moth.loot.some((r) => r.id === 'fogwort'), false, 'do not change other foes');
+});
+
 test('rollDamage stays inside the scaled range (min 1)', () => {
   const rng = createRng(99);
   for (let i = 0; i < 40; i++) {

@@ -320,6 +320,8 @@ kept. Walk back (open that stretch) to recover.
 
 Starter combat kit (on top of F1/S2 bank): 8 lantern-loaf, 6 wick-oil, 1 wick-knife. Lumen still 20 — dying on the fog-line is a walk-back, not a wipe.
 
+Fog-rat (Hearthway) always drops Fogwort ×1 so a typical kill is loot, not a currency receipt. Lumen 1–2 still always; Pall-fang stays an 8% extra roll. Other foes are unchanged. Hollow cap stays 12. The hunt well is leftover-loot at ≥184px live and leftover (not Melvor's 400px drawer): Hollow n/12 + Take all chrome, soul/lumen as well-head wallet chips, named drops as 56px `.loot-tile.loot-item` tiles. Empty chrome stays on a living fight after Take all; the grid has no ghost slots.
+
 ## Lantern hollow (S2e unique-stack cap)
 
 The working pack is weightless but not infinite: it holds a finite number of

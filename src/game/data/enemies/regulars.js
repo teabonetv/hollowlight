@@ -46,7 +46,7 @@ export const REGULARS = [
   m({ id: 'fog-rat', name: 'Fog-rat', z: 'hearthway', cat: 'pale',
     hp: 14, acc: 9, avo: 13, min: 1, max: 3, spd: 2000, style: 'strike', weak: 'rite', resist: 'shot',
     xp: 10, souls: 1, flavor: 'Too many joints. Too few eyes it is willing to use.',
-    loot: loot([L('lumen', [1, 2, 1]), L('fogwort', [1, 1, 0.22]), L('pall-fang', [1, 1, 0.08])]) }),
+    loot: loot([L('lumen', [1, 2, 1]), L('fogwort', [1, 1, 1]), L('pall-fang', [1, 1, 0.08])]) }),
   m({ id: 'hollow-cur', name: 'Hollow Cur', z: 'hearthway', cat: 'pale',
     hp: 28, acc: 12, avo: 8, min: 2, max: 5, spd: 2600, style: 'strike', weak: 'shot', resist: 'rite',
     xp: 18, souls: 2, flavor: 'A dog-shape that forgot the warm part of being a dog.',
