@@ -1166,7 +1166,7 @@ test('first live fight paints leftover-well chrome with an empty grid', () => {
   assert.match(fight.textContent ?? '', /Take all/);
   assert.ok(tray.querySelector('.loot-tray-grid'), 'empty grid furniture');
   assert.equal(tray.querySelectorAll('.loot-tile').length, 0);
-  assertGhostPack(tray, lanternRoom(state));
+  assertNoGhostPack(tray);
   const empty = leftoverLogVsTab({ loot: false });
   assert.ok(empty.fits);
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
@@ -1424,6 +1424,8 @@ function assertLootFurniture(host, { minItemTiles = 0, expectWallet = true } = {
     assert.equal(wallet.classList.contains('loot-tile'), false);
   }
   assert.ok(tray.querySelector('.leftover-take'), 'Take all stays on the furniture');
+  assert.equal(tray.querySelectorAll('.loot-ghost').length, 0, 'leftover-well has no ghost pack');
+  assert.equal(grid.classList.contains('is-ghost-pack'), false);
   const meter = tray.querySelector('.loot-well-meter');
   assert.ok(meter, 'Hollow pressure sits on the well live and leftover');
   assert.match(meter.textContent ?? '', /Hollow \d+\/\d+/);
@@ -1431,14 +1433,12 @@ function assertLootFurniture(host, { minItemTiles = 0, expectWallet = true } = {
   return { tray, tiles: itemTiles, itemTiles, wallet: tray.querySelector('.loot-wallet') };
 }
 
-function assertGhostPack(tray, cap) {
+function assertNoGhostPack(tray) {
   const grid = tray.querySelector('.loot-tray-grid');
   assert.ok(grid, 'empty grid furniture');
-  assert.ok(grid.classList.contains('is-ghost-pack'), 'empty well ghosts the hollow pack');
-  const ghosts = tray.querySelectorAll('.loot-ghost');
-  assert.equal(ghosts.length, cap, `ghost hollow slots ${ghosts.length} vs cap ${cap}`);
-  assert.equal(tray.querySelectorAll('.loot-tile').length, 0, 'ghosts are not loot-tiles');
-  return ghosts;
+  assert.equal(grid.classList.contains('is-ghost-pack'), false, 'empty well has no ghost pack');
+  assert.equal(tray.querySelectorAll('.loot-ghost').length, 0, 'no fake hollow slots');
+  return grid;
 }
 
 test('leftover unpaid tray is loot furniture: glyph + name + qty, Take all still grants', () => {
@@ -1505,7 +1505,9 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
   assert.ok(scr.node.querySelector('.leftover-take'), 'empty live well keeps Take all after collect');
   const emptyAfter = scr.node.querySelector('.leftover-loot') ?? scr.node.querySelector('.fight-loot');
   assert.ok(emptyAfter?.classList.contains('is-empty'));
-  assertGhostPack(emptyAfter, lanternRoom(state));
+  assert.ok(emptyAfter.querySelector('.loot-well-meter'), 'empty live well keeps Hollow chrome');
+  assert.ok(emptyAfter.querySelector('.leftover-take'), 'empty live well keeps Take all');
+  assertNoGhostPack(emptyAfter);
   assert.ok(scr.node.querySelector('.eat-btn'));
   assert.ok(scr.node.querySelector('.flee-btn'));
 
@@ -1992,16 +1994,15 @@ test('first live Fog-rat paints Hollow + Take all + empty grid while the foe sti
   assert.ok(tray.querySelector('.leftover-take'));
   assert.ok(tray.querySelector('.loot-tray-grid'));
   assert.equal(tray.querySelectorAll('.loot-tile').length, 0);
-  assertGhostPack(tray, lanternRoom(state));
+  assertNoGhostPack(tray);
   assert.ok(fight.querySelector('.acc-station'));
   assert.ok(fight.querySelector('.eat-pick'));
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
   assert.ok(fight.querySelector('.combat-keep'));
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
   assert.match(css, /\.screen\.fight-live \.craft-nav,\s*\n\.screen\.leftover-live \.craft-nav\s*\{[^}]*display:\s*none/);
-  assert.match(css, /\.loot-ghost\s*\{/);
-  assert.match(css, /\.loot-tray-grid\.is-ghost-pack/);
-  assert.doesNotMatch(css, /\.loot-ghost\s*\{[^}]*min-height:\s*103px/);
+  assert.doesNotMatch(css, /\.loot-ghost\s*\{/);
+  assert.doesNotMatch(css, /\.loot-tray-grid\.is-ghost-pack/);
   const emptyWell = fightLogVsTab({ loot: false });
   const piledWell = fightLogVsTab({ loot: true });
   assert.equal(emptyWell.lootH, piledWell.lootH, 'empty live well occupies the same leftover-loot room as piled');
@@ -2085,5 +2086,44 @@ test('unpaid Fogwort inspect shows tray qty / ungranted, not bank-held as if tak
   const banked = createItemInspector(makeCtx(state), 'fogwort');
   assert.match(banked.node.textContent ?? '', /4 in the bank/);
   assert.doesNotMatch(banked.node.textContent ?? '', /in the tray/);
+});
+
+test('Fog-rat kill with a fixed seed always paints an ungranted Fogwort tile', () => {
+  const state = createState({ rngSeed: 4 });
+  assert.ok(killFoe(state, 'fog-rat'));
+  const wort = (state.combat.lootTray ?? []).find((e) => e.kind === 'item' && e.id === 'fogwort');
+  assert.ok(wort, 'Fog-rat kill must land Fogwort');
+  assert.equal(wort.qty, 1);
+  assert.equal(wort.granted, false);
+  const souls = (state.combat.lootTray ?? []).filter((e) => e.kind === 'soul');
+  const lumen = (state.combat.lootTray ?? []).filter((e) => e.kind === 'lumen');
+  assert.ok(souls.length >= 1, 'Fog-rat still pays a soul');
+  assert.ok(lumen.length >= 1, 'Fog-rat still pays lumen');
+
+  const scr = renderSkillDetail(makeCtx(state), 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover?.classList.contains('leftover-well'));
+  assert.equal(leftover.querySelectorAll('.loot-ghost').length, 0);
+  const tile = leftover.querySelector('.loot-tile.loot-item');
+  assert.ok(tile, 'ungranted Fogwort is a named loot tile');
+  assert.match(tile.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
+  assert.equal(leftover.querySelector('.loot-tile.loot-soul'), null);
+  assert.equal(leftover.querySelector('.loot-tile.loot-lumen'), null);
+  const wallet = leftover.querySelector('.loot-wallet');
+  assert.ok(wallet);
+  assert.match(wallet.textContent ?? '', /soul|✦/);
+  assert.equal(wallet.classList.contains('loot-tile'), false);
+  assert.ok(leftover.querySelector('.leftover-another'), 'Hunt another stays outside leftover-loot');
+  assert.equal(leftover.querySelector('.leftover-loot')?.querySelector('.leftover-another'), null);
+  assert.ok(leftover.querySelector('.acc-station'));
+  assert.ok(leftover.querySelector('.leftover-kit'));
+  assert.match(leftover.querySelector('.eat-pick')?.textContent ?? '', /Lantern-loaf/);
+
+  const fell = leftoverLogVsTab({ loot: true });
+  const live = fightLogVsTab({ loot: true });
+  assert.ok(fell.lootH >= 184, `FELL leftover-loot ${fell.lootH}`);
+  assert.ok(live.lootH >= 184, `live leftover-loot ${live.lootH}`);
+  assert.ok(fell.lootH < 400);
+  assert.ok(live.lootH < 400);
 });
 

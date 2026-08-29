@@ -65,8 +65,8 @@ export const COMBAT_360 = {
    * loot-tiles. Acc / leftover-kit stay on unpaid leftover. leftover-well
    * packs Knife + styles into one 44px band so leftover-loot can spend its
    * empty floor (live critic 184 vs leftover 167) instead of collapsing
-   * chrome. Empty well ghosts the hollow pack (n slots), not a gold
-   * rectangle. Hunt another is a sibling under leftover-actions — not
+   * chrome. Empty well keeps Hollow + Take all; the grid has no fake
+   * slots. Hunt another is a sibling under leftover-actions — not
    * inside leftover-loot — so leftover-loot can match the live well.
    * S1s 140 was leftover-actions; leftover-loot then lost the flex race
    * to 90px. Do not grow this toward Melvor's 400px drawer.
@@ -1427,20 +1427,9 @@ function inspectLootItem(ctx, spec, entry) {
   else ctx.toast?.(`${spec.name} ${spec.qtyLabel}`, 'info');
 }
 
-function lootGhostSlot() {
-  return el('div', {
-    class: 'loot-ghost',
-    'aria-hidden': 'true',
-    'data-loot-kind': 'ghost',
-  });
-}
-
-function lootItemGrid(items, ctx, ghostCount) {
-  const grid = el('div', {
-    class: `leftover-loot-chips loot-tray-grid${ghostCount > 0 ? ' is-ghost-pack' : ''}`,
-  });
+function lootItemGrid(items, ctx) {
+  const grid = el('div', { class: 'leftover-loot-chips loot-tray-grid' });
   for (const e of items) grid.append(lootTile(e, ctx));
-  for (let i = 0; i < ghostCount; i++) grid.append(lootGhostSlot());
   return grid;
 }
 
@@ -1496,13 +1485,12 @@ function fillLootWell(row, ctx, st, paint) {
     return;
   }
   const meter = hollowPressureCopy(ctx.state);
-  const ghostCount = items.length === 0 ? lanternRoom(ctx.state) : 0;
   row.removeAttribute('hidden');
   row.removeAttribute('aria-hidden');
   row.setAttribute('aria-label', pending.length
     ? `Loot to collect · ${meter}`
     : `Loot well · ${meter}`);
-  const fp = `${trayFingerprint(pending)}|${meter}|empty:${pending.length === 0}|ghosts:${ghostCount}`;
+  const fp = `${trayFingerprint(pending)}|${meter}|empty:${pending.length === 0}`;
   if (row.dataset?.lootFp === fp
     && row.querySelector('.leftover-take')
     && row.querySelector('.loot-well-meter')
@@ -1522,7 +1510,7 @@ function fillLootWell(row, ctx, st, paint) {
   if (walletLine) head.append(walletLine);
   head.append(take);
   row.append(head);
-  row.append(lootItemGrid(items, ctx, ghostCount));
+  row.append(lootItemGrid(items, ctx));
 }
 
 function leftoverLog(st) {
