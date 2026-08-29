@@ -2172,6 +2172,9 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   assert.equal(ctx.inspectedOpts.length, 0);
   assert.equal(ctx.toasts.length, 2);
   assert.equal(ctx.toasts[1].msg, unpaidLootTapNote('Fogwort'));
+  assert.ok(scr.node.classList.contains('fight-live'));
+  assert.equal(scr.node.querySelector('.loot-unpaid-note')?.textContent, unpaidLootTapNote('Fogwort'));
+  assert.ok(liveItem.classList.contains('is-noted'));
   assert.equal(fight.querySelector('.sell-1-btn'), null);
   assert.equal(fight.querySelector('.sell-pin-btn'), null);
   assert.equal(fight.querySelector('.sell-lock-btn'), null);
