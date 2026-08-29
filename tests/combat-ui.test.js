@@ -136,7 +136,7 @@ test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
   const fight = scr.node.querySelector('.combat-fight');
   assert.ok(fight);
   const classes = fight.children.map((c) => c.className);
-  const iFighter = classes.findIndex((c) => /\bfighter\b/.test(c));
+  const iFighter = classes.findIndex((c) => /\bfight-pair\b/.test(c) || /\bfighter\b/.test(c));
   const iKit = classes.findIndex((c) => /\bacc-station\b/.test(c) || /\bfight-cockpit\b/.test(c));
   const iOil = classes.findIndex((c) => /\boil-line\b/.test(c));
   const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
@@ -144,7 +144,7 @@ test('in-fight first screen is HP, kit, oil, eat — Hand is a chip', () => {
   const iHand = iKitWrap >= 0 ? iKitWrap : classes.findIndex((c) => /\bhand-chip\b/.test(c));
   assert.ok(iFighter >= 0 && iKit > iFighter && iOil > iKit && iEat > iOil, 'HP then kit then oil then eat');
   assert.ok(iHand > iEat, 'weapon chip sits after the cockpit');
-  assert.equal(classes.filter((c) => /\bfighter\b/.test(c)).length, 2);
+  assert.equal(fight.querySelectorAll('.fighter').length, 2);
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
   assert.equal(classes.filter((c) => /\bflee-btn\b/.test(c) && /\bbtn-wide\b/.test(c)).length, 0);
   assert.match(fight.textContent ?? '', /You/);
@@ -388,7 +388,7 @@ test('hunt-from-scrolled-hub first paint contains You / Acc / they / oil / eat',
   assert.match(first, /Lantern-loaf/);
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
   const classes = fight.children.map((c) => c.className);
-  const iYou = classes.findIndex((c) => /\bfighter\b/.test(c));
+  const iYou = classes.findIndex((c) => /\bfight-pair\b/.test(c) || /\bfighter\b/.test(c));
   const iAcc = classes.findIndex((c) => /\bacc-station\b/.test(c));
   const iOil = classes.findIndex((c) => /\boil-line\b/.test(c));
   const iEat = classes.findIndex((c) => /\beat-row\b/.test(c));
