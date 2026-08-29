@@ -982,16 +982,8 @@
 .loot-tile.is-noted {
   box-shadow: inset 0 0 0 2px var(--gold-hi);
 }
-.loot-unpaid-hint {
-  display: block;
-  width: 100%;
-  font-size: 10px;
-  line-height: 1.2;
-  color: var(--gold-hi);
-  text-align: center;
-}
-/* Sits in leftover-loot (leftover-live DOM), not #toasts. Absolute so the
-   184px well does not grow toward tab 577. Opacity 1 — no rAF fade. */
+/* One leftover-loot copy. Absolute so the 184px well does not grow.
+   Opacity 1. No HUD toast, no in-tile paragraph. */
 .loot-unpaid-note {
   position: absolute;
   left: 6px;
