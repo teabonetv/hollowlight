@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { FakeNode, FakeText } from './helpers/fake-node.mjs';
@@ -1659,7 +1659,7 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
     `leftover-loot min ${C.leftoverWellMin} cannot be shorter than tile ${C.leftoverTileMinH}`);
   assert.equal(C.leftoverActionsMin, C.leftoverWellMin,
     'leftover-actions is the well only; Hunt another sits outside leftover-loot');
-  assert.equal(C.leftoverWellAcc, 22, 'leftover unpaid Acc stays a compact chip');
+  assert.equal(C.leftoverWellAcc, 16, 'leftover unpaid Acc stays a compact chip');
   assert.equal(C.leftoverWellKit, 44, 'leftover unpaid kit band stays a 44px tap row');
   assert.equal(C.leftoverWellMin, 184, 'leftover-loot floor matches critic live 184');
   assert.ok(C.leftoverLiveStationTop < C.leftoverStationTop, 'leftover-live pad-top 2 / gap 0');
@@ -1722,7 +1722,7 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.ok(logMin.some((h) => h >= 36), `leftover-well log-wrap min-height ${logMin.join(',')} cannot ship a 10px sliver`);
   assert.ok(logMax.every((h) => h >= 36), `leftover-well log-wrap max-height ${logMax.join(',')} cannot cap under 36px`);
   assert.match(css, /\.leftover-station\.leftover-well\s+\.leftover-kit\s*\{[^}]*max-height:\s*44px/);
-  assert.match(css, /\.leftover-station\.leftover-well\s+\.acc-station\s*\{[^}]*max-height:\s*22px/);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.acc-station\s*\{[^}]*max-height:\s*16px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fight-loot\.leftover-loot\s*\{[^}]*min-height:\s*184px/);
   const live = fightLogVsTab({ loot: true });
@@ -1734,11 +1734,14 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
 test('360 leftover-well You and Fog-rat bars are 8px+ tracks with a foe tile', () => {
   const C = COMBAT_360;
   assert.equal(C.leftoverWellFighter, C.fightFighter, 'leftover-well uses the documented fightFighter band');
-  assert.equal(C.leftoverWellFighter, 34);
+  assert.equal(C.leftoverWellFighter, 48);
   assert.ok(C.leftoverWellBar >= 8, `bar track ${C.leftoverWellBar}`);
   assert.equal(C.leftoverWellBar, 12);
-  assert.ok(C.leftoverWellFoeTile >= 32, `foe tile ${C.leftoverWellFoeTile}`);
+  assert.ok(C.leftoverWellFoeTile >= 48, `foe tile ${C.leftoverWellFoeTile}`);
+  assert.ok(C.leftoverWellFighter >= C.leftoverWellFoeTile, 'pair must fit the 48px rat');
+  assert.ok(C.leftoverWellFighter >= C.leftoverWellBar, 'pair must fit bar-lg at the same time');
   assert.equal(C.leftoverWellMin, 184);
+  assert.ok(C.leftoverWellMin < 400, 'well cannot grow toward 400');
 
   const leftover = leftoverLogVsTab({ loot: true });
   assert.ok(leftover.lootH >= C.leftoverWellMin, `leftover-loot ${leftover.lootH}`);
@@ -1767,6 +1770,14 @@ test('360 leftover-well You and Fog-rat bars are 8px+ tracks with a foe tile', (
   assert.ok(liveBar.some((h) => h >= 8), `live well bar-lg ${liveBar.join(',')}`);
   assert.ok(leftoverBar.every((h) => h >= 8), 'leftover-well cannot ship a 4px hairline bar');
   assert.ok(liveBar.every((h) => h >= 8), 'live leftover-well cannot ship a 4px hairline bar');
+  const leftoverBarMin = [...css.matchAll(/\.leftover-station\.leftover-well\s+\.bar\.bar-lg\s*\{([^}]+)\}/g)]
+    .flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  const liveBarMin = [...css.matchAll(/\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.bar\.bar-lg\s*\{([^}]+)\}/g)]
+    .flatMap((m) => [...m[1].matchAll(/min-height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(leftoverBarMin.every((h) => h >= 8), `leftover bar min-height ${leftoverBarMin.join(',')}`);
+  assert.ok(liveBarMin.every((h) => h >= 8), `live bar min-height ${liveBarMin.join(',')}`);
+  assert.match(css, /\.leftover-station\.leftover-well\s+\.bar\.bar-lg\s*\{[^}]*flex-shrink:\s*0/);
+  assert.match(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.bar\.bar-lg\s*\{[^}]*flex-shrink:\s*0/);
   assert.doesNotMatch(css, /\.leftover-station\.leftover-well\s+\.fighter\s*\{[^}]*max-height:\s*14px/);
   assert.doesNotMatch(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fighter\s*\{[^}]*max-height:\s*14px/);
   assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.fight-pair\\s*\\{[^}]*max-height:\\s*${C.leftoverWellFighter}px`));
@@ -1788,10 +1799,11 @@ test('360 leftover-well You and Fog-rat bars are 8px+ tracks with a foe tile', (
     assert.equal(you.querySelector('.foe-tile'), null, 'You is not the foe tile');
     const tile = foe.querySelector('.foe-tile');
     assert.ok(tile, 'Fog-rat has a cockpit tile');
-    assert.ok(tile.classList.contains('bank-glyph-fill'));
-    assert.ok(tile.classList.contains('glyph-sword'));
-    assert.match(tile.innerHTML, /<svg/i);
-    assert.match(tile.innerHTML, /fill="currentColor"/);
+    assert.equal(tile.classList.contains('glyph-sword'), false, 'Fog-rat is not a sword glyph');
+    const art = tile.querySelector('img');
+    assert.ok(art, 'Fog-rat cockpit is a real img');
+    assert.match(art.getAttribute('src') ?? '', /fog-rat\.png/);
+    assert.equal(you.querySelector('img'), null, 'You stays a label');
     assert.ok(host.querySelector('.eat-btn'));
     if (leftover) {
       assert.ok(host.querySelector('.leftover-another'), 'Hunt another stays outside leftover-loot');
@@ -1820,6 +1832,12 @@ test('360 leftover-well You and Fog-rat bars are 8px+ tracks with a foe tile', (
   assert.ok(leftoverHost?.classList.contains('leftover-well'));
   assertFoeCockpit(leftoverHost, { name: 'Fog-rat', leftover: true });
   assert.match(leftoverHost.querySelector('.loot-tile.loot-item')?.textContent ?? '', /Fogwort/);
+
+  const artPath = join(here, '../src/ui/assets/foes/fog-rat.png');
+  assert.equal(existsSync(artPath), true, 'Fog-rat PNG lives under src/ui/assets/foes');
+  const bytes = readFileSync(artPath);
+  assert.equal(bytes[0], 0x89);
+  assert.equal(bytes.subarray(1, 4).toString('ascii'), 'PNG');
 });
 
 test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and hunt list still show it', () => {

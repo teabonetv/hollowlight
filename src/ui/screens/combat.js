@@ -12,6 +12,7 @@ import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vi
 import { ITEMS_BY_ID } from '../../game/data/items.js';
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemies/index.js';
+import { foePortraitSrc } from '../../game/data/enemies/portraits.js';
 import { bankCount, uniqueStackCount, lanternRoom } from '../../game/systems/bank.js';
 import { buyFromStore, liveBuyUnit } from '../../game/systems/store.js';
 import * as combat from '../../game/systems/combat.js';
@@ -72,7 +73,7 @@ export const COMBAT_360 = {
    * to 90px. Do not grow this toward Melvor's 400px drawer.
    */
   leftoverWellMin: 184,
-  leftoverWellAcc: 22,
+  leftoverWellAcc: 16,
   leftoverWellKit: 44,
   leftoverTileMinW: 56,
   leftoverTileMinH: 103,
@@ -82,9 +83,9 @@ export const COMBAT_360 = {
   leftoverLootInnerGap: 6,
   leftoverActionsGap: 0,
   leftoverActionsMin: 184,
-  /** leftover-live #screen pad-top 1 + gap 0 (fight-live is pad 8 + gap 4).
-   *  1px stolen from pad so leftover-well can hold fightFighter 34. */
-  leftoverLiveStationTop: 106,
+  /** leftover-live #screen pad-top 0 + gap 0 (fight-live is pad 8 + gap 4).
+   *  Pad stolen so leftover-well can hold a 48px Fog-rat + bar-lg. */
+  leftoverLiveStationTop: 105,
   /**
    * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
    * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
@@ -92,22 +93,23 @@ export const COMBAT_360 = {
    */
   leftoverWellLogWrap: 36,
   /**
-   * leftover-well You|foe band. Head + bar-lg 12 + 32px foe tile. Counted
-   * once (side-by-side pair). The old 14px leftoverWellFighter clamp hid
-   * bar-lg behind overflow:hidden.
+   * leftover-well You|foe band. 48px Fog-rat tile beside head + bar-lg.
+   * 34px + overflow:hidden clipped bar-lg to a hairline even at height:12.
+   * FELL kicker stays in the DOM; well chrome does not pay its row.
    */
-  leftoverWellFighter: 34,
+  leftoverWellFighter: 48,
   leftoverWellBar: 12,
-  leftoverWellFoeTile: 32,
+  leftoverWellFoeTile: 48,
+  leftoverWellOil: 12,
   leftoverWellGap: 0,
-  leftoverWellKicker: 11,
+  leftoverWellKicker: 0,
   /**
    * Live unpaid well — same leftover-loot room as post-kill (56px glyphs),
    * not the v54 32px chip strip under Keep hunting.
    */
   fightLoot: 184,
   fightGap: 2,
-  fightFighter: 34, // leftover-well You|foe band: head + bar-lg 12, not leftover's 22
+  fightFighter: 48, // leftover-well You|foe band: 48px rat + bar-lg, not leftover's 22
   fightAcc: 28, // live cockpit pad 2 + chip 26; leftover stays leftoverAcc
   fightOil: 16,
   souls: 32,
@@ -171,7 +173,7 @@ export function cockpitLogVsTab(kind = 'leftover') {
  * kill-log (≥ leftoverWellLogWrap) by compacting leftover chrome —
  * leftover-loot stays ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56,
  * and ≥ the live unpaid well (critic 184). leftover-well You|foe share one
- * fightFighter band so bar-lg and the foe tile fit. leftover-live hides craft-nav so
+ * fightFighter band so a 48px Fog-rat and bar-lg fit. leftover-live hides craft-nav so
  * leftover-loot inherits that 44px as empty floor. .cockpit-fill is
  * display:none in well mode so its gaps cannot tax the portraits.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
@@ -198,13 +200,14 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     // leftover-well log stays readable; leftover-actions is the well only.
     // Hunt another is a sibling under leftover-loot, not inside it.
     // cockpit-fill is display:none. Compact leftover chrome / kicker / gap.
-    // You|foe share one leftoverWellFighter band so bar-lg 12 and the foe
-    // tile fit; leftover-loot stays ≥ leftoverWellMin.
+    // You|foe share one leftoverWellFighter band so the 48px Fog-rat and
+    // bar-lg fit; leftover-loot stays ≥ leftoverWellMin.
     const wrapH = C.leftoverWellLogWrap ?? 36;
     const wellFighterH = C.leftoverWellFighter ?? C.fightFighter ?? fighterH;
     const wellGap = C.leftoverWellGap ?? 0;
     const kickerH = C.leftoverWellKicker ?? C.kicker;
     const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
+    const wellOilH = oilBuy ? (C.oilBuy ?? 44) : (C.leftoverWellOil ?? C.oil);
     const kitH = C.leftoverWellKit ?? C.hand;
     const logBottom = box.logBottom;
     const logTop = logBottom - wrapH;
@@ -212,7 +215,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     y += kickerH + wellGap;
     y += wellFighterH + wellGap;
     y += accH + wellGap;
-    y += oilH + wellGap;
+    y += wellOilH + wellGap;
     const eatTop = y;
     const eatBottom = y + C.eat;
     y = eatBottom + wellGap;
@@ -256,7 +259,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
       glyphTop,
       glyphBottom,
       oilBuy,
-      oilH,
+      oilH: wellOilH,
       fillH: wellH,
       wellH,
       wellMin,
@@ -354,7 +357,7 @@ export function fightLogVsTab({ loot = false } = {}) {
   const wellGap = C.leftoverWellGap ?? 0;
   const fighterH = C.leftoverWellFighter ?? C.fightFighter ?? C.fighter;
   const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
-  const oilH = C.oil;
+  const oilH = C.leftoverWellOil ?? C.oil;
   const kitH = C.leftoverWellKit ?? C.hand;
   const wellMin = C.leftoverWellMin ?? 184;
   const tileMinH = C.leftoverTileMinH ?? 103;
@@ -1148,7 +1151,8 @@ function buildFight(ctx, st, paint) {
     hp: foe.hp,
     max: foe.max,
     fillClass: 'hp-foe',
-    glyph: foeMark(st),
+    portrait: foePortraitSrc(foeIdOf(st)),
+    glyph: foePortraitSrc(foeIdOf(st)) ? null : foeMark(st),
   }));
   wrap.append(pair);
 
@@ -1188,12 +1192,16 @@ function buildFight(ctx, st, paint) {
   return wrap;
 }
 
-/** Geometric filled mark for the cockpit foe tile. No enemy portraits yet. */
+/** Geometric filled mark when a foe has no cockpit PNG. */
 function foeMark(_st) {
   return 'sword';
 }
 
-function fighterBlock({ title, hp, max, fillClass, glyph = null, compact = false }) {
+function foeIdOf(st) {
+  return st.foe?.id ?? st.lastStation?.enemyId ?? null;
+}
+
+function fighterBlock({ title, hp, max, fillClass, glyph = null, portrait = null, compact = false }) {
   const frac = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 0;
   const vitals = el('div', { class: 'fighter-vitals' },
     el('div', { class: 'fighter-head' },
@@ -1201,9 +1209,18 @@ function fighterBlock({ title, hp, max, fillClass, glyph = null, compact = false
       el('span', { class: 'muted fighter-hp' }, `${hp} / ${max}`)),
     el('div', { class: `bar bar-lg hp-bar`, role: 'progressbar', 'aria-label': `${title} vitality` },
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
-  const role = glyph ? 'fighter-foe' : 'fighter-you';
+  const role = (glyph || portrait) ? 'fighter-foe' : 'fighter-you';
   const block = el('div', { class: `fighter ${role}${compact ? ' fighter-compact' : ''}`.trim() });
-  if (glyph) {
+  if (portrait) {
+    block.append(el('span', { class: 'foe-tile foe-art', 'aria-hidden': 'true' },
+      el('img', {
+        src: portrait,
+        alt: '',
+        width: '48',
+        height: '48',
+        decoding: 'async',
+      })));
+  } else if (glyph) {
     block.append(el('span', {
       class: `foe-tile bank-glyph bank-glyph-fill glyph-${glyph}`,
       html: filledIcon(glyph),
