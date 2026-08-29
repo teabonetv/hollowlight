@@ -20,25 +20,27 @@ globalThis.requestAnimationFrame = () => 0;
 try { globalThis.navigator = {}; } catch { /* node ≥21 */ }
 
 const { createState } = await import('../src/game/state.js');
-const { serializeSave, deserializeSave } = await import('../src/core/save.js');
+const { serializeSave, deserializeSave, SAVE_VERSION } = await import('../src/core/save.js');
 const { renderSkillDetail, renderSkillsScreen } = await import('../src/ui/screens/skills.js');
-const { cockpitLogVsTab, leftoverLogVsTab, fightLogVsTab, leftoverHuntRowVs360, lobbyFirstHuntBottom, COMBAT_360 } = await import('../src/ui/screens/combat.js');
+const { cockpitLogVsTab, leftoverLogVsTab, fightLogVsTab, leftoverHuntRowVs360, lobbyFirstHuntBottom, COMBAT_360, unpaidLootTapNote } = await import('../src/ui/screens/combat.js');
 const combat = await import('../src/game/systems/combat.js');
 const runner = await import('../src/game/systems/action-runner.js');
 const { buyFromStore } = await import('../src/game/systems/store.js');
 const { ITEMS } = await import('../src/game/data/items.js');
 const { uniqueStackCount, lanternRoom, canAcceptStack } = await import('../src/game/systems/bank.js');
 const { paintHud } = await import('../src/ui/hud.js');
-const { createItemInspector, inspectorHeldLine } = await import('../src/ui/item-inspector.js');
+const { createItemInspector } = await import('../src/ui/item-inspector.js');
 
 function makeCtx(state) {
   const inspected = [];
   const inspectedOpts = [];
+  const toasts = [];
   return {
     state,
     inspected,
     inspectedOpts,
-    toast() {},
+    toasts,
+    toast(msg, kind) { toasts.push({ msg, kind }); },
     openSkill() {},
     openSkillsList() {},
     actionStatus: (id) => runner.actionStatus(state, id),
@@ -2144,9 +2146,14 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   assert.match(wallet.textContent ?? '', /2 souls|2 soul/);
   assert.match(wallet.textContent ?? '', /✦3/);
   itemTile.click();
-  assert.deepEqual(ctx.inspected, ['fogwort']);
-  assert.equal(ctx.inspectedOpts[0]?.unpaid, true);
-  assert.equal(ctx.inspectedOpts[0]?.trayQty, 1);
+  assert.deepEqual(ctx.inspected, [], 'ungranted leftover tap must not open a sell sheet');
+  assert.equal(ctx.inspectedOpts.length, 0);
+  assert.equal(ctx.toasts.length, 1);
+  assert.equal(ctx.toasts[0].msg, unpaidLootTapNote('Fogwort'));
+  assert.equal(leftover.querySelector('.sell-1-btn'), null);
+  assert.equal(leftover.querySelector('.sell-pin-btn'), null);
+  assert.equal(leftover.querySelector('.sell-lock-btn'), null);
+  assert.equal(leftover.querySelector('.item-inspector-body'), null);
 
   leftover.querySelector('.leftover-hunt').click();
   assert.equal(state.combat.fighting, true);
@@ -2158,43 +2165,98 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   assert.equal(fight.querySelector('.loot-tile.loot-soul'), null);
   assert.equal(fight.querySelector('.loot-tile.loot-lumen'), null);
   liveItem.click();
-  assert.deepEqual(ctx.inspected, ['fogwort', 'fogwort']);
-  assert.equal(ctx.inspectedOpts[1]?.unpaid, true);
-  assert.equal(ctx.inspectedOpts[1]?.trayQty, 1);
+  assert.deepEqual(ctx.inspected, [], 'live unpaid tap must not open a sell sheet');
+  assert.equal(ctx.inspectedOpts.length, 0);
+  assert.equal(ctx.toasts.length, 2);
+  assert.equal(ctx.toasts[1].msg, unpaidLootTapNote('Fogwort'));
+  assert.equal(fight.querySelector('.sell-1-btn'), null);
+  assert.equal(fight.querySelector('.sell-pin-btn'), null);
+  assert.equal(fight.querySelector('.sell-lock-btn'), null);
 });
 
-test('unpaid Fogwort inspect shows tray qty / ungranted, not bank-held as if taken', () => {
+test('unpaid Fogwort tap is a tray note, not a stall; Take all then bank inspect is real', () => {
   const state = createState({ rngSeed: 4 });
-  state.bank.fogwort = 4;
-  const inspector = createItemInspector(makeCtx(state), 'fogwort', {
-    unpaid: true,
-    trayQty: 1,
-  });
-  assert.ok(inspector);
-  const text = inspector.node.textContent ?? '';
-  assert.match(text, /1 in the tray/);
-  assert.match(text, /ungranted/i);
-  assert.doesNotMatch(text, /4 in the bank/);
-  assert.equal(inspectorHeldLine({ unpaid: true, trayQty: 1, bankQty: 4 }), '1 in the tray · ungranted');
-  assert.equal(inspectorHeldLine({ bankQty: 4 }), '4 in the bank');
-  assert.ok(inspector.node.classList.contains('item-inspector-unpaid'));
-  assert.equal(inspector.node.getAttribute('data-inspect-origin'), 'tray');
-  const sell1 = inspector.node.querySelector('.sell-1-btn');
-  assert.ok(sell1);
-  assert.equal(sell1.disabled, true, 'sell stays closed until Take all');
-  assert.ok(sell1.classList.contains('btn-disabled'), 'Sell 1 must not look armed on an ungranted drop');
-  assert.equal(sell1.getAttribute('aria-disabled'), 'true');
-  const confirm = inspector.node.querySelector('.sell-all-btn');
-  assert.match(confirm?.textContent ?? '', /Ungranted|Take all/i);
-  assert.equal(confirm?.getAttribute('aria-disabled'), 'true');
-  inspector.node.querySelector('.sell-pin-btn')?.click();
-  inspector.node.querySelector('.sell-lock-btn')?.click();
-  sell1.click();
-  assert.equal(state.bank.fogwort, 4, 'ungranted inspect must not sell the banked stack');
+  assert.ok(killFoe(state, 'fog-rat'));
+  const wort = (state.combat.lootTray ?? []).find((e) => e.kind === 'item' && e.id === 'fogwort');
+  assert.ok(wort, 'Fog-rat kill must land Fogwort');
+  assert.equal(wort.granted, false);
+  const lumen0 = state.lumen;
+  const souls0 = state.souls;
+  const bank0 = state.bank.fogwort ?? 0;
+
+  const ctx = makeCtx(state);
+  const scr = renderSkillDetail(ctx, 'combat');
+  const leftover = scr.node.querySelector('.leftover-station');
+  assert.ok(leftover?.classList.contains('leftover-well'), 'leftover-as-mode holds');
+  const tile = leftover.querySelector('.loot-tile.loot-item');
+  assert.ok(tile);
+  assert.match(tile.querySelector('.loot-name')?.textContent ?? '', /Fogwort/);
+  tile.click();
+  assert.deepEqual(ctx.inspected, [], 'unpaid Fogwort must not mount a sell sheet');
+  assert.equal(ctx.inspectedOpts.length, 0);
+  assert.equal(ctx.toasts[0]?.msg, unpaidLootTapNote('Fogwort'));
+  assert.match(ctx.toasts[0]?.msg ?? '', /Take all/);
+  const leftoverText = leftover.textContent ?? '';
+  assert.doesNotMatch(leftoverText, /\bSell 1\b/);
+  assert.doesNotMatch(leftoverText, /\bPin\b/);
+  assert.doesNotMatch(leftoverText, /\bLock\b/);
+  assert.equal(leftover.querySelector('.sell-1-btn'), null);
+  assert.equal(leftover.querySelector('.sell-pin-btn'), null);
+  assert.equal(leftover.querySelector('.sell-lock-btn'), null);
+  assert.equal(leftover.querySelector('.item-inspector-unpaid'), null);
+  assert.equal(leftover.querySelector('.item-inspector-body'), null);
+  assert.equal(state.bank.fogwort ?? 0, bank0, 'ungranted tap must not bank or sell the drop');
+
+  const art = leftover.querySelector('.fighter-foe img');
+  assert.ok(art, 'Fog-rat cockpit PNG stays');
+  assert.match(art.getAttribute('src') ?? '', /fog-rat\.png/);
+  assert.ok(leftover.querySelector('.bar.bar-lg'));
+  assert.ok(leftover.querySelector('.acc-station'));
+  assert.ok(leftover.querySelector('.leftover-kit'));
+  assert.match(leftover.querySelector('.eat-pick')?.textContent ?? '', /Lantern-loaf/);
+  assert.ok(leftover.querySelector('.leftover-another'), 'Hunt another stays outside leftover-loot');
+  assert.equal(leftover.querySelector('.leftover-loot')?.querySelector('.leftover-another'), null);
+  assert.equal(leftover.querySelectorAll('.loot-ghost').length, 0);
+  const wallet = leftover.querySelector('.loot-wallet');
+  assert.ok(wallet, 'soul/lumen stay well-head wallet');
+  assert.match(wallet.textContent ?? '', /soul|✦/);
+
+  leftover.querySelector('.leftover-take').click();
+  assert.deepEqual(state.combat.lootTray, []);
+  assert.equal(state.bank.fogwort ?? 0, bank0 + wort.qty);
+  assert.ok(state.lumen > lumen0);
+  assert.ok(state.souls > souls0);
 
   const banked = createItemInspector(makeCtx(state), 'fogwort');
-  assert.match(banked.node.textContent ?? '', /4 in the bank/);
+  assert.ok(banked);
+  assert.match(banked.node.textContent ?? '', /in the bank/);
   assert.doesNotMatch(banked.node.textContent ?? '', /in the tray/);
+  assert.doesNotMatch(banked.node.textContent ?? '', /ungranted/i);
+  assert.equal(banked.node.classList.contains('item-inspector-unpaid'), false);
+  assert.equal(banked.node.getAttribute('data-inspect-origin'), 'bank');
+  const sell1 = banked.node.querySelector('.sell-1-btn');
+  const pin = banked.node.querySelector('.sell-pin-btn');
+  const lock = banked.node.querySelector('.sell-lock-btn');
+  assert.ok(sell1, 'granted inspect is the real bank sheet');
+  assert.ok(pin);
+  assert.ok(lock);
+  assert.equal(sell1.disabled, false);
+  assert.equal(pin.disabled, false);
+  assert.equal(lock.disabled, false);
+
+  const fell = leftoverLogVsTab({ loot: true });
+  const live = fightLogVsTab({ loot: true });
+  assert.ok(COMBAT_360.leftoverWellMin >= 184);
+  assert.ok(COMBAT_360.fightLoot >= 184);
+  assert.equal(COMBAT_360.fightLoot, COMBAT_360.leftoverWellMin);
+  assert.ok(fell.lootH >= 184, `leftover-loot ${fell.lootH}`);
+  assert.ok(live.lootH >= 184, `live leftover-loot ${live.lootH}`);
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  const leftoverBar = [...css.matchAll(/\.leftover-station\.leftover-well\s+\.bar\.bar-lg\s*\{([^}]+)\}/g)]
+    .flatMap((m) => [...m[1].matchAll(/height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(leftoverBar.some((h) => h >= 8), `bar-lg ${leftoverBar.join(',')}`);
+  assert.ok(leftoverBar.every((h) => h >= 8));
+  assert.equal(SAVE_VERSION, 5);
 });
 
 test('Fog-rat kill with a fixed seed always paints an ungranted Fogwort tile', () => {

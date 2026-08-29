@@ -1460,14 +1460,19 @@ function lootTile(entry, ctx) {
       el('span', { class: 'loot-qty' }, spec.qtyLabel)));
 }
 
+/** Honest leftover tap — name the drop and point at Take all. Not a stall card. */
+export function unpaidLootTapNote(name) {
+  return `${name} is still in the tray. Take all to keep it.`;
+}
+
 function inspectLootItem(ctx, spec, entry) {
   if (!spec?.id) return;
-  const opts = {
-    unpaid: entry?.granted === false,
-    trayQty: entry?.qty ?? 0,
-  };
-  if (ctx.openSellSheet) ctx.openSellSheet(spec.id, opts);
-  else if (ctx.inspectLoot) ctx.inspectLoot(spec.id, { name: spec.name, qty: opts.trayQty, unpaid: opts.unpaid });
+  if (entry?.granted === false) {
+    ctx.toast?.(unpaidLootTapNote(spec.name), 'info');
+    return;
+  }
+  if (ctx.openSellSheet) ctx.openSellSheet(spec.id);
+  else if (ctx.inspectLoot) ctx.inspectLoot(spec.id, { name: spec.name, qty: entry?.qty ?? 0 });
   else ctx.toast?.(`${spec.name} ${spec.qtyLabel}`, 'info');
 }
 
