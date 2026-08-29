@@ -435,6 +435,7 @@
   color: var(--gold-hi);
 }
 .leftover-loot {
+  position: relative;
   margin: 0;
   flex: 0 0 auto;
   display: flex;
@@ -982,16 +983,16 @@
 .loot-tile.is-noted {
   box-shadow: inset 0 0 0 2px var(--gold-hi);
 }
-/* One leftover-loot copy. Absolute so the 184px well does not grow.
-   Opacity 1. No HUD toast, no in-tile paragraph. */
+/* In-flow on leftover-loot-chips. Absolute escaped to #app / .screen
+   and read as a HUD toast at y=64 while leftover-loot stayed mute.
+   Opacity 1. No role=status. Tile stays Fogwort ×1. Well stays 184. */
 .loot-unpaid-note {
-  position: absolute;
-  left: 6px;
-  right: 6px;
-  top: 6px;
-  z-index: 4;
+  flex: 1 1 140px;
+  min-width: 120px;
+  max-width: 220px;
+  align-self: center;
   margin: 0;
-  padding: 6px 8px;
+  padding: 8px 10px;
   font-size: 12px;
   line-height: 1.25;
   color: var(--gold-hi);
@@ -1000,6 +1001,14 @@
   border-radius: var(--radius-sm);
   pointer-events: none;
   opacity: 1;
+}
+.leftover-station.leftover-well .leftover-loot:has(.loot-unpaid-note),
+.combat-fight.leftover-well:not(.leftover-station) .leftover-loot:has(.loot-unpaid-note) {
+  overflow: visible;
+}
+.leftover-station.leftover-well .leftover-loot-chips:has(.loot-unpaid-note),
+.combat-fight.leftover-well:not(.leftover-station) .leftover-loot-chips:has(.loot-unpaid-note) {
+  overflow: visible;
 }
 .leftover-loot-chips {
   flex: 1 1 auto;
