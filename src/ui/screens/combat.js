@@ -1480,30 +1480,18 @@ function firstQuery(node, sel) {
 }
 
 /**
- * Leftover unpaid tap must paint in leftover-live / leftover-loot.
- * ctx.toast lands in #toasts (opacity 0 until rAF, above the HUD) — the
- * leftover critic never sees that. Write the note on the well.
+ * One leftover-loot note. Tile keeps a gold ring only, no in-tile
+ * paragraph. HUD toast is a third copy; inspectLootItem must not fire it.
  */
 function paintUnpaidLootNote(tile, spec) {
   const note = unpaidLootTapNote(spec?.name ?? 'Loot');
-  if (tile?.classList) {
-    tile.classList.add('is-noted');
-    let hint = firstQuery(tile, '.loot-unpaid-hint');
-    if (!hint) {
-      hint = el('span', { class: 'loot-unpaid-hint' }, note);
-      tile.append(hint);
-    } else {
-      hint.textContent = note;
-    }
-  }
+  if (tile?.classList) tile.classList.add('is-noted');
   const well = closestClass(tile, 'leftover-loot');
-  const live = closestClass(tile, 'leftover-live') ?? closestClass(tile, 'fight-live');
-  const host = well ?? live;
-  if (!host) return note;
-  let banner = firstQuery(host, '.loot-unpaid-note');
+  if (!well) return note;
+  let banner = firstQuery(well, '.loot-unpaid-note');
   if (!banner) {
     banner = el('p', { class: 'loot-unpaid-note', role: 'status' }, note);
-    host.append(banner);
+    well.append(banner);
   } else {
     banner.textContent = note;
   }
@@ -1513,8 +1501,7 @@ function paintUnpaidLootNote(tile, spec) {
 function inspectLootItem(ctx, spec, entry, tile) {
   if (!spec?.id) return;
   if (entry?.granted === false) {
-    const note = paintUnpaidLootNote(tile, spec);
-    ctx.toast?.(note, 'info');
+    paintUnpaidLootNote(tile, spec);
     return;
   }
   if (ctx.openSellSheet) ctx.openSellSheet(spec.id);
