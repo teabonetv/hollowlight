@@ -102,7 +102,7 @@
   flex-direction: column;
   container-type: size;
 }
-#screen:has(.leftover-live) { padding-top: 2px; }
+#screen:has(.leftover-live) { padding-top: 1px; }
 #screen:has(.fight-live),
 #screen:has(.leftover-live) { overflow: hidden; }
 
@@ -157,9 +157,22 @@
   max-height: 100%;
   overflow: hidden;
 }
-.fighter { display: flex; flex-direction: column; gap: 2px; }
-.fighter-head { display: flex; justify-content: space-between; gap: 8px; }
-.fighter-head strong { font-size: 13px; }
+.fight-pair { display: flex; flex-direction: column; gap: 2px; }
+.fighter { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.fighter-foe { flex-direction: row; align-items: center; gap: 6px; }
+.fighter-vitals { display: flex; flex-direction: column; gap: 2px; flex: 1 1 auto; min-width: 0; }
+.fighter-head { display: flex; justify-content: space-between; gap: 8px; min-width: 0; }
+.fighter-head strong { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.foe-tile {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  max-width: 32px;
+  max-height: 32px;
+}
+.foe-tile svg { width: 24px; height: 24px; }
 .eat-row {
   display: flex;
   flex-direction: column;
@@ -284,10 +297,22 @@
 }
 .leftover-station > * { min-width: 0; }
 .leftover-station .leftover-kicker { line-height: 1.2; }
+.leftover-station .fight-pair { gap: 1px; }
 .leftover-station .fighter { gap: 0; }
+.leftover-station .fighter-vitals { gap: 0; }
 .leftover-station .fighter-head { line-height: 1.15; }
 .leftover-station .fighter-head strong { font-size: 12px; }
 .leftover-station .bar.bar-lg { height: 8px; }
+.leftover-station:not(.leftover-well) .foe-tile {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  max-width: 20px;
+  max-height: 20px;
+}
+.leftover-station:not(.leftover-well) .foe-tile svg { width: 16px; height: 16px; }
 .leftover-station .fight-cockpit { padding: 2px 6px; }
 .leftover-station .acc-station .chip {
   min-height: 22px;
@@ -588,16 +613,33 @@
   max-height: 11px;
   overflow: hidden;
 }
-.leftover-station.leftover-well .fighter {
-  flex: 0 0 14px;
-  min-height: 0;
-  max-height: 14px;
+.leftover-station.leftover-well .fight-pair {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 0 34px;
+  min-height: 34px;
+  max-height: 34px;
   overflow: hidden;
 }
+.leftover-station.leftover-well .fighter {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 34px;
+  overflow: hidden;
+}
+.leftover-station.leftover-well .fighter-vitals { gap: 2px; }
 .leftover-station.leftover-well .fighter-head { line-height: 1; }
 .leftover-station.leftover-well .fighter-head strong,
 .leftover-station.leftover-well .fighter-hp { font-size: 11px; }
-.leftover-station.leftover-well .bar.bar-lg { height: 4px; }
+.leftover-station.leftover-well .bar.bar-lg { height: 12px; }
+.leftover-station.leftover-well .foe-tile {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+}
 .leftover-station.leftover-well .oil-line { font-size: 11px; line-height: 1.1; }
 .leftover-station.leftover-well .oil-line:not(.leftover-oil-row) {
   flex: 0 0 14px;
@@ -730,16 +772,33 @@
   padding: 4px 4px;
   font-size: 11.5px;
 }
-.combat-fight.leftover-well:not(.leftover-station) .fighter {
-  flex: 0 0 14px;
-  min-height: 0;
-  max-height: 14px;
+.combat-fight.leftover-well:not(.leftover-station) .fight-pair {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  flex: 0 0 34px;
+  min-height: 34px;
+  max-height: 34px;
   overflow: hidden;
 }
+.combat-fight.leftover-well:not(.leftover-station) .fighter {
+  flex: 1 1 0;
+  min-height: 0;
+  max-height: 34px;
+  overflow: hidden;
+}
+.combat-fight.leftover-well:not(.leftover-station) .fighter-vitals { gap: 2px; }
 .combat-fight.leftover-well:not(.leftover-station) .fighter-head { line-height: 1; }
 .combat-fight.leftover-well:not(.leftover-station) .fighter-head strong,
 .combat-fight.leftover-well:not(.leftover-station) .fighter-hp { font-size: 11px; }
-.combat-fight.leftover-well:not(.leftover-station) .bar.bar-lg { height: 4px; }
+.combat-fight.leftover-well:not(.leftover-station) .bar.bar-lg { height: 12px; }
+.combat-fight.leftover-well:not(.leftover-station) .foe-tile {
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+}
 .combat-fight.leftover-well:not(.leftover-station) .oil-line { font-size: 11px; line-height: 1.1; }
 .combat-fight.leftover-well:not(.leftover-station) .oil-line:not(.leftover-oil-row) {
   flex: 0 0 14px;
