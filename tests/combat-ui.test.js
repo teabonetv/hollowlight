@@ -1731,6 +1731,97 @@ test('leftover unpaid leftover-loot at 360 cannot be shorter than its portrait t
   assert.ok(live.trayBottom <= 577 - C.tabClearance);
 });
 
+test('360 leftover-well You and Fog-rat bars are 8px+ tracks with a foe tile', () => {
+  const C = COMBAT_360;
+  assert.equal(C.leftoverWellFighter, C.fightFighter, 'leftover-well uses the documented fightFighter band');
+  assert.equal(C.leftoverWellFighter, 34);
+  assert.ok(C.leftoverWellBar >= 8, `bar track ${C.leftoverWellBar}`);
+  assert.equal(C.leftoverWellBar, 12);
+  assert.ok(C.leftoverWellFoeTile >= 32, `foe tile ${C.leftoverWellFoeTile}`);
+  assert.equal(C.leftoverWellMin, 184);
+
+  const leftover = leftoverLogVsTab({ loot: true });
+  assert.ok(leftover.lootH >= C.leftoverWellMin, `leftover-loot ${leftover.lootH}`);
+  assert.ok(leftover.eatBottom < 577, `Eat ${leftover.eatBottom}`);
+  assert.ok(leftover.anotherBottom <= 577 - C.tabClearance, `Hunt another ${leftover.anotherBottom}`);
+  assert.ok(leftover.logBottom <= 577 - C.tabClearance, `log ${leftover.logBottom}`);
+  assert.ok(leftover.fits);
+  const dry = leftoverLogVsTab({ loot: true, oilBuy: true });
+  assert.ok(dry.lootH >= C.leftoverWellMin, `dry leftover-loot ${dry.lootH}`);
+  assert.ok(dry.anotherBottom <= 577 - C.tabClearance);
+  assert.ok(dry.fits);
+
+  const live = fightLogVsTab({ loot: true });
+  assert.ok(live.lootH >= C.leftoverWellMin, `live leftover-loot ${live.lootH}`);
+  assert.ok(live.eatBottom < 577, `Eat ${live.eatBottom}`);
+  assert.ok(live.fleeBottom < 577, `Fall back ${live.fleeBottom}`);
+  assert.ok(live.trayBottom <= 577 - C.tabClearance);
+  assert.ok(live.fits);
+
+  const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
+  const leftoverBar = [...css.matchAll(/\.leftover-station\.leftover-well\s+\.bar\.bar-lg\s*\{([^}]+)\}/g)]
+    .flatMap((m) => [...m[1].matchAll(/height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  const liveBar = [...css.matchAll(/\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.bar\.bar-lg\s*\{([^}]+)\}/g)]
+    .flatMap((m) => [...m[1].matchAll(/height:\s*(\d+)px/g)].map((x) => Number(x[1])));
+  assert.ok(leftoverBar.some((h) => h >= 8), `leftover well bar-lg ${leftoverBar.join(',')}`);
+  assert.ok(liveBar.some((h) => h >= 8), `live well bar-lg ${liveBar.join(',')}`);
+  assert.ok(leftoverBar.every((h) => h >= 8), 'leftover-well cannot ship a 4px hairline bar');
+  assert.ok(liveBar.every((h) => h >= 8), 'live leftover-well cannot ship a 4px hairline bar');
+  assert.doesNotMatch(css, /\.leftover-station\.leftover-well\s+\.fighter\s*\{[^}]*max-height:\s*14px/);
+  assert.doesNotMatch(css, /\.combat-fight\.leftover-well:not\(\.leftover-station\)\s+\.fighter\s*\{[^}]*max-height:\s*14px/);
+  assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.fight-pair\\s*\\{[^}]*max-height:\\s*${C.leftoverWellFighter}px`));
+  assert.match(css, new RegExp(`\\.combat-fight\\.leftover-well:not\\(\\.leftover-station\\)\\s+\\.fight-pair\\s*\\{[^}]*max-height:\\s*${C.leftoverWellFighter}px`));
+  assert.match(css, new RegExp(`\\.leftover-station\\.leftover-well\\s+\\.foe-tile\\s*\\{[^}]*min-height:\\s*${C.leftoverWellFoeTile}px`));
+  assert.match(css, new RegExp(`\\.combat-fight\\.leftover-well:not\\(\\.leftover-station\\)\\s+\\.foe-tile\\s*\\{[^}]*min-height:\\s*${C.leftoverWellFoeTile}px`));
+
+  function assertFoeCockpit(host, { name, leftover }) {
+    const pair = host.querySelector('.fight-pair');
+    assert.ok(pair, 'You|foe sit in one leftover-well band');
+    const you = host.querySelector('.fighter-you');
+    const foe = host.querySelector('.fighter-foe');
+    assert.ok(you, 'You fighter');
+    assert.ok(foe, 'foe fighter');
+    assert.match(you.textContent ?? '', /You/);
+    assert.match(foe.textContent ?? '', new RegExp(name));
+    assert.ok(you.querySelector('.bar.bar-lg.hp-bar'), 'You bar stays bar-lg');
+    assert.ok(foe.querySelector('.bar.bar-lg.hp-bar'), 'Fog-rat bar stays bar-lg');
+    assert.equal(you.querySelector('.foe-tile'), null, 'You is not the foe tile');
+    const tile = foe.querySelector('.foe-tile');
+    assert.ok(tile, 'Fog-rat has a cockpit tile');
+    assert.ok(tile.classList.contains('bank-glyph-fill'));
+    assert.ok(tile.classList.contains('glyph-sword'));
+    assert.match(tile.innerHTML, /<svg/i);
+    assert.match(tile.innerHTML, /fill="currentColor"/);
+    assert.ok(host.querySelector('.eat-btn'));
+    if (leftover) {
+      assert.ok(host.querySelector('.leftover-another'), 'Hunt another stays outside leftover-loot');
+      assert.match(host.querySelector('.leftover-kicker')?.textContent ?? '', /Fog-rat fell/i);
+    } else {
+      assert.match(host.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
+    }
+    assert.ok(host.querySelector('.combat-log'));
+    const well = host.querySelector('.leftover-loot') ?? host.querySelector('.fight-loot');
+    assert.ok(well);
+    assert.ok(well.classList.contains('leftover-loot') || well.classList.contains('fight-loot'));
+  }
+
+  const liveState = createState({ rngSeed: 4 });
+  combat.startFight(liveState, 'fog-rat', { encounterSeed: 1 });
+  const liveScr = renderSkillDetail(makeCtx(liveState), 'combat');
+  const fight = liveScr.node.querySelector('.combat-fight');
+  assert.ok(fight.classList.contains('leftover-well'));
+  assert.equal(fight.classList.contains('leftover-station'), false);
+  assertFoeCockpit(fight, { name: 'Fog-rat', leftover: false });
+
+  const deadState = createState({ rngSeed: 4 });
+  assert.ok(killFoe(deadState, 'fog-rat'));
+  const deadScr = renderSkillDetail(makeCtx(deadState), 'combat');
+  const leftoverHost = deadScr.node.querySelector('.leftover-station');
+  assert.ok(leftoverHost?.classList.contains('leftover-well'));
+  assertFoeCockpit(leftoverHost, { name: 'Fog-rat', leftover: true });
+  assert.match(leftoverHost.querySelector('.loot-tile.loot-item')?.textContent ?? '', /Fogwort/);
+});
+
 test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and hunt list still show it', () => {
   const css = readFileSync(join(here, '../src/ui/combat.css'), 'utf8');
   assert.match(css, /\.screen\.fight-live \.detail-head,\s*\n\.screen\.leftover-live \.detail-head\s*\{[^}]*display:\s*none/);

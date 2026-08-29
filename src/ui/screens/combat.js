@@ -82,15 +82,23 @@ export const COMBAT_360 = {
   leftoverLootInnerGap: 6,
   leftoverActionsGap: 0,
   leftoverActionsMin: 184,
-  /** leftover-live #screen pad-top 2 + gap 0 (fight-live is pad 8 + gap 4). */
-  leftoverLiveStationTop: 107,
+  /** leftover-live #screen pad-top 1 + gap 0 (fight-live is pad 8 + gap 4).
+   *  1px stolen from pad so leftover-well can hold fightFighter 34. */
+  leftoverLiveStationTop: 106,
   /**
    * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
    * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
-   * leftover chrome (fighters / hidden craft-nav / leftover-live pad), not the log.
+   * leftover chrome (oil / keep / gaps / leftover-live pad), not the log.
    */
   leftoverWellLogWrap: 36,
-  leftoverWellFighter: 14,
+  /**
+   * leftover-well You|foe band. Head + bar-lg 12 + 32px foe tile. Counted
+   * once (side-by-side pair). The old 14px leftoverWellFighter clamp hid
+   * bar-lg behind overflow:hidden.
+   */
+  leftoverWellFighter: 34,
+  leftoverWellBar: 12,
+  leftoverWellFoeTile: 32,
   leftoverWellGap: 0,
   leftoverWellKicker: 11,
   /**
@@ -99,7 +107,7 @@ export const COMBAT_360 = {
    */
   fightLoot: 184,
   fightGap: 2,
-  fightFighter: 34, // head + bar-lg 12, not leftover's 22
+  fightFighter: 34, // leftover-well You|foe band: head + bar-lg 12, not leftover's 22
   fightAcc: 28, // live cockpit pad 2 + chip 26; leftover stays leftoverAcc
   fightOil: 16,
   souls: 32,
@@ -162,7 +170,8 @@ export function cockpitLogVsTab(kind = 'leftover') {
  * leftover-loot does not pay its 44px. Unpaid leftover keeps a readable
  * kill-log (≥ leftoverWellLogWrap) by compacting leftover chrome —
  * leftover-loot stays ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56,
- * and ≥ the live unpaid well (critic 184). leftover-live hides craft-nav so
+ * and ≥ the live unpaid well (critic 184). leftover-well You|foe share one
+ * fightFighter band so bar-lg and the foe tile fit. leftover-live hides craft-nav so
  * leftover-loot inherits that 44px as empty floor. .cockpit-fill is
  * display:none in well mode so its gaps cannot tax the portraits.
  * oilBuy: dry leftover paints a 44px stall buy on the oil row.
@@ -188,9 +197,11 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   if (loot) {
     // leftover-well log stays readable; leftover-actions is the well only.
     // Hunt another is a sibling under leftover-loot, not inside it.
-    // cockpit-fill is display:none. Compact leftover fighters / kicker / gap.
+    // cockpit-fill is display:none. Compact leftover chrome / kicker / gap.
+    // You|foe share one leftoverWellFighter band so bar-lg 12 and the foe
+    // tile fit; leftover-loot stays ≥ leftoverWellMin.
     const wrapH = C.leftoverWellLogWrap ?? 36;
-    const wellFighterH = C.leftoverWellFighter ?? fighterH;
+    const wellFighterH = C.leftoverWellFighter ?? C.fightFighter ?? fighterH;
     const wellGap = C.leftoverWellGap ?? 0;
     const kickerH = C.leftoverWellKicker ?? C.kicker;
     const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
@@ -199,7 +210,6 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     const logTop = logBottom - wrapH;
     let y = stationTop;
     y += kickerH + wellGap;
-    y += wellFighterH + wellGap;
     y += wellFighterH + wellGap;
     y += accH + wellGap;
     y += oilH + wellGap;
@@ -327,7 +337,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
  * Hollow, Take all) sitting on the living fight — not a 32px chip strip.
  * Keep hunting stays; it is not the loot furniture. Eat / Fall back stay
  * above tab 577; well bottom ≤ tab−8. Unpaid live borrows leftover-well
- * compact chrome (fighters / Acc / packed kit / 36px log) so the well can
+ * compact chrome (one You|foe band / Acc / packed kit / 36px log) so the well can
  * stay ≥ leftoverWellMin instead of collapsing to a strip to 'fit'.
  */
 export function fightLogVsTab({ loot = false } = {}) {
@@ -342,7 +352,7 @@ export function fightLogVsTab({ loot = false } = {}) {
   const logBottom = box.logBottom;
   const logTop = logBottom - wrapH;
   const wellGap = C.leftoverWellGap ?? 0;
-  const fighterH = C.leftoverWellFighter ?? C.fighter;
+  const fighterH = C.leftoverWellFighter ?? C.fightFighter ?? C.fighter;
   const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
   const oilH = C.oil;
   const kitH = C.leftoverWellKit ?? C.hand;
@@ -353,7 +363,6 @@ export function fightLogVsTab({ loot = false } = {}) {
   const lootInnerGap = C.leftoverLootInnerGap ?? 6;
   const headH = C.leftoverWellHead ?? C.hunt;
   let y = stationTop;
-  y += fighterH + wellGap;
   y += fighterH + wellGap;
   y += accH + wellGap;
   y += oilH + wellGap;
@@ -1127,19 +1136,21 @@ function buildFight(ctx, st, paint) {
   setHidden(kicker, !leftover);
   wrap.append(kicker);
 
-  wrap.append(fighterBlock({
+  const pair = el('div', { class: 'fight-pair' });
+  pair.append(fighterBlock({
     title: 'You',
     hp: st.playerHp,
     max: st.playerMaxHp,
     fillClass: 'hp-you',
   }));
-
-  wrap.append(fighterBlock({
+  pair.append(fighterBlock({
     title: foe.name,
     hp: foe.hp,
     max: foe.max,
     fillClass: 'hp-foe',
+    glyph: foeMark(st),
   }));
+  wrap.append(pair);
 
   wrap.append(accStation(cockpitKit(ctx, st), '', leftover ? {} : {
     you: st.playerNextMs,
@@ -1177,14 +1188,30 @@ function buildFight(ctx, st, paint) {
   return wrap;
 }
 
-function fighterBlock({ title, hp, max, fillClass, compact = false }) {
+/** Geometric filled mark for the cockpit foe tile. No enemy portraits yet. */
+function foeMark(_st) {
+  return 'sword';
+}
+
+function fighterBlock({ title, hp, max, fillClass, glyph = null, compact = false }) {
   const frac = max > 0 ? Math.max(0, Math.min(1, hp / max)) : 0;
-  return el('div', { class: `fighter ${compact ? 'fighter-compact' : ''}`.trim() },
+  const vitals = el('div', { class: 'fighter-vitals' },
     el('div', { class: 'fighter-head' },
       el('strong', {}, title),
       el('span', { class: 'muted fighter-hp' }, `${hp} / ${max}`)),
     el('div', { class: `bar bar-lg hp-bar`, role: 'progressbar', 'aria-label': `${title} vitality` },
       el('span', { class: `bar-fill ${fillClass}`, style: `width:${(frac * 100).toFixed(1)}%` })));
+  const role = glyph ? 'fighter-foe' : 'fighter-you';
+  const block = el('div', { class: `fighter ${role}${compact ? ' fighter-compact' : ''}`.trim() });
+  if (glyph) {
+    block.append(el('span', {
+      class: `foe-tile bank-glyph bank-glyph-fill glyph-${glyph}`,
+      html: filledIcon(glyph),
+      'aria-hidden': 'true',
+    }));
+  }
+  block.append(vitals);
+  return block;
 }
 
 function eatRow(ctx, st, paint) {
