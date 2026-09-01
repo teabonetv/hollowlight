@@ -436,6 +436,7 @@ function boot() {
   const ctx = {
     get state() { return game; },
     toast: (m, t) => toaster.push(m, t),
+    modalRoot,
     actionStatus: (id) => runner.actionStatus(game, id),
     toggleAction(actionId) {
       if (game.actions.active[actionId]) {

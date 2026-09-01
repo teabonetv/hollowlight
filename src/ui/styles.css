@@ -289,7 +289,7 @@ button.pill:active {
   animation: rise 240ms ease-out;
 }
 /* Hunt leftover / live fight already clear the tab via their own cockpit
-   budget (leftover-loot 184, live well 184). Do not steal that room. */
+   budget (satchel chip 44). Do not steal that room. */
 .screen.fight-live,
 .screen.leftover-live {
   padding-bottom: 0;
