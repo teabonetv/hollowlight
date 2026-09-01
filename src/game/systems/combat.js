@@ -13,7 +13,10 @@ import {
   FOG_BITE_DMG, FOG_HIT_MULT, FOG_GRACE_MS, AUTO_EAT_DEFAULT_THRESHOLD, AUTO_BREW_DEFAULT_THRESHOLD,
 } from '../data/combat/consumables.js';
 import { VIGIL_TIERS, VIGIL_TIER_BY_N, VIGIL_CATEGORIES, VIGIL_CATEGORY_BY_ID } from '../data/combat/vigils.js';
-import { ITEMS_BY_ID } from '../data/items.js';
+import { ITEMS, ITEMS_BY_ID } from '../data/items.js';
+import {
+  CHIMNEY_ITEM_ID, SMITH_CHIMNEY_ACTION_ID, WEAR_SLOT_IDS, LANTERN_WEAR,
+} from '../data/wear.js';
 import { formatNoun } from '../../core/format.js';
 import { masteryXpMultiplier } from './action-runner.js';
 import * as bank from './bank.js';
@@ -57,7 +60,8 @@ export function createCombatState() {
     vigils: { current: null, completed: 0, nextTier: 1 },
     kills: {},
     stretchKills: {}, // zoneId -> non-boss kills (guardian stir)
-    equipment: {}, // { weapon: itemId | null } — unset weapon auto-wields starter steel
+    equipment: {}, // { weapon, lantern, head, hands, cloak, tool } — weapon unset auto-wields starter steel
+    wearUnlocked: false, // 2×3 grid after first chimney smithed or equipped
     paused: false,
     dryAnnounced: false,
     foodId: null, // selected eat slot; null = first owned in FOOD_ORDER
@@ -83,6 +87,15 @@ export function ensureCombat(state) {
   if (!c.equipment || typeof c.equipment !== 'object') c.equipment = {};
   if (c.equipment.weapon === undefined) {
     c.equipment.weapon = defaultWeaponId(state);
+  }
+  for (const slot of WEAR_SLOT_IDS) {
+    if (slot === 'weapon') continue;
+    if (c.equipment[slot] === undefined) c.equipment[slot] = null;
+  }
+  if (c.wearUnlocked == null) c.wearUnlocked = false;
+  const freshHunt = !c.fighting && !c.lastStation && Object.keys(c.kills ?? {}).length === 0;
+  if (freshHunt && (c.player.hp == null || c.player.hp === BASE_MAX_HP)) {
+    c.player.hp = playerMaxHp(state);
   }
   if (c.paused == null) c.paused = false;
   if (c.dryAnnounced == null) c.dryAnnounced = false;
@@ -226,9 +239,89 @@ export function playerOffense(state, style) {
     minDmg: w.minDmg,
     maxDmg: w.maxDmg,
     speedMs,
-    accuracy: 8 + 2 * lv + (w.accuracy ?? 0),
+    accuracy: 8 + 2 * lv + (w.accuracy ?? 0) + lanternAccuracyBonus(state),
     avoidance: Math.round(7 + 1.5 * lv),
   };
+}
+
+export function wearGridUnlocked(state) {
+  ensureCombat(state);
+  if (state.combat.wearUnlocked) return true;
+  if ((state.actions?.completed?.[SMITH_CHIMNEY_ACTION_ID] ?? 0) > 0) {
+    state.combat.wearUnlocked = true;
+    return true;
+  }
+  if (state.combat.equipment?.lantern) {
+    state.combat.wearUnlocked = true;
+    return true;
+  }
+  return false;
+}
+
+export function unlockWearGrid(state) {
+  ensureCombat(state);
+  state.combat.wearUnlocked = true;
+}
+
+export function heldSlotItem(state, slot) {
+  ensureCombat(state);
+  const id = state.combat.equipment?.[slot];
+  if (!id) return null;
+  if (bank.bankCount(state.bank, id) <= 0) return null;
+  return ITEMS_BY_ID[id] ?? null;
+}
+
+export function heldLantern(state) {
+  return heldSlotItem(state, 'lantern');
+}
+
+export function ownedWearForSlot(state, slot) {
+  ensureCombat(state);
+  return ITEMS.filter((it) => it.slot === slot && bank.bankCount(state.bank, it.id) > 0);
+}
+
+/**
+ * Equip `itemId` into `slot`. Weapon delegates to equipWeapon (Hand / wick-knife).
+ * Tool never writes combat damage. Lantern unlocks the 2×3 grid.
+ */
+export function equipSlot(state, slot, itemId) {
+  ensureCombat(state);
+  if (slot === 'weapon') return equipWeapon(state, itemId);
+  if (!WEAR_SLOT_IDS.includes(slot)) return { ok: false, error: 'Unknown slot.' };
+  if (itemId == null || itemId === 'empty' || itemId === 'unarmed') {
+    state.combat.equipment[slot] = null;
+    return { ok: true, item: null };
+  }
+  const item = ITEMS_BY_ID[itemId];
+  if (!item || item.slot !== slot) return { ok: false, error: 'That does not fit.' };
+  if (bank.bankCount(state.bank, itemId) <= 0) return { ok: false, error: 'You do not hold that.' };
+  state.combat.equipment[slot] = itemId;
+  if (slot === 'lantern' || itemId === CHIMNEY_ITEM_ID) unlockWearGrid(state);
+  return { ok: true, item };
+}
+
+function lanternWearStats(state) {
+  const item = heldLantern(state);
+  if (!item) return null;
+  return LANTERN_WEAR[item.id] ?? null;
+}
+
+function lanternAccuracyBonus(state) {
+  const stats = lanternWearStats(state);
+  if (!stats?.accuracy) return 0;
+  if (!lanternIsFed(state)) return 0;
+  return stats.accuracy;
+}
+
+export function lanternOilIntervalMs(state, oilId) {
+  const base = OILS[oilId]?.intervalMs ?? OIL_CHECK_MS;
+  const stats = lanternWearStats(state);
+  return Math.round(base * (stats?.oilIntervalMult ?? 1));
+}
+
+export function lanternFogBiteDmg(state) {
+  const stats = lanternWearStats(state);
+  return stats?.fogBiteDmg ?? FOG_BITE_DMG;
 }
 
 /** Stretch preview target, or the live foe when a fight is up. */
@@ -758,7 +851,7 @@ export function consumeOilSip(state) {
     if (bank.bankCount(state.bank, id) > 0) {
       bank.bankPay(state.bank, [{ id, qty: 1 }]);
       state.combat.lanternDry = false;
-      const interval = OILS[id].intervalMs;
+      const interval = lanternOilIntervalMs(state, id);
       pushCombatLog(state, `The lantern drinks ${OILS[id].name}.`, 'oil');
       return interval;
     }
@@ -1039,8 +1132,9 @@ function tickOilAndFog(state, step, rng) {
     c.fogMs -= step;
     if (c.fogMs <= 0) {
       c.fogMs += FOG_BITE_MS;
-      c.player.hp = Math.max(0, c.player.hp - FOG_BITE_DMG);
-      pushCombatLog(state, `The dry lantern fails — fog bites for ${FOG_BITE_DMG}.`, 'fog');
+      const bite = lanternFogBiteDmg(state);
+      c.player.hp = Math.max(0, c.player.hp - bite);
+      pushCombatLog(state, `The dry lantern fails — fog bites for ${bite}.`, 'fog');
       return c.player.hp <= 0;
     }
   } else {

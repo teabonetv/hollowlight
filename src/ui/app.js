@@ -694,6 +694,11 @@ function boot() {
       if (res.ok) afterMutation();
       return res;
     },
+    equipSlot(slot, itemId) {
+      const res = combat.equipSlot(game, slot, itemId);
+      if (res.ok) afterMutation();
+      return res;
+    },
     setCombatAutoContinue(on) {
       combat.ensureCombat(game).autoContinue = !!on;
       afterMutation();

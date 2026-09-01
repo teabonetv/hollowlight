@@ -235,11 +235,11 @@ function assertNoGhostPack(tray) {
   return grid;
 }
 
-test('skills list marks combat live and five skills still future', () => {
+test('skills list marks combat live and four skills still future', () => {
   const scr = renderSkillsScreen(makeCtx(createState({ rngSeed: 1 })));
   const rows = scr.node.querySelectorAll('.skill-row');
   assert.equal(rows.length, 8);
-  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 5);
+  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 4);
 });
 
 test('combat skill detail shows Hearthway hunts, not a coming-soon panel', () => {

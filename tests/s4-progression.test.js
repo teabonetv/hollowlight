@@ -409,7 +409,7 @@ test('LOG completion uses Skills/Mastery/Items/Feats; tab-open feats do not pad 
   assert.ok(tot.pct < 0.08, `headline must stay a small early %, got ${tot.pct}`);
 });
 
-test('practiced mastery 7/1089 prints 0.6%, not 0%, next to Feats', () => {
+test('practiced mastery 7/1188 prints 0.6%, not 0%, next to Feats', () => {
   const s = createState({ nowMs: 0, rngSeed: 9 });
   const tracks = logCategoryStats(s).find((r) => r.id === 'mastery');
   assert.equal(tracks.done, 0);
@@ -421,7 +421,7 @@ test('practiced mastery 7/1089 prints 0.6%, not 0%, next to Feats', () => {
   s.actions.completed['gather-herbs'] = 20;
   const mastery = logCategoryStats(s).find((r) => r.id === 'mastery');
   assert.equal(mastery.done, 7);
-  assert.equal(mastery.total, 1089);
+  assert.equal(mastery.total, 1188);
   assert.equal(formatCompletionPct(mastery.pct), '0.6%');
   assert.notEqual(formatCompletionPct(mastery.pct), '0%');
   assert.equal(formatCompletionPct(0.01), '1%');

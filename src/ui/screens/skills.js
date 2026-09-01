@@ -13,11 +13,16 @@ import { levelProgress } from '../../core/xp.js';
 import { formatNumber, formatSeconds } from '../../core/format.js';
 import { bankCount } from '../../game/systems/bank.js';
 
-/** Live crafts first (Emberkeeping, Foraging, Combat), then later waves. */
+/** A craft is playable when Wave 0, or when it already has a live action. */
+export function skillIsPlayable(skill) {
+  return skill.wave === 0 || actionsForSkill(skill.id).length > 0;
+}
+
+/** Live crafts first (Emberkeeping, Foraging, Smithing, Combat), then later waves. */
 export function craftNavSkills() {
   return [
-    ...SKILLS.filter((s) => s.wave === 0),
-    ...SKILLS.filter((s) => s.wave !== 0),
+    ...SKILLS.filter((s) => skillIsPlayable(s)),
+    ...SKILLS.filter((s) => !skillIsPlayable(s)),
   ];
 }
 
@@ -48,7 +53,7 @@ export function renderSkillsScreen(ctx) {
   for (const s of SKILLS) {
     const sk = state.skills[s.id];
     const prog = levelProgress(sk.xp);
-    const live = s.wave === 0;
+    const live = skillIsPlayable(s);
     const running = s.id === 'combat'
       ? !!state.combat?.fighting
       : actionsForSkill(s.id).some((a) => state.actions.active[a.id]);
@@ -84,7 +89,7 @@ export function renderSkillsScreen(ctx) {
 export function renderSkillDetail(ctx, skillId) {
   const skill = SKILL_BY_ID[skillId];
   const sk = ctx.state.skills[skillId];
-  const live = skill.wave === 0;
+  const live = skillIsPlayable(skill);
 
   const fighting = skillId === 'combat' && !!ctx.state.combat?.fighting;
   const leftover = skillId === 'combat' && !fighting && !!ctx.state.combat?.lastStation;

@@ -38,8 +38,8 @@ test('skills list renders all eight registry rows', () => {
   const scr = renderSkillsScreen(makeCtx(state));
   const rows = scr.node.querySelectorAll('.skill-row');
   assert.equal(rows.length, 8, 'one row per charter skill');
-  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 5,
-    'five skills marked future once combat is live');
+  assert.equal(rows.filter((r) => r.matchesSelector('.skill-row-future')).length, 4,
+    'four skills marked future once smithing is live');
 });
 
 test('playable skill detail renders action cards with live controls', () => {

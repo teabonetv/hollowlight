@@ -83,6 +83,25 @@ export const ACTIONS = [
     xp: 22,
     masteryXp: 16,
   },
+
+  // ── Smithing ──────────────────────────────────────────────────
+  {
+    id: 'smith-chimney',
+    skill: 'smithing',
+    name: 'Smith a Chimney',
+    desc: 'Heat tinderscrap and grave-resin until glass will hold a still flame. The first chimney the lantern can wear.',
+    unlockLevel: 1,
+    durationMs: 8000,
+    costs: [
+      { id: 'tinderscrap', qty: 2 },
+      { id: 'graveresin', qty: 1 },
+    ],
+    outputs: [
+      { kind: 'item', id: 'glass-chimney', min: 1, max: 1 },
+    ],
+    xp: 22,
+    masteryXp: 16,
+  },
 ];
 
 export const ACTIONS_BY_ID = Object.fromEntries(ACTIONS.map((a) => [a.id, a]));
