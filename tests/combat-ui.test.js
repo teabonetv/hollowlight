@@ -1217,7 +1217,7 @@ test('ungranted leftover chips paint on the next live fight; kill still does not
   const state = createState({ rngSeed: 4 });
   const lumen0 = state.lumen;
   const souls0 = state.souls;
-  combat.startFight(state, 'pale-moth', { encounterSeed: 1 });
+  combat.startFight(state, 'fog-rat', { encounterSeed: 1 });
   const first = renderSkillDetail(makeCtx(state), 'combat');
   assertNoSatchel(first.node.querySelector('.combat-fight'));
   assert.equal(leftoverTake(first.node), null, 'empty live fight has no Take all');

@@ -956,7 +956,7 @@ test('v5 hydrate unions lootTray without a SAVE_VERSION bump', () => {
 test('v5 hydrate keeps pending tray loot ungranted across reload', () => {
   const s = createState({ rngSeed: 4 });
   const snap = walletSnap(s);
-  assert.ok(killPaleMoth(s, 1));
+  assert.ok(killFogRat(s, 1));
   const pile = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
   assert.ok(pile.every((e) => e.granted === false));
   assertWalletUnchanged(s, snap);

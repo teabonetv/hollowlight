@@ -153,12 +153,15 @@ test('Take all still grants named Fogwort and hides the empty satchel', () => {
   assert.equal(state.bank.fogwort ?? 0, bank0 + 1);
   assert.ok(state.lumen > lumen0);
   assert.ok(state.souls > souls0);
-  leftover.querySelector('.satchel-chip')?.click();
   assert.equal(HuntSatchel.unpaidCount(combat.combatStatus(state), ctx), 0);
-  const chip = leftover.querySelector('.satchel-chip');
+  const after = scr.node.querySelector('.leftover-station') ?? scr.node.querySelector('.combat-fight');
+  const chip = after?.querySelector('.satchel-chip');
   if (chip) {
-    assert.equal(chip.getAttribute('hidden') != null || chip.classList.contains('is-empty'), true);
+    assert.equal(chip.getAttribute('hidden') != null || chip.classList.contains('is-empty'), true,
+      'empty named satchel hides after Take all');
   }
+  chip?.click();
+  assert.equal(satchelSheet(ctx), null, 'empty satchel does not open a sheet of nothing');
 });
 
 test('wallet-only tray without a kill still settles and does not count as n', () => {
