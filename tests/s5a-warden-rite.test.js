@@ -171,7 +171,7 @@ test('Hunt road lists Hearthway and Ashfen only; Ashfen hunts appear after the r
 
   const s = createState({ nowMs: 0, rngSeed: 19 });
   const before = renderCombatPanel(makeCtx(s));
-  const chips = before.node.querySelectorAll('.zone-chips .chip-btn');
+  const chips = before.node.querySelectorAll('[data-zone]');
   assert.equal(chips.length, 2);
   const ashChip = chips.find((c) => c.getAttribute('data-zone') === 'ashfen');
   assert.ok(ashChip);

@@ -420,6 +420,13 @@ function buildWardenRiteCard(ctx) {
     class: 'btn btn-primary btn-wide',
     type: 'button',
     'data-rite': 'warden',
+    onclick: () => {
+      if (isAshfenReachable(ctx.state)) {
+        ctx.travelToSettlement?.('ashfen');
+        return;
+      }
+      if (canPerformWardenRite(ctx.state).ok) ctx.performWardenRite?.();
+    },
   });
 
   function paint() {
@@ -440,13 +447,6 @@ function buildWardenRiteCard(ctx) {
         }, c.id === 'lumen' ? `✦${c.qty}` : `${c.name} ×${c.qty}`));
       }
     }
-    riteBtn.onclick = () => {
-      if (done) {
-        ctx.travelToSettlement?.('ashfen');
-        return;
-      }
-      ctx.performWardenRite?.();
-    };
     if (done) {
       riteBtn.textContent = 'Walk to Ashfen';
       riteBtn.className = 'btn btn-primary btn-wide';
