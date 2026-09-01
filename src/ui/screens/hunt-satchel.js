@@ -252,11 +252,20 @@ export class HuntSatchel {
     if (!HuntSatchel.showChip(st, ctx)) return null;
     const mount = HuntSatchel.modalMount(ctx);
     if (!mount) return null;
-    const body = HuntSatchel.buildBody(ctx, st);
+    let body = HuntSatchel.buildBody(ctx, st);
     let ref = null;
     const take = HuntSatchel.takeAllBtn(ctx, paint, {
       onTaken: (res) => {
-        if (res?.blocked) return;
+        if (res?.blocked) {
+          const next = HuntSatchel.buildBody(ctx, combat.combatStatus(ctx.state));
+          const holder = body.parentNode;
+          if (holder) {
+            holder.removeChild(body);
+            holder.append(next);
+            body = next;
+          }
+          return;
+        }
         ref?.close();
         if (mount) clear(mount);
       },
