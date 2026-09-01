@@ -43,19 +43,26 @@ test('track data validates: three tracks, six tiers, ascending ~geometric costs'
     assert.equal(t.tiers.length, 6, `${t.id}: six tiers`);
     for (let i = 1; i < t.tiers.length; i++) {
       const ratio = t.tiers[i].lumen / t.tiers[i - 1].lumen;
-      // Hunt spend: Wick 1–2 are cheap lamp-oil gates (8, 16), then the
+      // Hunt spend: Wick 1–2 are cheap lumen gates (8, 16), then the
       // original curve resumes at 200. That 16→200 step is outside ×2.0–2.9.
       if (t.id === 'lantern-wick' && i === 2) {
-        assert.ok(ratio > 2.9, `${t.id}: tier ${i} jumps after the lamp-oil gates`);
+        assert.ok(ratio > 2.9, `${t.id}: tier ${i} jumps after the early wick gates`);
         continue;
       }
       assert.ok(ratio >= 2.0 && ratio <= 2.9,
         `${t.id}: tier ${i} ratio ${ratio.toFixed(2)} outside 2.0–2.9`);
     }
-    // Every tier costs MATERIALS too — goods must be sinks, not just Lumen.
+    // Every later tier costs MATERIALS too — goods must be sinks, not just
+    // Lumen. Wick 0–1 are lumen-only so Hunt keeps the pressed flask.
     for (const [i, tier] of t.tiers.entries()) {
-      assert.ok(tier.items && Object.keys(tier.items).length >= 1,
-        `${t.id}: tier ${i} must include material costs`);
+      const lumenOnlyWick = t.id === 'lantern-wick' && i < 2;
+      if (lumenOnlyWick) {
+        assert.equal(Object.keys(tier.items ?? {}).length, 0,
+          `${t.id}: tier ${i} must omit material costs`);
+      } else {
+        assert.ok(tier.items && Object.keys(tier.items).length >= 1,
+          `${t.id}: tier ${i} must include material costs`);
+      }
       assert.ok(tier.name && tier.flavor, `${t.id}: tier ${i} needs name + flavor`);
     }
   }
@@ -86,22 +93,24 @@ test('buying a tier pays Lumen AND materials atomically and levels the track', (
 test('failed buys leave state untouched — no partial payments ever', () => {
   const s = createState({ rngSeed: 2 });
 
-  // Not enough Lumen (materials present).
+  // Not enough Lumen (wick 0 is lumen-only).
   const tier = TRACKS_BY_ID['lantern-wick'].tiers[0];
-  for (const [id, qty] of Object.entries(tier.items)) s.bank[id] = (s.bank[id] ?? 0) + qty;
+  for (const [id, qty] of Object.entries(tier.items ?? {})) s.bank[id] = (s.bank[id] ?? 0) + qty;
   s.lumen = tier.lumen - 1;
   assert.equal(buyUpgrade(s, 'lantern-wick').ok, false);
   assert.equal(s.lumen, tier.lumen - 1, 'lumen untouched');
   assert.equal(upgradeLevel(s, 'lantern-wick'), 0);
 
-  // Enough Lumen, short on a material.
+  // Enough Lumen, short on a material (later wick still costs goods).
+  const goods = TRACKS_BY_ID['lantern-wick'].tiers[2];
+  s.campUpgrades = { 'lantern-wick': 2 };
   s.lumen = 10_000;
-  delete s.bank[tinderKey(tier)];
+  delete s.bank[tinderKey(goods)];
   assert.equal(buyUpgrade(s, 'lantern-wick').ok, false);
   assert.equal(s.lumen, 10_000, 'lumen untouched when materials are short');
-  assert.equal(upgradeLevel(s, 'lantern-wick'), 0);
+  assert.equal(upgradeLevel(s, 'lantern-wick'), 2);
 
-  function tinderKey(t) { return Object.keys(t.items)[0]; }
+  function tinderKey(t) { return Object.keys(t.items ?? {})[0]; }
 });
 
 test('upgradeNeedLabel names Lumen or the missing stack — never a generic lie', () => {

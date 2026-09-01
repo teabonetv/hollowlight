@@ -26,9 +26,9 @@ export const TRACKS = [
     perTier: 0.05, cap: 0.30, // +5%/tier, hard-capped at +30%
     tiers: [
       { name: 'Scraped Wicks', flavor: 'Splinters of dead lanterns, twisted into a wick. The pressed oil feeds the first strike.',
-        lumen: 8, items: { 'lamp-oil': 1 } },
+        lumen: 8 },
       { name: 'Fogwort Dressing', flavor: 'Herb-oil worked into the braid. It burns green for a heartbeat, then clean.',
-        lumen: 16, items: { 'lamp-oil': 1 } },
+        lumen: 16 },
       { name: 'Moss-packed Core', flavor: 'Bog-moss holds the flame like a secret. Slow to catch, loath to die.',
         lumen: 200, items: { bogmoss: 12, tinderscrap: 15 } },
       { name: 'Pale-cap Mantle', flavor: 'Fungus-fibre woven to a mantle that glows faintly even unlit.',

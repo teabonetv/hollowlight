@@ -1,5 +1,5 @@
-// S1ak: Hunt spend is Lamp-oil. Lantern & Wick first two tiers
-// consume pressed oil; wick-knife blow clock follows speedMultiplier.
+// S1ak/S1al: Lantern & Wick first two tiers are lumen-only (8 / 16).
+// Wick speed spend must not steal Lamp-oil. Clock follows speedMultiplier.
 // SAVE_VERSION stays 5. No new track / recipe / item.
 
 import { test } from 'node:test';
@@ -25,13 +25,13 @@ test('SAVE_VERSION stays 5; wick lumen stays strictly ascending', () => {
   assert.deepEqual(lumens.slice(2), [200, 450, 1000, 2200]);
 });
 
-test('fresh camp: 1 lamp-oil + lumen 8 buys Scraped Wicks; wick-knife clock is 2.1s', () => {
+test('fresh camp: lumen 8 buys Scraped Wicks; wick-knife clock is 2.1s', () => {
   const s = createState({ rngSeed: 1 });
   s.campUpgrades = {};
   s.lumen = 8;
-  s.bank['lamp-oil'] = 1;
   const tier = wickTier(0);
   assert.equal(tier.name, 'Scraped Wicks');
+  assert.deepEqual(tier.items ?? {}, {});
   assert.equal(canAffordUpgrade(s, tier), true);
   assert.equal(buyUpgrade(s, 'lantern-wick').ok, true);
   const speedMs = playerOffense(s, 'strike').speedMs;
@@ -39,13 +39,13 @@ test('fresh camp: 1 lamp-oil + lumen 8 buys Scraped Wicks; wick-knife clock is 2
   assert.equal(formatSeconds(speedMs), '2.1s');
 });
 
-test('wick I: 1 lamp-oil + lumen 16 buys Fogwort Dressing; clock is 2.0s', () => {
+test('wick I: lumen 16 buys Fogwort Dressing; clock is 2.0s', () => {
   const s = createState({ rngSeed: 1 });
   s.campUpgrades = { 'lantern-wick': 1 };
   s.lumen = 16;
-  s.bank['lamp-oil'] = 1;
   const tier = wickTier(1);
   assert.equal(tier.name, 'Fogwort Dressing');
+  assert.deepEqual(tier.items ?? {}, {});
   assert.equal(canAffordUpgrade(s, tier), true);
   assert.equal(buyUpgrade(s, 'lantern-wick').ok, true);
   const speedMs = playerOffense(s, 'strike').speedMs;
@@ -53,22 +53,22 @@ test('wick I: 1 lamp-oil + lumen 16 buys Fogwort Dressing; clock is 2.0s', () =>
   assert.equal(formatSeconds(speedMs), '2.0s');
 });
 
-test('same states without lamp-oil: unaffordable; Need names Lamp-oil not a lumen lie', () => {
+test('unaffordable Need names lumen, not a materials lie', () => {
   const fresh = createState({ rngSeed: 1 });
   fresh.campUpgrades = {};
-  fresh.lumen = 8;
+  fresh.lumen = 7;
   delete fresh.bank['lamp-oil'];
   const t0 = wickTier(0);
   assert.equal(canAffordUpgrade(fresh, t0), false);
-  assert.equal(upgradeNeedLabel(fresh, t0), 'Need Lamp-oil ×1');
-  assert.doesNotMatch(upgradeNeedLabel(fresh, t0), /Need ✦/);
+  assert.equal(upgradeNeedLabel(fresh, t0), 'Need ✦8');
+  assert.doesNotMatch(upgradeNeedLabel(fresh, t0), /Lamp-oil/);
 
   const owned = createState({ rngSeed: 2 });
   owned.campUpgrades = { 'lantern-wick': 1 };
-  owned.lumen = 16;
+  owned.lumen = 15;
   delete owned.bank['lamp-oil'];
   const t1 = wickTier(1);
   assert.equal(canAffordUpgrade(owned, t1), false);
-  assert.equal(upgradeNeedLabel(owned, t1), 'Need Lamp-oil ×1');
-  assert.doesNotMatch(upgradeNeedLabel(owned, t1), /Need ✦/);
+  assert.equal(upgradeNeedLabel(owned, t1), 'Need ✦16');
+  assert.doesNotMatch(upgradeNeedLabel(owned, t1), /Lamp-oil/);
 });
