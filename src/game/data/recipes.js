@@ -1,11 +1,14 @@
-// Camp hearth crafts — one live recipe. Chandlercraft’s later lattice is
+// Camp hearth crafts — two live recipes. Chandlercraft’s later lattice is
 // not this table. Shape consumed by systems/craft.js:
 //   { id, name, flavor, costs:{ itemId: qty }, output:{ id, qty } }
 
 import { ITEMS_BY_ID } from './items.js';
 
-/** Hunt Fog-rat always drops Fogwort; this press is the one live close. */
+/** Hunt Fog-rat always drops Fogwort; this press is the first live close. */
 export const PRESS_LAMP_OIL_ID = 'press-lamp-oil';
+
+/** Fogwort + Pale-cap + Tinderscrap. Instant atomic pay; fills the HEAD slot. */
+export const STITCH_FOG_HOOD_ID = 'stitch-fog-hood';
 
 export const RECIPES = [
   {
@@ -14,6 +17,13 @@ export const RECIPES = [
     flavor: 'Fogwort crushed at the hearth. The lantern drinks twice as long as wick-oil.',
     costs: { fogwort: 2 },
     output: { id: 'lamp-oil', qty: 1 },
+  },
+  {
+    id: STITCH_FOG_HOOD_ID,
+    name: 'Stitch Fog-hood',
+    flavor: 'Linen boiled in Pale-cap, bound with Fogwort and dry scrap. The fog mistakes you for kin.',
+    costs: { fogwort: 1, palecap: 1, tinderscrap: 1 },
+    output: { id: 'fog-hood', qty: 1 },
   },
 ];
 
