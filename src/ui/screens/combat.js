@@ -13,9 +13,12 @@ import { ITEMS_BY_ID } from '../../game/data/items.js';
 import { itemGlyph } from '../../game/data/item-glyphs.js';
 import { enemiesInZone, bossOfZone, ENEMIES_BY_ID } from '../../game/data/enemies/index.js';
 import { foePortraitSrc } from '../../game/data/enemies/portraits.js';
-import { bankCount, uniqueStackCount, lanternRoom } from '../../game/systems/bank.js';
+import { bankCount } from '../../game/systems/bank.js';
 import { buyFromStore, liveBuyUnit } from '../../game/systems/store.js';
 import * as combat from '../../game/systems/combat.js';
+import { HuntSatchel } from './hunt-satchel.js';
+
+export { HuntSatchel };
 
 /**
  * 360×640 fight / leftover budget. Must stay in lockstep with combat.css:
@@ -59,20 +62,8 @@ export const COMBAT_360 = {
   fightKeep: 32,
   hunt: 44,
   loot: 44,
-  /**
-   * Leftover unpaid leftover-loot box (not leftover-actions). Header 44 +
-   * pad 12 + gap 6 + 103px bank-item portrait (56px glyph + name + qty).
-   * Soul / lumen sit as compact wallet in the well head — not 103px
-   * loot-tiles. Acc / leftover-kit stay on unpaid leftover. leftover-well
-   * packs Knife + styles into one 44px band so leftover-loot can spend its
-   * empty floor (live critic 184 vs leftover 167) instead of collapsing
-   * chrome. Empty well keeps Hollow + Take all; the grid has no fake
-   * slots. Hunt another is a sibling under leftover-actions — not
-   * inside leftover-loot — so leftover-loot can match the live well.
-   * S1s 140 was leftover-actions; leftover-loot then lost the flex race
-   * to 90px. Do not grow this toward Melvor's 400px drawer.
-   */
-  leftoverWellMin: 184,
+  /** Compact Hunt satchel chip on live + leftover. Not a 184px leftover-well. */
+  satchelChip: 44,
   leftoverWellAcc: 16,
   leftoverWellKit: 44,
   leftoverTileMinW: 56,
@@ -82,34 +73,20 @@ export const COMBAT_360 = {
   leftoverLootPad: 6,
   leftoverLootInnerGap: 6,
   leftoverActionsGap: 0,
-  leftoverActionsMin: 184,
-  /** leftover-live #screen pad-top 0 + gap 0 (fight-live is pad 8 + gap 4).
-   *  Pad stolen so leftover-well can hold a 48px Fog-rat + bar-lg. */
+  leftoverActionsMin: 44,
+  /** leftover-live #screen pad-top 0 (fight-live is pad 8). */
   leftoverLiveStationTop: 105,
-  /**
-   * Unpaid leftover kill-log. One wrapping .log-line (12px × 1.2 × 2 = 28.8)
-   * plus pad. Must not shrink: leftover-loot holds 56px portraits by stealing
-   * leftover chrome (oil / keep / gaps / leftover-live pad), not the log.
-   */
   leftoverWellLogWrap: 36,
-  /**
-   * leftover-well You|foe band. 48px Fog-rat tile beside head + bar-lg.
-   * 34px + overflow:hidden clipped bar-lg to a hairline even at height:12.
-   * FELL kicker stays in the DOM; well chrome does not pay its row.
-   */
   leftoverWellFighter: 48,
   leftoverWellBar: 12,
   leftoverWellFoeTile: 48,
   leftoverWellOil: 12,
   leftoverWellGap: 0,
   leftoverWellKicker: 0,
-  /**
-   * Live unpaid well — same leftover-loot room as post-kill (56px glyphs),
-   * not the v54 32px chip strip under Keep hunting.
-   */
-  fightLoot: 184,
+  /** Live unpaid loot furniture is the satchel chip, not leftover-well 184. */
+  fightLoot: 44,
   fightGap: 2,
-  fightFighter: 48, // leftover-well You|foe band: 48px rat + bar-lg, not leftover's 22
+  fightFighter: 48,
   fightAcc: 28, // live cockpit pad 2 + chip 26; leftover stays leftoverAcc
   fightOil: 16,
   souls: 32,
@@ -163,21 +140,11 @@ export function cockpitLogVsTab(kind = 'leftover') {
 }
 
 /**
- * Leftover 360 geometry after kill (loot well) or Fall back (no pile).
- * leftover-station is height-capped to the hub. Unpaid leftover keeps Acc /
- * Knife / styles (Melvor loot lives with the fight) and spends leftover-loot
- * empty floor on that chrome so leftover is still a room, not a 90px
- * overflow:hidden drawer. lootH is leftover-loot (header + portraits), not
- * leftover-actions. Hunt another sits under leftover-actions as a sibling —
- * leftover-loot does not pay its 44px. Unpaid leftover keeps a readable
- * kill-log (≥ leftoverWellLogWrap) by compacting leftover chrome —
- * leftover-loot stays ≥ leftoverWellMin ≥ leftoverTileMinH, glyphs 56,
- * and ≥ the live unpaid well (critic 184). leftover-well You|foe share one
- * fightFighter band so a 48px Fog-rat and bar-lg fit. leftover-live hides craft-nav so
- * leftover-loot inherits that 44px as empty floor. .cockpit-fill is
- * display:none in well mode so its gaps cannot tax the portraits.
- * oilBuy: dry leftover paints a 44px stall buy on the oil row.
- * No-loot leftover-actions stays a 44px Hunt another row.
+ * Leftover 360 geometry after kill. Unpaid leftover keeps Acc / Knife / styles
+ * on the fight cockpit (leftover-as-mode). Loot furniture is a 44px satchel
+ * chip — named tiles live in the satchel sheet, not a 184px leftover-well.
+ * Hunt another sits under leftover-actions. oilBuy: dry leftover paints a
+ * 44px stall buy on the oil row. Empty leftover hides the chip.
  */
 export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const C = COMBAT_360;
@@ -187,63 +154,36 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
   const fighterH = C.leftoverFighter ?? C.fighter;
   const gap = C.leftoverGap ?? C.gap;
   const clearance = C.tabClearance ?? 8;
-  const wellMin = C.leftoverWellMin ?? 184;
-  const headH = C.leftoverWellHead ?? C.hunt;
-  const actionsGap = C.leftoverActionsGap ?? 0;
+  const chipH = C.satchelChip ?? C.fightLoot ?? 44;
   const tileMinH = C.leftoverTileMinH ?? 103;
   const glyphH = C.leftoverGlyph ?? 56;
-  const lootPad = C.leftoverLootPad ?? 6;
-  const lootInnerGap = C.leftoverLootInnerGap ?? 6;
-  const actionsMin = C.leftoverActionsMin ?? wellMin;
+  const actionsMin = C.leftoverActionsMin ?? chipH;
 
   if (loot) {
-    // leftover-well log stays readable; leftover-actions is the well only.
-    // Hunt another is a sibling under leftover-loot, not inside it.
-    // cockpit-fill is display:none. Compact leftover chrome / kicker / gap.
-    // You|foe share one leftoverWellFighter band so the 48px Fog-rat and
-    // bar-lg fit; leftover-loot stays ≥ leftoverWellMin.
-    const wrapH = C.leftoverWellLogWrap ?? 36;
-    const wellFighterH = C.leftoverWellFighter ?? C.fightFighter ?? fighterH;
-    const wellGap = C.leftoverWellGap ?? 0;
-    const kickerH = C.leftoverWellKicker ?? C.kicker;
-    const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
-    const wellOilH = oilBuy ? (C.oilBuy ?? 44) : (C.leftoverWellOil ?? C.oil);
-    const kitH = C.leftoverWellKit ?? C.hand;
+    const wrapH = C.logWrapLeftover ?? 100;
+    const accH = C.leftoverAcc ?? C.acc;
     const logBottom = box.logBottom;
     const logTop = logBottom - wrapH;
     let y = stationTop;
-    y += kickerH + wellGap;
-    y += wellFighterH + wellGap;
-    y += accH + wellGap;
-    y += wellOilH + wellGap;
+    y += C.kicker + gap;
+    y += fighterH + gap;
+    y += fighterH + gap;
+    y += accH + gap;
+    y += oilH + gap;
     const eatTop = y;
     const eatBottom = y + C.eat;
-    y = eatBottom + wellGap;
-    y += kitH + wellGap;
+    y = eatBottom + gap;
+    y += C.hand + gap;
+    y += C.styles + gap;
     const lootTop = y;
-    const anotherBottom = logTop - wellGap;
-    const anotherTop = anotherBottom - C.hunt;
-    const lootBottom = anotherTop - actionsGap;
-    const lootH = lootBottom - lootTop;
-    const wellTop = lootTop;
-    const wellBottom = lootBottom;
-    const wellH = lootH;
-    const takeTop = lootTop + lootPad;
-    const takeBottom = takeTop + headH;
-    const tileTop = takeBottom + lootInnerGap;
-    const tileBottom = tileTop + tileMinH;
-    const glyphTop = tileTop + 8;
-    const glyphBottom = glyphTop + glyphH;
-    const wellClears = wellBottom <= box.tabTop - clearance
+    const lootBottom = y + chipH;
+    y = lootBottom + gap;
+    const anotherTop = y;
+    const anotherBottom = y + C.hunt;
+    const lootH = chipH;
+    const chipClears = lootBottom <= box.tabTop - clearance
       && anotherBottom <= box.tabTop - clearance
-      && takeBottom <= box.tabTop - clearance
-      && lootBottom <= box.tabTop - clearance
       && anotherTop >= lootBottom;
-    const portraitsFit = lootH >= wellMin
-      && lootH >= tileMinH
-      && tileBottom <= lootBottom
-      && glyphBottom <= lootBottom
-      && glyphH >= 56;
     return {
       ...box,
       wrapH,
@@ -252,34 +192,33 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
       lootH,
       lootTop,
       lootBottom,
-      tileTop,
-      tileBottom,
+      tileTop: null,
+      tileBottom: null,
       tileH: tileMinH,
       glyphH,
-      glyphTop,
-      glyphBottom,
+      glyphTop: null,
+      glyphBottom: null,
       oilBuy,
-      oilH: wellOilH,
-      fillH: wellH,
-      wellH,
-      wellMin,
-      wellTop,
-      wellBottom,
-      wellGap: box.tabTop - wellBottom,
+      oilH,
+      fillH: Math.max(0, logTop - anotherBottom),
+      wellH: lootH,
+      wellMin: chipH,
+      wellTop: lootTop,
+      wellBottom: lootBottom,
+      wellGap: box.tabTop - lootBottom,
       actionsMin,
       stationTop,
       stationBottom: box.logBottom,
       eatTop,
       eatBottom,
-      takeTop,
-      takeBottom,
+      takeTop: lootTop,
+      takeBottom: lootBottom,
       anotherTop,
       anotherBottom,
       clearance,
-      // Portraits and a readable leftover kill-log both sit above tab−8.
-      fits: portraitsFit && wellClears && logBottom <= box.tabTop - clearance
-        && wrapH >= 36 && eatBottom < box.tabTop && wellH >= actionsMin
-        && anotherTop >= lootBottom && lootH >= wellMin,
+      fits: chipClears && logBottom <= box.tabTop - clearance
+        && wrapH >= 36 && eatBottom < box.tabTop
+        && lootH === chipH && lootH < 80,
     };
   }
 
@@ -316,7 +255,7 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
     oilH,
     fillH,
     wellH: 0,
-    wellMin,
+    wellMin: chipH,
     wellTop: null,
     wellBottom: null,
     wellGap: null,
@@ -336,59 +275,41 @@ export function leftoverLogVsTab({ loot = true, oilBuy = false } = {}) {
 }
 
 /**
- * Live 360 fight geometry. Unpaid loot is the leftover well (56px glyphs,
- * Hollow, Take all) sitting on the living fight — not a 32px chip strip.
- * Keep hunting stays; it is not the loot furniture. Eat / Fall back stay
- * above tab 577; well bottom ≤ tab−8. Unpaid live borrows leftover-well
- * compact chrome (one You|foe band / Acc / packed kit / 36px log) so the well can
- * stay ≥ leftoverWellMin instead of collapsing to a strip to 'fit'.
+ * Live 360 fight geometry. Unpaid loot is a 44px satchel chip — named tiles
+ * live in the satchel sheet. Empty hides the chip. Keep hunting stays; it is
+ * not the loot furniture. Eat / Fall back stay above tab 577.
  */
 export function fightLogVsTab({ loot = false } = {}) {
   const C = COMBAT_360;
   const clearance = C.tabClearance ?? 8;
   const keepH = C.fightKeep ?? C.keep;
   const stationTop = C.leftoverStationTop;
-
-  // Empty live well still occupies leftoverWellMin — same furniture as piled.
-  const wrapH = C.leftoverWellLogWrap ?? 36;
+  const wrapH = C.logWrapFight ?? 64;
   const box = cockpitLogVsTab('fight');
   const logBottom = box.logBottom;
   const logTop = logBottom - wrapH;
-  const wellGap = C.leftoverWellGap ?? 0;
-  const fighterH = C.leftoverWellFighter ?? C.fightFighter ?? C.fighter;
-  const accH = C.leftoverWellAcc ?? C.leftoverAcc ?? C.acc;
-  const oilH = C.leftoverWellOil ?? C.oil;
-  const kitH = C.leftoverWellKit ?? C.hand;
-  const wellMin = C.leftoverWellMin ?? 184;
+  const gap = C.fightGap ?? 0;
+  const fighterH = C.fighter;
+  const accH = C.fightAcc ?? C.acc;
+  const oilH = C.fightOil ?? C.oil;
+  const chipH = C.satchelChip ?? C.fightLoot ?? 44;
   const tileMinH = C.leftoverTileMinH ?? 103;
   const glyphH = C.leftoverGlyph ?? 56;
-  const lootPad = C.leftoverLootPad ?? 6;
-  const lootInnerGap = C.leftoverLootInnerGap ?? 6;
-  const headH = C.leftoverWellHead ?? C.hunt;
   let y = stationTop;
-  y += fighterH + wellGap;
-  y += accH + wellGap;
-  y += oilH + wellGap;
+  y += fighterH + gap;
+  y += fighterH + gap;
+  y += accH + gap;
+  y += oilH + gap;
   const eatTop = y;
   const eatBottom = y + C.eat;
-  y = eatBottom + wellGap;
-  y += kitH + wellGap;
-  y += keepH + wellGap;
+  y = eatBottom + gap;
+  y += C.hand + gap;
+  y += C.styles + gap;
+  y += keepH + gap;
   const lootTop = y;
-  const lootBottom = logTop - wellGap;
-  const lootH = lootBottom - lootTop;
-  const takeTop = lootTop + lootPad;
-  const takeBottom = takeTop + headH;
-  const tileTop = takeBottom + lootInnerGap;
-  const tileBottom = tileTop + tileMinH;
-  const glyphTop = tileTop + 8;
-  const glyphBottom = glyphTop + glyphH;
-  const trayClears = lootBottom <= box.tabTop - clearance;
-  const portraitsFit = lootH >= wellMin
-    && lootH >= tileMinH
-    && tileBottom <= lootBottom
-    && glyphBottom <= lootBottom
-    && glyphH >= 56;
+  const lootH = loot ? chipH : 0;
+  const lootBottom = loot ? lootTop + chipH : lootTop;
+  const trayClears = !loot || lootBottom <= box.tabTop - clearance;
   return {
     ...box,
     wrapH,
@@ -397,38 +318,38 @@ export function fightLogVsTab({ loot = false } = {}) {
     lootH,
     keepH,
     clearance,
-    fillH: lootH,
+    fillH: Math.max(0, logTop - lootBottom),
     wellH: lootH,
-    wellMin,
-    wellTop: lootTop,
-    wellBottom: lootBottom,
-    wellGap: box.tabTop - lootBottom,
+    wellMin: chipH,
+    wellTop: loot ? lootTop : null,
+    wellBottom: loot ? lootBottom : null,
+    wellGap: loot ? box.tabTop - lootBottom : null,
     stationTop,
     stationBottom: logBottom,
     eatTop,
     eatBottom,
     fleeBottom: eatBottom,
-    trayTop: lootTop,
-    trayBottom: lootBottom,
-    trayGap: box.tabTop - lootBottom,
-    tileTop,
-    tileBottom,
+    trayTop: loot ? lootTop : null,
+    trayBottom: loot ? lootBottom : null,
+    trayGap: loot ? box.tabTop - lootBottom : null,
+    tileTop: null,
+    tileBottom: null,
     tileH: tileMinH,
     glyphH,
-    glyphTop,
-    glyphBottom,
-    takeTop,
-    takeBottom,
-    fits: portraitsFit && trayClears && logBottom <= box.tabTop - clearance
-      && eatBottom < box.tabTop && wrapH >= 36,
+    glyphTop: null,
+    glyphBottom: null,
+    takeTop: loot ? lootTop : null,
+    takeBottom: loot ? lootBottom : null,
+    fits: trayClears && logBottom <= box.tabTop - clearance
+      && eatBottom < box.tabTop && wrapH >= 36
+      && (!loot || (lootH === chipH && lootH < 80)),
   };
 }
 
 /**
  * Eat + Hunt-this-foe on one 360 row. Food is a loaf chip (glyph + two-line
- * Lantern-loaf / +14 · n), not an ellipsized fake <select>. Well header is
- * Hollow meter + wallet chips + Take all; Hunt another is full-width under
- * the well.
+ * Lantern-loaf / +14 · n), not an ellipsized fake <select>. Unpaid loot is a
+ * satchel chip; Hunt another is full-width under leftover-actions.
  */
 export function leftoverHuntRowVs360() {
   const C = COMBAT_360;
@@ -439,7 +360,7 @@ export function leftoverHuntRowVs360() {
   const chipMin = C.eatChipMin ?? 108;
   const huntW = C.leftoverHuntMin ?? 88;
   const eatUsed = chipMin + C.eat + huntW + gap * 2;
-  const wellHeadUsed = 110 + (C.leftoverWellHead ?? C.loot) + gap;
+  const satchelUsed = 110;
   const actionsUsed = C.hunt;
   const anotherRight = padX + contentW;
   return {
@@ -447,12 +368,12 @@ export function leftoverHuntRowVs360() {
     contentW,
     eatUsed,
     actionsUsed,
-    wellHeadUsed,
+    wellHeadUsed: satchelUsed,
     anotherRight,
     eatFits: eatUsed < contentW,
     actionsFits: actionsUsed < contentW,
-    wellHeadFits: wellHeadUsed < contentW,
-    fits: eatUsed < contentW && actionsUsed < contentW && wellHeadUsed < contentW
+    wellHeadFits: satchelUsed < contentW,
+    fits: eatUsed < contentW && actionsUsed < contentW && satchelUsed < contentW
       && anotherRight <= viewportW,
   };
 }
@@ -1055,7 +976,7 @@ function mountFight(ctx, st, paint) {
   const keep = wrap.querySelector('.combat-keep');
   const keepBox = keep?.querySelector('input');
   const actions = wrap.querySelector('.leftover-actions');
-  const tray = wrap.querySelector('.fight-loot') ?? wrap.querySelector('.leftover-loot');
+  const chip = wrap.querySelector('.satchel-chip');
   const another = wrap.querySelector('.leftover-another');
   const hunt = wrap.querySelector('.leftover-hunt');
   const flee = wrap.querySelector('.flee-btn');
@@ -1065,13 +986,12 @@ function mountFight(ctx, st, paint) {
   function applyMode(next) {
     const leftover = isLeftover(next);
     const unpaid = leftoverHasUngranted(next, ctx);
-    const well = showLootWell(next, ctx);
     wrap.classList.toggle('leftover-station', leftover);
-    wrap.classList.toggle('leftover-well', well);
+    wrap.classList.remove('leftover-well');
     if (leftover) {
       wrap.setAttribute('aria-label', unpaid ? 'Loot to collect' : 'After the hunt');
     } else {
-      wrap.setAttribute('aria-label', 'Loot to collect');
+      wrap.setAttribute('aria-label', unpaid ? 'Loot to collect' : 'Hunt');
     }
     if (kicker) {
       kicker.textContent = leftover ? combat.leftoverKicker(next.lastStation) : '';
@@ -1081,7 +1001,7 @@ function mountFight(ctx, st, paint) {
     setHidden(flee, leftover);
     setHidden(hunt, !leftover);
     setHidden(another, !leftover);
-    setHidden(actions, leftover && !unpaid);
+    setHidden(actions, !unpaid);
     setHidden(held, leftover || !next.paused);
     if (keepBox) keepBox.checked = !!next.autoContinue;
   }
@@ -1105,7 +1025,7 @@ function mountFight(ctx, st, paint) {
       syncOil(oil, ctx, next, paint);
       syncEatRow(eat, ctx, next);
       syncLeftoverHunt(hunt, ctx, next);
-      if (tray) fillLootWell(tray, ctx, next, paint);
+      if (chip) HuntSatchel.fillChip(chip, ctx, next);
       fillLogBox(logBox, leftover ? leftoverLog(next) : next.log, leftover ? 4 : 12);
     },
   };
@@ -1114,12 +1034,11 @@ function mountFight(ctx, st, paint) {
 function buildFight(ctx, st, paint) {
   const leftover = isLeftover(st);
   const unpaid = leftoverHasUngranted(st, ctx);
-  const well = showLootWell(st, ctx);
   const foe = foeVitals(st);
   const wrap = el('div', {
-    class: `combat-fight${leftover ? ' leftover-station' : ''}${well ? ' leftover-well' : ''}`.trim(),
+    class: `combat-fight${leftover ? ' leftover-station' : ''}`.trim(),
   });
-  wrap.setAttribute('aria-label', leftover && !unpaid ? 'After the hunt' : 'Loot to collect');
+  wrap.setAttribute('aria-label', leftover && !unpaid ? 'After the hunt' : unpaid ? 'Loot to collect' : 'Hunt');
 
   if (st.paused && st.fighting) {
     wrap.append(el('div', { class: 'encounter-held' },
@@ -1308,11 +1227,11 @@ function fleeButton(ctx, paint) {
 }
 
 function leftoverHasUngranted(st, ctx) {
-  return ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []).length > 0;
+  return HuntSatchel.showChip(st, ctx);
 }
 
-function showLootWell(st, ctx) {
-  return !isLeftover(st) || leftoverHasUngranted(st, ctx);
+export function unpaidLootTapNote(name) {
+  return HuntSatchel.unpaidTapNote(name);
 }
 
 function oilBlock(ctx, st, paint) {
@@ -1378,236 +1297,12 @@ function leftoverOilRow(ctx, st, paint, { sips, dry }) {
   return row;
 }
 
-function trayEntries(tray) {
-  return (tray ?? []).filter((e) => e && e.qty > 0);
-}
-
-function ungrantedTrayEntries(tray) {
-  return trayEntries(tray).filter((e) => e.granted === false);
-}
-
-function trayFingerprint(entries) {
-  return entries.map((e) => `${e.kind}:${e.id ?? ''}:${e.qty}`).join('|');
-}
-
-function trayWalletEntries(entries) {
-  return (entries ?? []).filter((e) => e.kind === 'soul' || e.kind === 'lumen');
-}
-
-function trayItemEntries(entries) {
-  return (entries ?? []).filter((e) => e.kind === 'item');
-}
-
-function walletChip(entry) {
-  if (entry.kind === 'soul') {
-    const label = formatNoun(entry.qty, 'soul');
-    return el('span', {
-      class: 'loot-wallet-chip loot-wallet-soul',
-      'data-loot-kind': 'soul',
-      'aria-label': `${label} unpaid`,
-    }, label);
-  }
-  const label = `✦${formatNumber(entry.qty)}`;
-  return el('span', {
-    class: 'loot-wallet-chip loot-wallet-lumen',
-    'data-loot-kind': 'lumen',
-    'aria-label': `${label} Lumen unpaid`,
-  }, label);
-}
-
-function lootWalletLine(entries) {
-  if (!entries.length) return null;
-  const line = el('span', { class: 'loot-wallet' });
-  for (const e of entries) line.append(walletChip(e));
-  return line;
-}
-
-/** Named 56px portrait for a bank-item tray row. Wallet never uses this. */
-function trayTileSpec(entry) {
-  const item = entry.id ? ITEMS_BY_ID[entry.id] : null;
-  const name = item?.name ?? entry.name ?? entry.id ?? 'Loot';
-  return {
-    kind: 'item',
-    id: entry.id ?? name,
-    glyph: itemGlyph(item),
-    name,
-    qtyLabel: `×${formatNumber(entry.qty)}`,
-    aria: `${name} ×${formatNumber(entry.qty)} unpaid`,
-  };
-}
-
-function lootTile(entry, ctx) {
-  const spec = trayTileSpec(entry);
-  const inspectable = spec.id && ITEMS_BY_ID[spec.id];
-  const attrs = {
-    class: `loot-tile loot-item${inspectable ? ' loot-inspectable' : ''} glyph-${spec.glyph}`,
-    'data-loot-kind': 'item',
-    'data-loot-id': spec.id ?? '',
-    'aria-label': spec.aria,
-  };
-  if (inspectable) attrs.type = 'button';
-  const tile = el(inspectable ? 'button' : 'div', attrs,
-    el('span', {
-      class: `loot-glyph bank-glyph bank-glyph-fill glyph-${spec.glyph}`,
-      html: filledIcon(spec.glyph),
-      'aria-hidden': 'true',
-    }),
-    el('span', { class: 'loot-copy' },
-      el('span', { class: 'loot-name' }, spec.name),
-      el('span', { class: 'loot-qty' }, spec.qtyLabel)));
-  if (inspectable) {
-    tile.addEventListener('click', (ev) => {
-      inspectLootItem(ctx, spec, entry, ev.currentTarget ?? tile);
-    });
-  }
-  return tile;
-}
-
-/** Honest leftover tap — name the drop and point at Take all. Not a stall card. */
-export function unpaidLootTapNote(name) {
-  return `${name} is still in the tray. Take all to keep it.`;
-}
-
-function closestClass(node, cls) {
-  let n = node;
-  while (n) {
-    if (n.classList?.contains?.(cls)) return n;
-    n = n.parentNode;
-  }
-  return null;
-}
-
-function firstQuery(node, sel) {
-  try { return node?.querySelector?.(sel) ?? null; } catch { return null; }
-}
-
-/**
- * One leftover-loot note, in-flow on leftover-loot-chips (the 184px well
- * the leftover critic photographs). Absolute + role=status painted a
- * live-region sibling that sat at #toasts y=64 while leftover-loot
- * stayed mute. No HUD toast. Tile stays Fogwort ×1.
- */
-function unpaidNoteHost(tile) {
-  const well = closestClass(tile, 'leftover-loot')
-    ?? closestClass(tile, 'leftover-tray')
-    ?? closestClass(tile, 'fight-loot');
-  if (!well) return { well: null, host: null };
-  const chips = firstQuery(well, '.leftover-loot-chips')
-    ?? firstQuery(well, '.loot-tray-grid');
-  return { well, host: chips ?? well };
-}
-
-function paintUnpaidLootNote(tile, spec) {
-  const note = unpaidLootTapNote(spec?.name ?? 'Loot');
-  if (tile?.classList) tile.classList.add('is-noted');
-  const { well, host } = unpaidNoteHost(tile);
-  if (!host) return note;
-  let banner = firstQuery(well ?? host, '.loot-unpaid-note');
-  if (!banner) {
-    banner = el('p', { class: 'loot-unpaid-note' }, note);
-    host.append(banner);
-  } else {
-    banner.textContent = note;
-    if (banner.parentNode !== host) host.append(banner);
-  }
-  return note;
-}
-
-function inspectLootItem(ctx, spec, entry, tile) {
-  if (!spec?.id) return;
-  if (entry?.granted === false) {
-    paintUnpaidLootNote(tile, spec);
-    return;
-  }
-  if (ctx.openSellSheet) ctx.openSellSheet(spec.id);
-  else if (ctx.inspectLoot) ctx.inspectLoot(spec.id, { name: spec.name, qty: entry?.qty ?? 0 });
-  else ctx.toast?.(`${spec.name} ${spec.qtyLabel}`, 'info');
-}
-
-function lootItemGrid(items, ctx) {
-  const grid = el('div', { class: 'leftover-loot-chips loot-tray-grid' });
-  for (const e of items) grid.append(lootTile(e, ctx));
-  return grid;
-}
-
-function takeAllBtn(ctx, paint) {
-  return el('button', {
-    class: 'btn btn-ghost leftover-take',
-    type: 'button',
-    onclick: () => {
-      const res = ctx.takeAllLootTray
-        ? ctx.takeAllLootTray()
-        : combat.takeAllLootTray(ctx.state);
-      if (res?.blocked) ctx.toast?.(res.error, 'warn');
-      paint();
-    },
-  }, 'Take all');
-}
-
-function hollowPressureCopy(state) {
-  return `Hollow ${uniqueStackCount(state?.bank)}/${lanternRoom(state)}`;
-}
-
 function leftoverActionsRow(ctx, st, paint) {
-  const leftover = isLeftover(st);
   const unpaid = leftoverHasUngranted(st, ctx);
   const row = el('div', { class: 'leftover-actions' });
-  setHidden(row, leftover && !unpaid);
-  row.append(mountLootWell(ctx, st, paint));
+  setHidden(row, !unpaid);
+  row.append(HuntSatchel.mountChip(ctx, st, paint));
   return row;
-}
-
-function mountLootWell(ctx, st, paint) {
-  const row = el('div', { class: 'fight-loot leftover-tray leftover-loot' });
-  fillLootWell(row, ctx, st, paint);
-  return row;
-}
-
-/** Same well live and leftover: Hollow meter, wallet chips, 56px item tiles, Take all. */
-function fillLootWell(row, ctx, st, paint) {
-  const leftover = isLeftover(st);
-  const pending = ungrantedTrayEntries(st.lootTray ?? ctx.state.combat?.lootTray ?? []);
-  const items = trayItemEntries(pending);
-  const wallet = trayWalletEntries(pending);
-  const showChrome = !leftover || pending.length > 0;
-  row.classList.toggle('is-empty', pending.length === 0);
-  row.classList.toggle('leftover-loot', showChrome);
-  row.classList.add('fight-loot');
-  if (!showChrome) {
-    clear(row);
-    if (row.dataset) row.dataset.lootFp = '';
-    row.setAttribute('hidden', '');
-    row.setAttribute('aria-hidden', 'true');
-    row.removeAttribute('aria-label');
-    return;
-  }
-  const meter = hollowPressureCopy(ctx.state);
-  row.removeAttribute('hidden');
-  row.removeAttribute('aria-hidden');
-  row.setAttribute('aria-label', pending.length
-    ? `Loot to collect · ${meter}`
-    : `Loot well · ${meter}`);
-  const fp = `${trayFingerprint(pending)}|${meter}|empty:${pending.length === 0}`;
-  if (row.dataset?.lootFp === fp
-    && row.querySelector('.leftover-take')
-    && row.querySelector('.loot-well-meter')
-    && row.querySelector('.loot-tray-grid')) {
-    return;
-  }
-  if (row.dataset) row.dataset.lootFp = fp;
-  clear(row);
-  const head = el('div', { class: 'loot-well-head' });
-  const take = takeAllBtn(ctx, paint);
-  if (!pending.length) {
-    take.setAttribute('aria-disabled', 'true');
-    take.classList.add('btn-disabled');
-  }
-  head.append(el('span', { class: 'loot-well-meter' }, meter));
-  const walletLine = lootWalletLine(wallet);
-  if (walletLine) head.append(walletLine);
-  head.append(take);
-  row.append(head);
-  row.append(lootItemGrid(items, ctx));
 }
 
 function leftoverLog(st) {
