@@ -19,6 +19,7 @@ import { taskProgress } from '../../game/systems/dailies.js';
 import { ZONES } from '../../game/data/combat/zones.js';
 import * as combat from '../../game/systems/combat.js';
 import { ITEMS_BY_ID } from '../../game/data/items.js';
+import { WEAR_SLOTS } from '../../game/data/wear.js';
 import { RECIPES } from '../../game/data/recipes.js';
 import * as craft from '../../game/systems/craft.js';
 import { renderBankScreen } from './bank.js';
@@ -174,8 +175,9 @@ export function renderCampScreen(ctx) {
     el('p', { class: 'section-sub muted' }, 'Repairs spend scrap and Lumen. A cracked chimney still burns — just poorer.'),
     repairCard.node,
 
-    el('h2', { class: 'section-title' }, 'Hand'),
-    el('p', { class: 'section-sub muted' }, 'Wear what you already hold. The next Hunt reads it.'),
+    el('h2', { class: 'section-title', 'data-camp-wear': 'title' }, 'Hand'),
+    el('p', { class: 'section-sub muted', 'data-camp-wear': 'sub' },
+      'Wear what you already hold. The next Hunt reads it.'),
     handCard.node,
 
     el('h2', { class: 'section-title' }, 'Hearth craft'),
@@ -236,6 +238,15 @@ export function renderCampScreen(ctx) {
     repairCard.update();
     handCard.update();
     craftCard.update();
+    const wearOn = combat.wearGridUnlocked(ctx.state);
+    const wearTitle = root.querySelector('[data-camp-wear="title"]');
+    const wearSub = root.querySelector('[data-camp-wear="sub"]');
+    if (wearTitle) wearTitle.textContent = wearOn ? 'Wear' : 'Hand';
+    if (wearSub) {
+      wearSub.textContent = wearOn
+        ? 'Weapon, lantern, head, hands, cloak, tool. Tool never strikes.'
+        : 'Wear what you already hold. The next Hunt reads it.';
+    }
   }
   update();
 
@@ -403,49 +414,122 @@ function buildRepairCard(ctx) {
   };
 }
 
+function paintWeaponButtons(ctx, row, paint) {
+  const held = combat.heldWeapon(ctx.state);
+  const unarmedOn = !held;
+  row.append(el('button', {
+    class: `btn ${unarmedOn ? 'btn-primary on' : 'btn-ghost'}`,
+    type: 'button',
+    'data-equip': 'unarmed',
+    onclick: () => {
+      ctx.equipWeapon?.('unarmed');
+      paint();
+    },
+  }, 'Unarmed'));
+  for (const w of combat.ownedWeapons(ctx.state)) {
+    const on = held?.id === w.id;
+    row.append(el('button', {
+      class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
+      type: 'button',
+      'data-equip': w.id,
+      onclick: () => {
+        ctx.equipWeapon?.(w.id);
+        paint();
+      },
+    }, ITEMS_BY_ID[w.id]?.name ?? w.id));
+  }
+}
+
+function paintWearCell(ctx, slot, paint) {
+  const worn = slot.id === 'weapon'
+    ? (combat.heldWeapon(ctx.state)
+      ? ITEMS_BY_ID[combat.heldWeapon(ctx.state).id]
+      : null)
+    : combat.heldSlotItem(ctx.state, slot.id);
+  const wornName = slot.id === 'weapon'
+    ? (worn?.name ?? 'Unarmed')
+    : (worn?.name ?? 'Empty');
+  const row = el('div', { class: 'camp-hand-row wear-cell-row' });
+  if (slot.id === 'weapon') {
+    paintWeaponButtons(ctx, row, paint);
+  } else {
+    const emptyOn = !worn;
+    row.append(el('button', {
+      class: `btn ${emptyOn ? 'btn-primary on' : 'btn-ghost'}`,
+      type: 'button',
+      'data-equip-slot': slot.id,
+      'data-equip': 'empty',
+      onclick: () => {
+        ctx.equipSlot?.(slot.id, 'empty');
+        paint();
+      },
+    }, 'Empty'));
+    for (const item of combat.ownedWearForSlot(ctx.state, slot.id)) {
+      const on = worn?.id === item.id;
+      row.append(el('button', {
+        class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
+        type: 'button',
+        'data-equip-slot': slot.id,
+        'data-equip': item.id,
+        onclick: () => {
+          ctx.equipSlot?.(slot.id, item.id);
+          paint();
+        },
+      }, item.name));
+    }
+  }
+  return el('div', {
+    class: 'wear-cell',
+    'data-wear-slot': slot.id,
+  },
+    el('span', { class: 'wear-cell-label' }, slot.label),
+    el('span', { class: 'wear-cell-name' }, wornName),
+    row);
+}
+
 function buildHandCard(ctx) {
   const effectLine = el('span', { class: 'track-effect' });
   const heldName = el('span', { class: 'track-tier-name' });
   const flavor = el('p', { class: 'track-flavor muted' });
   const row = el('div', { class: 'camp-hand-row' });
+  const grid = el('div', { class: 'wear-grid', 'data-wear-grid': '1' });
+  const cardName = el('h3', { class: 'track-name' }, 'Hand');
 
   function paint() {
     combat.ensureCombat(ctx.state);
     const held = combat.heldWeapon(ctx.state);
     const kit = combat.fightCockpit(ctx.state);
     const off = combat.playerOffense(ctx.state, ctx.state.combat.player.style);
+    const wearOn = combat.wearGridUnlocked(ctx.state);
     heldName.textContent = held
       ? (ITEMS_BY_ID[held.id]?.name ?? held.id)
       : 'Unarmed';
     effectLine.textContent = kit
       ? `Acc ${kit.hitPct}% · ${kit.playerMinHit}–${kit.playerMaxHit} · ${formatSeconds(off.speedMs)} / blow`
       : `${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow`;
-    flavor.textContent = held
-      ? 'The wick-knife is a Strike. Unequip to feel the gap on the next Hunt.'
-      : 'Bare hands. Wear the wick-knife before you walk the fog-line.';
+    cardName.textContent = wearOn ? 'Wear' : 'Hand';
+    flavor.textContent = wearOn
+      ? (held
+        ? 'Lantern is oil class. Tool is for the crafts — never a Hunt blow.'
+        : 'Bare hands. Wear the wick-knife before you walk the fog-line.')
+      : (held
+        ? 'The wick-knife is a Strike. Unequip to feel the gap on the next Hunt.'
+        : 'Bare hands. Wear the wick-knife before you walk the fog-line.');
 
     clear(row);
-    const unarmedOn = !held;
-    row.append(el('button', {
-      class: `btn ${unarmedOn ? 'btn-primary on' : 'btn-ghost'}`,
-      type: 'button',
-      'data-equip': 'unarmed',
-      onclick: () => {
-        ctx.equipWeapon?.('unarmed');
-        paint();
-      },
-    }, 'Unarmed'));
-    for (const w of combat.ownedWeapons(ctx.state)) {
-      const on = held?.id === w.id;
-      row.append(el('button', {
-        class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
-        type: 'button',
-        'data-equip': w.id,
-        onclick: () => {
-          ctx.equipWeapon?.(w.id);
-          paint();
-        },
-      }, ITEMS_BY_ID[w.id]?.name ?? w.id));
+    clear(grid);
+    if (wearOn) {
+      row.style.display = 'none';
+      heldName.style.display = 'none';
+      grid.style.display = '';
+      for (const slot of WEAR_SLOTS) {
+        grid.append(paintWearCell(ctx, slot, paint));
+      }
+    } else {
+      row.style.display = '';
+      heldName.style.display = '';
+      grid.style.display = 'none';
+      paintWeaponButtons(ctx, row, paint);
     }
   }
   paint();
@@ -454,11 +538,12 @@ function buildHandCard(ctx) {
       el('div', { class: 'track-head' },
         el('span', { class: 'skill-icon glyph-sword', html: icon('sword') }),
         el('span', { class: 'track-title' },
-          el('h3', { class: 'track-name' }, 'Hand'),
+          cardName,
           effectLine)),
       heldName,
       flavor,
-      row),
+      row,
+      grid),
     update: paint,
   };
 }

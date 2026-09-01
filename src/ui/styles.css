@@ -1244,6 +1244,34 @@ html.reduced-motion *::after {
 .camp-hand-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .camp-hand-row .btn { flex: 1; min-height: 44px; min-width: 44px; }
 
+.wear-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.wear-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--line, rgba(232, 214, 176, 0.18));
+  border-radius: 8px;
+  min-width: 0;
+}
+.wear-cell-label {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.wear-cell-name {
+  font-size: 14px;
+  color: var(--gold-hi);
+  line-height: 1.3;
+}
+.wear-cell-row { margin: 0; }
+.wear-cell-row .btn { flex: 1 1 44px; min-height: 44px; min-width: 44px; }
+
 /* ── Bank sell sheet ───────────────────────────────────────── */
 .sell-flavor { margin: 0 0 10px; font-style: italic; color: var(--muted); line-height: 1.5; }
 .sell-uses { margin-bottom: 10px; }

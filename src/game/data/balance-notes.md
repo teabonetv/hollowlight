@@ -42,6 +42,7 @@ MAX_LEVEL = 120, milestone level 99
 | Fan the Coals (Ek 10) | 6 s | 2 Tinderscrap, 1 Grave-resin | +6 Flame, +3 Lumen | 34 | 24 |
 | Gather Herbs (Fo 1) | 5 s | — | 1–2 Fogwort, 10% 1 Grave-resin, 30% 1 Tinderscrap | 16 | 12 |
 | Gather Fungi (Fo 5) | 6.5 s | — | 1–3 Pale-cap, 15% 1 Bog-moss | 22 | 16 |
+| Smith a Chimney (Sm 1) | 8 s | 2 Tinderscrap, 1 Grave-resin | 1 Glass Chimney | 22 | 16 |
 
 Reasoning:
 
@@ -306,7 +307,7 @@ kept. Walk back (open that stretch) to recover.
 | Avoidance | round(7 + 1.5×level) | You get hit. Eating is not optional on the Cur / Warden. |
 | Hit chance | clamp(0.20, 0.95, 0.12 + 0.88·acc/(acc+avo)) | Never a coin-flip void; never a sure thing. |
 | Weakness / resist | ×1.18 / ×0.86 | Style swap is a real DPS lever on every card (weakness listed on the hunt). |
-| Hunt → Camp loop | one craft, three tracks, Hand wear | Fogwort ×2 → Lamp-oil (`press-lamp-oil`) is the only live Camp craft — Hunt Fog-rat named loot is the input. Keeper’s Camp still has three tracks; Lantern & Wick now divides Hunt `playerOffense.speedMs` the same way it shortens gathering bars. Hand on Camp reuses `equipWeapon` (wick-knife / unarmed). No 184-recipe dump, no six-slot doll. |
+| Hunt → Camp loop | one craft, three tracks, Hand wear | Fogwort ×2 → Lamp-oil (`press-lamp-oil`) is the only live Camp craft — Hunt Fog-rat named loot is the input. Keeper’s Camp still has three tracks; Lantern & Wick now divides Hunt `playerOffense.speedMs` the same way it shortens gathering bars. Hand on Camp reuses `equipWeapon` (wick-knife / unarmed). First chimney (`smith-chimney`: 2 tinder + 1 grave-resin → glass-chimney) unlocks the 2×3 wear grid (weapon, lantern, head, hands, cloak, tool). Grid is hidden on boot. Tool never adds combat damage. Lantern is oil class: +4 acc while fed, ×1.25 oil seconds, fog-bite 1. Fights start at `playerMaxHp` (no 36/40 lie). No 184-recipe dump, no six-slot doll on minute one. |
 | Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. Opening windup is `max(1.2s, weapon speed)` — Pale Moth (16 HP) cannot die on a t=0 blow. Lantern & Wick (Camp) shortens that interval: `round(weapon.speedMs / speedMultiplier)`. |
 | Unarmed Shot / Rite | slower, lower max | You *can* swap styles day one; you *want* the matching drop. |
 | Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Stall always sells wick-oil (mercy buy ✦8). Hunt starts **already dry** if flasks are empty — never paint “Lantern fed” at 0 sips. Dry lantern: first 10 s of fog-gather (no bite), then 2 fog-bite / 2 s and ×0.85 hit chance. **Keep hunting defaults OFF.** Auto-continue refuses the next moth while the lantern is dry. Hub Hunt at 0 sips stays labelled Hunt (disabled) with **one** Need oil line — not on every stretch button. Hub chip is “lantern ready” only when sips remain. |

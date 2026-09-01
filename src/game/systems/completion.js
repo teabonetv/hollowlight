@@ -245,7 +245,7 @@ function featsLogRow(state) {
 }
 
 /**
- * Headline percents must move once practice exists. 7/1089 is ~0.6% — flooring
+ * Headline percents must move once practice exists. 7/1188 is ~0.6% — flooring
  * that to 0% next to Feats 27% made the LOG look like mastery did not count.
  */
 export function formatCompletionPct(pct) {

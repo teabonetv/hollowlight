@@ -12,6 +12,7 @@ export const ACTION_GLYPH = {
   'fan-the-coals': 'spark',
   'gather-herbs': 'leaf',
   'gather-fungi': 'mushroom',
+  'smith-chimney': 'anvil',
 };
 
 /**
