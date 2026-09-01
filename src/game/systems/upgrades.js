@@ -7,9 +7,9 @@
 // - Tiers gate strictly in order: tier i requires level i (0-indexed), i.e.
 //   you must own every previous tier of that track.
 // - Effects expose three multipliers consumed by the REAL math paths:
-//     speedMultiplier → action durations (live ticks, offline calc, ETA UI)
+//     speedMultiplier → action durations AND Hunt blow interval (playerOffense)
 //     yieldChance     → extra-unit rolls on gathering outputs (action runner)
-//     xpMultiplier    → skill XP grants (live + offline, identical rounding)
+//     xpMultiplier    → skill XP grants (live + offline + combat XP)
 // - Reads tolerate old saves: `state.campUpgrades` may be missing entirely.
 
 import { TRACKS_BY_ID } from '../data/upgrades.js';
@@ -102,7 +102,7 @@ export function trackEffectFraction(state, track) {
   return Math.min(track.cap, clean);
 }
 
-/** Global action-speed multiplier (≥1). Durations divide by this. */
+/** Global speed multiplier (≥1). Gathering durations and Hunt blows divide by this. */
 export function speedMultiplier(state) {
   return 1 + trackEffectFraction(state, TRACKS_BY_ID['lantern-wick']);
 }

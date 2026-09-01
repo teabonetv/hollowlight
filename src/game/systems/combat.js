@@ -220,11 +220,12 @@ export function equippedWeapon(state, style) {
 export function playerOffense(state, style) {
   const lv = state.skills.combat?.level ?? 1;
   const w = equippedWeapon(state, style);
+  const speedMs = Math.max(1, Math.round(w.speedMs / camp.speedMultiplier(state)));
   return {
     weapon: w,
     minDmg: w.minDmg,
     maxDmg: w.maxDmg,
-    speedMs: w.speedMs,
+    speedMs,
     accuracy: 8 + 2 * lv + (w.accuracy ?? 0),
     avoidance: Math.round(7 + 1.5 * lv),
   };
