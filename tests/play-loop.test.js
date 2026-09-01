@@ -105,14 +105,14 @@ test('Camp spend on Lantern & Wick consumes goods/lumen, persists, and shortens 
   const s = createState({ rngSeed: 3 });
   const tier = fundWickTier0(s);
   const lumen0 = s.lumen;
-  const tinder0 = s.bank.tinderscrap;
+  const oil0 = s.bank['lamp-oil'] ?? 0;
   const speed0 = combat.playerOffense(s, 'strike').speedMs;
   assert.equal(speed0, 2200);
   const res = buyUpgrade(s, 'lantern-wick');
   assert.equal(res.ok, true);
   assert.equal(upgradeLevel(s, 'lantern-wick'), 1);
   assert.equal(s.lumen, lumen0 - tier.lumen);
-  assert.equal(s.bank.tinderscrap, tinder0 - tier.items.tinderscrap);
+  assert.equal(s.bank['lamp-oil'] ?? 0, oil0 - tier.items['lamp-oil']);
   assert.equal(speedMultiplier(s), 1.05);
   const speed1 = combat.playerOffense(s, 'strike').speedMs;
   assert.equal(speed1, Math.round(2200 / 1.05));

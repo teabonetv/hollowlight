@@ -43,6 +43,12 @@ test('track data validates: three tracks, six tiers, ascending ~geometric costs'
     assert.equal(t.tiers.length, 6, `${t.id}: six tiers`);
     for (let i = 1; i < t.tiers.length; i++) {
       const ratio = t.tiers[i].lumen / t.tiers[i - 1].lumen;
+      // Hunt spend: Wick 1–2 are cheap lamp-oil gates (8, 16), then the
+      // original curve resumes at 200. That 16→200 step is outside ×2.0–2.9.
+      if (t.id === 'lantern-wick' && i === 2) {
+        assert.ok(ratio > 2.9, `${t.id}: tier ${i} jumps after the lamp-oil gates`);
+        continue;
+      }
       assert.ok(ratio >= 2.0 && ratio <= 2.9,
         `${t.id}: tier ${i} ratio ${ratio.toFixed(2)} outside 2.0–2.9`);
     }
