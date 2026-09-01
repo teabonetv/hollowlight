@@ -40,8 +40,13 @@ export class HuntSatchel {
     return HuntSatchel.ungranted(tray);
   }
 
+  /** Named item rows still sitting in the tray. Souls/lumen are wallet, not n. */
+  static unpaidNamedEntries(st, ctx) {
+    return HuntSatchel.itemEntries(HuntSatchel.unpaidEntries(st, ctx));
+  }
+
   static unpaidCount(st, ctx) {
-    return HuntSatchel.unpaidEntries(st, ctx).length;
+    return HuntSatchel.unpaidNamedEntries(st, ctx).length;
   }
 
   static showChip(st, ctx) {
@@ -236,7 +241,7 @@ export class HuntSatchel {
     const meter = HuntSatchel.hollowCopy(ctx.state);
     const body = el('div', {
       class: 'satchel-body leftover-loot leftover-tray',
-      'aria-label': `Satchel · ${pending.length} · ${meter}`,
+      'aria-label': `Satchel · ${items.length} · ${meter}`,
     });
     const head = el('div', { class: 'loot-well-head satchel-head' });
     head.append(el('span', { class: 'loot-well-meter' }, meter));

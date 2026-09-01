@@ -139,8 +139,14 @@ test('kills grant combat XP via the shared mastery × altar formula and drop loo
   assert.ok(kill, 'kill event');
   assert.equal(kill.enemyId, 'pale-moth');
   assert.ok(s.skills.combat.xp > 0);
-  assert.equal(s.souls, 0, 'souls wait on the leftover tray');
-  assert.ok(s.combat.lootTray.some((e) => e.kind === 'soul' && e.qty >= 1 && e.granted === false));
+  const named = (s.combat.lootTray ?? []).filter((e) => e.kind === 'item' && e.granted === false);
+  if (named.length === 0) {
+    assert.ok(s.souls >= 1, 'wallet-only moth grants souls without a satchel pile');
+    assert.equal((s.combat.lootTray ?? []).some((e) => e.kind === 'soul' && e.granted === false), false);
+  } else {
+    assert.equal(s.souls, 0, 'souls wait on the leftover tray while named loot is unpaid');
+    assert.ok(s.combat.lootTray.some((e) => e.kind === 'soul' && e.qty >= 1 && e.granted === false));
+  }
   assert.equal(s.stats.kills, 1);
 });
 
@@ -706,9 +712,9 @@ test('dismissLastStation clears leftover without starting a fight', () => {
   assert.equal(s.combat.fighting, false);
 });
 
-function killPaleMoth(s, encounterSeed = 1) {
+function killFoe(s, enemyId = 'pale-moth', encounterSeed = 1) {
   s.combat.autoContinue = false;
-  combat.startFight(s, 'pale-moth', { encounterSeed });
+  combat.startFight(s, enemyId, { encounterSeed });
   let kill = null;
   for (let i = 0; i < 80 && !kill; i++) {
     if (s.combat.foe) s.combat.foe.hp = 1;
@@ -717,6 +723,14 @@ function killPaleMoth(s, encounterSeed = 1) {
     kill = events.find((e) => e.type === 'combat-kill') ?? kill;
   }
   return kill;
+}
+
+function killPaleMoth(s, encounterSeed = 1) {
+  return killFoe(s, 'pale-moth', encounterSeed);
+}
+
+function killFogRat(s, encounterSeed = 1) {
+  return killFoe(s, 'fog-rat', encounterSeed);
 }
 
 function traySum(tray, kind, id) {
@@ -777,12 +791,23 @@ function assertWalletMatchesPile(s, snap, pile) {
   assert.deepEqual({ ...s.bank }, expected);
 }
 
-test('kill leaves bank and lumen unpaid until Take all; second Take all is a no-op', () => {
+test('wallet-only Pale Moth kill grants souls and lumen without a leftover pile', () => {
   const s = createState({ rngSeed: 4 });
   const snap = walletSnap(s);
   assert.ok(killPaleMoth(s, 1));
+  const named = (s.combat.lootTray ?? []).filter((e) => e.kind === 'item' && e.granted === false);
+  assert.equal(named.length, 0, 'this seed is wallet-only');
+  assert.ok(s.souls > snap.souls);
+  assert.ok(s.lumen > snap.lumen);
+  assert.equal((s.combat.lootTray ?? []).filter((e) => e.granted === false).length, 0);
+});
+
+test('Fog-rat named loot stays unpaid until Take all; second Take all is a no-op', () => {
+  const s = createState({ rngSeed: 4 });
+  const snap = walletSnap(s);
+  assert.ok(killFogRat(s, 1));
   const pile = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
-  assert.ok(pile.length >= 1, 'kill fills the leftover pile');
+  assert.ok(pile.some((e) => e.kind === 'item' && e.id === 'fogwort'), 'kill fills named Fogwort');
   assert.ok(pile.some((e) => e.kind === 'soul'));
   assert.ok(pile.some((e) => e.kind === 'lumen'));
   assert.ok(pile.every((e) => e.granted === false), 'tray is pending, not a receipt');
@@ -804,15 +829,15 @@ test('kill leaves bank and lumen unpaid until Take all; second Take all is a no-
   assertWalletUnchanged(s, paid);
 });
 
-test('two kills without Take all stack the tray; wallet stays unpaid until one collect', () => {
+test('two Fog-rat kills without Take all stack the tray; wallet stays unpaid until one collect', () => {
   const s = createState({ rngSeed: 4 });
   const snap = walletSnap(s);
-  assert.ok(killPaleMoth(s, 1));
+  assert.ok(killFogRat(s, 1));
   const first = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
-  assert.ok(first.length >= 1);
+  assert.ok(first.some((e) => e.kind === 'item' && e.id === 'fogwort'));
   assertWalletUnchanged(s, snap);
 
-  assert.ok(killPaleMoth(s, 2));
+  assert.ok(killFogRat(s, 2));
   const tray = s.combat.lootTray;
   assert.ok(tray.some((e) => e.kind === 'soul' && e.qty >= 2), 'souls stack across hunts');
   assert.ok(tray.every((e) => e.granted === false));
@@ -849,9 +874,9 @@ test('Take all skips granted receipts and never double-pays', () => {
 test('Fall back keeps the unpaid tray; Hunt another auto-collects it', () => {
   const s = createState({ rngSeed: 4 });
   const snap = walletSnap(s);
-  assert.ok(killPaleMoth(s, 1));
+  assert.ok(killFogRat(s, 1));
   const before = s.combat.lootTray.map((e) => ({ ...e }));
-  assert.ok(before.length >= 1);
+  assert.ok(before.some((e) => e.kind === 'item' && e.id === 'fogwort'));
   combat.startFight(s, 'pale-moth', { encounterSeed: 9 });
   combat.fleeFight(s);
   assert.equal(s.combat.lastStation?.ended, 'flee');
@@ -931,7 +956,7 @@ test('v5 hydrate unions lootTray without a SAVE_VERSION bump', () => {
 test('v5 hydrate keeps pending tray loot ungranted across reload', () => {
   const s = createState({ rngSeed: 4 });
   const snap = walletSnap(s);
-  assert.ok(killPaleMoth(s, 1));
+  assert.ok(killFogRat(s, 1));
   const pile = (s.combat.lootTray ?? []).map((e) => ({ ...e }));
   assert.ok(pile.every((e) => e.granted === false));
   assertWalletUnchanged(s, snap);

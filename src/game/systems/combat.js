@@ -394,6 +394,20 @@ export function pushLeftoverTray(state, entries) {
   return c.lootTray;
 }
 
+export function ungrantedNamedLoot(state) {
+  return leftoverLootTray(state).filter((e) => e && e.qty > 0 && e.granted === false && e.kind === 'item');
+}
+
+/**
+ * Wallet-only leftover (souls/lumen, no named chips) pays itself. Named unpaid
+ * stays in the tray for the satchel sheet. Reuses takeAllLootTray.
+ */
+export function settleWalletOnlyTray(state) {
+  ensureCombat(state);
+  if (ungrantedNamedLoot(state).length > 0) return { ok: true, granted: [], skipped: true };
+  return takeAllLootTray(state);
+}
+
 /**
  * Pay pending (granted: false) rows into bank/wallet. Already-granted receipts
  * are not paid again. Items that cannot enter the hollow stay ungranted on the
@@ -874,6 +888,7 @@ function onKill(state, rng) {
   if (enemy.souls) trayEntries.push({ kind: 'soul', qty: enemy.souls, granted: false });
   for (const d of described) trayEntries.push({ ...d, granted: false });
   pushLeftoverTray(state, trayEntries);
+  settleWalletOnlyTray(state);
 
   const repeatId = enemy.id;
   const auto = c.autoContinue && !enemy.boss && lanternIsFed(state);
