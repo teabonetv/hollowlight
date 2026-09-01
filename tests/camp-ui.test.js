@@ -308,6 +308,7 @@ test('shared #screen padding-bottom equals the tab bar on every tab', () => {
   assert.match(combat, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
   assert.match(combat, /\.satchel-chip/);
   assert.match(combat, /\.satchel-sheet \.loot-tile\s*\{[^}]*min-height:\s*103px/);
+  assert.match(combat, /\.sheet-panel\.satchel-sheet-panel\s*\{[^}]*min-height:\s*300px/);
   assert.doesNotMatch(css, /\.camp[^{]*\{[^}]*--tabbar-size/s,
     'tab padding is shared chrome, not a Camp-only hack');
   assert.doesNotMatch(css, /\.bank-screen[^{]*\{[^}]*--tabbar-size/s);

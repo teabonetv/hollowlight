@@ -629,17 +629,32 @@
 .satchel-sheet .leftover-loot-chips:has(.loot-unpaid-note) {
   overflow: visible;
 }
+.satchel-sheet.sheet-overlay {
+  padding-top: 48vh;
+  padding-top: 48dvh;
+}
+.sheet-panel.satchel-sheet-panel {
+  height: 52vh;
+  height: 52dvh;
+  max-height: 52vh;
+  max-height: 52dvh;
+  min-height: 300px;
+}
+.satchel-sheet-panel .modal-body {
+  overflow: hidden;
+  min-height: 0;
+}
 .satchel-sheet .satchel-body,
 .satchel-sheet .leftover-loot {
   display: flex;
   flex-direction: column;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: stretch;
   gap: 8px;
   min-height: 0;
   max-height: none;
   height: auto;
-  overflow: visible;
+  overflow: hidden;
 }
 .satchel-sheet .satchel-head {
   display: flex;

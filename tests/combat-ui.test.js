@@ -1471,6 +1471,7 @@ test('leftover-live and fight-live hide craft-nav; Emberkeeping, Foraging, and h
   assert.match(css, /\.leftover-station \.log-wrap\s*\{[^}]*min-height:\s*100px/);
   assert.match(css, /\.combat-fight:not\(\.leftover-station\)\s+\.combat-keep\s*\{[^}]*max-height:\s*32px/);
   assert.match(css, /\.satchel-sheet \.loot-tile\s*\{[^}]*min-height:\s*103px/);
+  assert.match(css, /\.sheet-panel\.satchel-sheet-panel\s*\{[^}]*min-height:\s*300px/);
 
   const ember = renderSkillDetail(makeCtx(createState({ rngSeed: 2 })), 'emberkeeping');
   assert.equal(ember.node.classList.contains('leftover-live'), false);
