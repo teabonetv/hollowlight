@@ -48,7 +48,7 @@ test('track cards show next tier name, flavor, effect line and cost chips', () =
   const cards = scr.node.querySelectorAll('.track-card');
   const wick = cards[0];
   assert.match(wick.textContent ?? '', /Scraped Wicks/);
-  assert.match(wick.textContent ?? '', /\+5% action speed per tier/);
+  assert.match(wick.textContent ?? '', /\+5% action & Hunt speed per tier/);
   assert.match(wick.textContent ?? '', /✦40/, 'lumen chip present');
   assert.match(wick.textContent ?? '', /Tinderscrap ×10/, 'material chip present');
 });

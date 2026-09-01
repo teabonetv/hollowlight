@@ -36,6 +36,7 @@ import { TRACKS_BY_ID } from '../game/data/upgrades.js';
 import { SKILL_BY_ID } from '../game/data/skills.js';
 import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
+import * as craftSys from '../game/systems/craft.js';
 import * as combat from '../game/systems/combat.js';
 import { sellItems, togglePin as pinItem, toggleLock as lockItem, savePreset as writePreset, applyPreset as usePreset,
   deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot, resolveBankTab, STALL_TAB } from '../game/systems/bank.js';
@@ -564,6 +565,15 @@ function boot() {
       const track = TRACKS_BY_ID[trackId];
       toaster.push(`${track.name} — ${res.tier.name}. The camp brightens.`, 'success');
       pushLog(game, `Upgraded ${track.name}: ${res.tier.name} (${camp.upgradeLevel(game, trackId)}/${track.tiers.length}).`, game.stats.playtimeMs);
+      afterMutation({ redraw: true });
+      return res;
+    },
+    craftRecipe(recipeId) {
+      const res = craftSys.craftRecipe(game, recipeId);
+      if (!res.ok) { toaster.push(res.error ?? 'Could not craft.', 'warn'); return res; }
+      const name = ITEMS_BY_ID[res.output.id]?.name ?? res.output.id;
+      toaster.push(`${res.recipe.name} — ${name} ×${res.output.qty}.`, 'success');
+      pushLog(game, `Crafted ${name} ×${res.output.qty}.`, game.stats.playtimeMs);
       afterMutation({ redraw: true });
       return res;
     },

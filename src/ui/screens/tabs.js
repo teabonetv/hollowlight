@@ -12,12 +12,15 @@ import { KINDLING_BUNDLE } from '../../game/data/store.js';
 import { bankCount } from '../../game/systems/bank.js';
 import { lanternIntegrity, canAffordRepair, repairNeedLabel, repairCostChips } from '../../game/systems/repairs.js';
 import * as camp from '../../game/systems/upgrades.js';
-import { formatNumber, formatDuration } from '../../core/format.js';
+import { formatNumber, formatDuration, formatSeconds } from '../../core/format.js';
 import { nextWants, trueCompletion } from '../../game/systems/completion.js';
 import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
 import { taskProgress } from '../../game/systems/dailies.js';
 import { ZONES } from '../../game/data/combat/zones.js';
-import { isBeaconKindled } from '../../game/systems/combat.js';
+import * as combat from '../../game/systems/combat.js';
+import { ITEMS_BY_ID } from '../../game/data/items.js';
+import { RECIPES } from '../../game/data/recipes.js';
+import * as craft from '../../game/systems/craft.js';
 import { renderBankScreen } from './bank.js';
 
 export { renderBankScreen };
@@ -141,6 +144,8 @@ export function renderCampScreen(ctx) {
 
   const tinderBanner = el('div', { class: 'empty-state camp-starve' });
   const repairCard = buildRepairCard(ctx);
+  const handCard = buildHandCard(ctx);
+  const craftCard = buildCraftCard(ctx, RECIPES[0]);
 
   const root = el('section', { class: 'screen camp' },
     el('div', { class: 'sigil-wrap', 'aria-hidden': 'true' }, el('div', { class: 'sigil' })),
@@ -168,6 +173,14 @@ export function renderCampScreen(ctx) {
     el('h2', { class: 'section-title' }, 'The Lantern'),
     el('p', { class: 'section-sub muted' }, 'Repairs spend scrap and Lumen. A cracked chimney still burns — just poorer.'),
     repairCard.node,
+
+    el('h2', { class: 'section-title' }, 'Hand'),
+    el('p', { class: 'section-sub muted' }, 'Wear what you already hold. The next Hunt reads it.'),
+    handCard.node,
+
+    el('h2', { class: 'section-title' }, 'Hearth craft'),
+    el('p', { class: 'section-sub muted' }, 'One press from Hunt Fogwort. Chandlercraft’s later lattice stays later.'),
+    craftCard.node,
 
     // ── The Keeper's Camp — upgrade tracks (F1c economy sink) ──
     el('h2', { class: 'section-title' }, "The Keeper's Camp"),
@@ -221,6 +234,8 @@ export function renderCampScreen(ctx) {
     emptyBanner.style.display = anyOwned ? 'none' : '';
     for (const r of trackRefs) r.update();
     repairCard.update();
+    handCard.update();
+    craftCard.update();
   }
   update();
 
@@ -250,7 +265,7 @@ function dailyStrip(ctx) {
 /** Human label for a track's current summed effect, e.g. “+10% action speed”. */
 function effectLabel(track, fraction) {
   const pct = Math.round(fraction * 100);
-  if (track.effect === 'speed') return `+${pct}% action speed`;
+  if (track.effect === 'speed') return `+${pct}% action & Hunt speed`;
   if (track.effect === 'yield') return `+${pct}% bonus finds while gathering`;
   return `+${pct}% XP from every task`;
 }
@@ -388,10 +403,113 @@ function buildRepairCard(ctx) {
   };
 }
 
+function buildHandCard(ctx) {
+  const effectLine = el('span', { class: 'track-effect' });
+  const heldName = el('span', { class: 'track-tier-name' });
+  const flavor = el('p', { class: 'track-flavor muted' });
+  const row = el('div', { class: 'camp-hand-row' });
+
+  function paint() {
+    combat.ensureCombat(ctx.state);
+    const held = combat.heldWeapon(ctx.state);
+    const kit = combat.fightCockpit(ctx.state);
+    const off = combat.playerOffense(ctx.state, ctx.state.combat.player.style);
+    heldName.textContent = held
+      ? (ITEMS_BY_ID[held.id]?.name ?? held.id)
+      : 'Unarmed';
+    effectLine.textContent = kit
+      ? `Acc ${kit.hitPct}% · ${kit.playerMinHit}–${kit.playerMaxHit} · ${formatSeconds(off.speedMs)} / blow`
+      : `${off.minDmg}–${off.maxDmg} · ${formatSeconds(off.speedMs)} / blow`;
+    flavor.textContent = held
+      ? 'The wick-knife is a Strike. Unequip to feel the gap on the next Hunt.'
+      : 'Bare hands. Wear the wick-knife before you walk the fog-line.';
+
+    clear(row);
+    const unarmedOn = !held;
+    row.append(el('button', {
+      class: `btn ${unarmedOn ? 'btn-primary on' : 'btn-ghost'}`,
+      type: 'button',
+      'data-equip': 'unarmed',
+      onclick: () => {
+        ctx.equipWeapon?.('unarmed');
+        paint();
+      },
+    }, 'Unarmed'));
+    for (const w of combat.ownedWeapons(ctx.state)) {
+      const on = held?.id === w.id;
+      row.append(el('button', {
+        class: `btn ${on ? 'btn-primary on' : 'btn-ghost'}`,
+        type: 'button',
+        'data-equip': w.id,
+        onclick: () => {
+          ctx.equipWeapon?.(w.id);
+          paint();
+        },
+      }, ITEMS_BY_ID[w.id]?.name ?? w.id));
+    }
+  }
+  paint();
+  return {
+    node: el('article', { class: 'card camp-hand', 'data-camp': 'hand' },
+      el('div', { class: 'track-head' },
+        el('span', { class: 'skill-icon glyph-sword', html: icon('sword') }),
+        el('span', { class: 'track-title' },
+          el('h3', { class: 'track-name' }, 'Hand'),
+          effectLine)),
+      heldName,
+      flavor,
+      row),
+    update: paint,
+  };
+}
+
+function buildCraftCard(ctx, recipe) {
+  const effectLine = el('span', { class: 'track-effect' });
+  const costChips = el('span', { class: 'chips' });
+  const craftBtn = el('button', {
+    class: 'btn btn-primary btn-wide',
+    type: 'button',
+    'data-craft': recipe.id,
+    onclick: () => ctx.craftRecipe?.(recipe.id),
+  });
+
+  function paint() {
+    const out = ITEMS_BY_ID[recipe.output.id];
+    effectLine.textContent = `Yields ${out?.name ?? recipe.output.id} ×${recipe.output.qty}`;
+    clear(costChips);
+    for (const c of craft.recipeCostList(recipe)) {
+      const have = bankCount(ctx.state.bank, c.id);
+      costChips.append(el('span', {
+        class: `chip ${have >= c.qty ? 'chip-cost' : 'chip-cost chip-short'}`,
+        title: c.name,
+      }, `${c.name} ×${formatNumber(c.qty)}`));
+    }
+    const affordable = craft.canCraft(ctx.state, recipe.id);
+    craftBtn.textContent = affordable
+      ? `Craft · ${recipe.name}`
+      : craft.craftNeedLabel(ctx.state, recipe.id);
+    craftBtn.className = `btn btn-wide ${affordable ? 'btn-primary' : 'btn-ghost btn-disabled'}`;
+    craftBtn.setAttribute('aria-disabled', affordable ? 'false' : 'true');
+  }
+  paint();
+  return {
+    node: el('article', { class: 'card camp-craft', 'data-camp': 'craft' },
+      el('div', { class: 'track-head' },
+        el('span', { class: 'skill-icon glyph-flame', html: icon('flame') }),
+        el('span', { class: 'track-title' },
+          el('h3', { class: 'track-name' }, recipe.name),
+          effectLine)),
+      el('p', { class: 'track-flavor muted' }, recipe.flavor),
+      el('div', { class: 'action-chips' }, costChips),
+      craftBtn),
+    update: paint,
+  };
+}
+
 export function renderMapScreen(ctx) {
   const road = el('ol', { class: 'map-road', role: 'list' });
   ZONES.forEach((z) => {
-    const lit = isBeaconKindled(ctx.state, z.beaconId);
+    const lit = combat.isBeaconKindled(ctx.state, z.beaconId);
     road.append(el('li', {},
       el('button', {
         class: `map-node ${lit ? 'lit' : ''}`,

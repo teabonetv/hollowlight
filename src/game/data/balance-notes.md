@@ -111,7 +111,7 @@ All data lives in `src/game/data/upgrades.js`; the engine is
 
 | Track | Effect | Per tier | Cap | Where it bites |
 |---|---|---|---|---|
-| Lantern & Wick | global action speed | +5% | +30% | cycle duration = `round(durationMs / (1+frac))` — live ticks (`action-runner.tickActions`), UI bars/ETA (`actionStatus`), and offline completions (`offline.computeOfflineProgress`) all share `effectiveDurationMs` |
+| Lantern & Wick | global action speed | +5% | +30% | cycle duration = `round(durationMs / (1+frac))` — live ticks, UI bars/ETA, and offline share `effectiveDurationMs`. Hunt blow interval is `round(weapon.speedMs / speedMultiplier)` in `playerOffense`. |
 | Keeper's Satchel | bonus-find chance per ITEM output | +4% | +35% | each item output rolls one extra unit at `yieldChance` after its base roll (`rollOutputs`), live only — offline keeps expected values |
 | Ember Altar | XP multiplier, all skills | +3% | +18% | `xp = round(base × masteryMult × altarMult)` — identical expression in live play and offline so the two never disagree by 1 |
 
@@ -306,7 +306,8 @@ kept. Walk back (open that stretch) to recover.
 | Avoidance | round(7 + 1.5×level) | You get hit. Eating is not optional on the Cur / Warden. |
 | Hit chance | clamp(0.20, 0.95, 0.12 + 0.88·acc/(acc+avo)) | Never a coin-flip void; never a sure thing. |
 | Weakness / resist | ×1.18 / ×0.86 | Style swap is a real DPS lever on every card (weakness listed on the hunt). |
-| Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. Opening windup is `max(1.2s, weapon speed)` — Pale Moth (16 HP) cannot die on a t=0 blow. |
+| Hunt → Camp loop | one craft, three tracks, Hand wear | Fogwort ×2 → Lamp-oil (`press-lamp-oil`) is the only live Camp craft — Hunt Fog-rat named loot is the input. Keeper’s Camp still has three tracks; Lantern & Wick now divides Hunt `playerOffense.speedMs` the same way it shortens gathering bars. Hand on Camp reuses `equipWeapon` (wick-knife / unarmed). No 184-recipe dump, no six-slot doll. |
+| Wick-knife | 3–6, 2.2 s, +4 acc | Starter Strike. Shot/Rite start unarmed until ash-sling / prayer-stub drop. Opening windup is `max(1.2s, weapon speed)` — Pale Moth (16 HP) cannot die on a t=0 blow. Lantern & Wick (Camp) shortens that interval: `round(weapon.speedMs / speedMultiplier)`. |
 | Unarmed Shot / Rite | slower, lower max | You *can* swap styles day one; you *want* the matching drop. |
 | Oil sip | 1 wick-oil / 8 s (lamp-oil / 16 s) | A 6-flask starter pack ≈ 48 s of fed lantern. Stall always sells wick-oil (mercy buy ✦8). Hunt starts **already dry** if flasks are empty — never paint “Lantern fed” at 0 sips. Dry lantern: first 10 s of fog-gather (no bite), then 2 fog-bite / 2 s and ×0.85 hit chance. **Keep hunting defaults OFF.** Auto-continue refuses the next moth while the lantern is dry. Hub Hunt at 0 sips stays labelled Hunt (disabled) with **one** Need oil line — not on every stretch button. Hub chip is “lantern ready” only when sips remain. |
 | Hand slot | Wick-knife 3–6 / 2.2 s / +4 acc | One honest weapon. Unarmed Strike is 2–4 / 2.4 s. Ash-sling and prayer-stub apply when held and the matching style is selected. |

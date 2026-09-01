@@ -1232,13 +1232,17 @@ html.reduced-motion *::after {
 
 .track-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
 .track-card { display: flex; flex-direction: column; gap: 8px; }
+.camp-hand, .camp-craft { display: flex; flex-direction: column; gap: 8px; }
 .track-head { display: flex; align-items: center; gap: 10px; }
 .track-title { display: flex; flex-direction: column; min-width: 0; }
 .track-name { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
 .track-effect { font-size: 12.5px; color: var(--ok); letter-spacing: 0.02em; }
 .track-tier-name { font-size: 13.5px; color: var(--gold-hi); }
 .track-flavor { margin: 0; font-size: 13px; font-style: italic; line-height: 1.45; }
-.track-card .btn-wide { min-height: 46px; }
+.track-card .btn-wide, .camp-craft .btn-wide { min-height: 46px; }
+
+.camp-hand-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.camp-hand-row .btn { flex: 1; min-height: 44px; min-width: 44px; }
 
 /* ── Bank sell sheet ───────────────────────────────────────── */
 .sell-flavor { margin: 0 0 10px; font-style: italic; color: var(--muted); line-height: 1.5; }
