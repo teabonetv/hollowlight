@@ -119,8 +119,8 @@ All data lives in `src/game/data/upgrades.js`; the engine is
 
 | Tier | Lantern & Wick | Keeper's Satchel | Ember Altar |
 |---|---|---|---|
-| 1 | 40 + 10 tinder | 30 + 15 fogwort | 60 + 15 tinder |
-| 2 | 90 + 25 fogwort | 80 + 30 fogwort | 140 + 10 resin |
+| 1 | 8 + 1 lamp-oil | 30 + 15 fogwort | 60 + 15 tinder |
+| 2 | 16 + 1 lamp-oil | 80 + 30 fogwort | 140 + 10 resin |
 | 3 | 200 + 12 bogmoss + 15 tinder | 180 + 25 palecap | 320 + 22 resin + 30 fogwort |
 | 4 | 450 + 30 palecap | 420 + 60 palecap + 20 tinder | 720 + 45 resin |
 | 5 | 1000 + 8 resin + 50 palecap | 950 + 12 resin + 60 palecap | 1600 + 90 resin + 60 tinder |
