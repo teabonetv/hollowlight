@@ -38,6 +38,8 @@ import * as runner from '../game/systems/action-runner.js';
 import * as camp from '../game/systems/upgrades.js';
 import * as craftSys from '../game/systems/craft.js';
 import * as combat from '../game/systems/combat.js';
+import { performWardenRite as doWardenRite, isSettlementReachable } from '../game/systems/rite.js';
+import { SETTLEMENT_BY_ID } from '../game/data/world/settlements.js';
 import { sellItems, togglePin as pinItem, toggleLock as lockItem, savePreset as writePreset, applyPreset as usePreset,
   deletePreset as dropPreset, captureBankSnapshot, captureGearSnapshot, resolveBankTab, STALL_TAB } from '../game/systems/bank.js';
 import * as storeSys from '../game/systems/store.js';
@@ -576,6 +578,26 @@ function boot() {
       pushLog(game, `Crafted ${name} ×${res.output.qty}.`, game.stats.playtimeMs);
       afterMutation({ redraw: true });
       return res;
+    },
+    performWardenRite() {
+      const res = doWardenRite(game);
+      if (!res.ok) { toaster.push(res.error ?? 'The rite will not take.', 'warn'); return res; }
+      toaster.push(res.toast, 'success');
+      afterMutation({ redraw: true });
+      return res;
+    },
+    travelToSettlement(id) {
+      const place = SETTLEMENT_BY_ID[id];
+      if (!place) return { ok: false };
+      if (!isSettlementReachable(game, id)) {
+        toaster.push(place.lockCopy ?? 'That wick is still dark.', 'info');
+        return { ok: false, locked: true };
+      }
+      combat.ensureCombat(game);
+      game.combat.zoneId = place.zoneId;
+      ctx.openSkill('combat');
+      toaster.push(place.walkCopy, 'success');
+      return { ok: true, zoneId: place.zoneId };
     },
     openSkill(id) {
       ui.tab = 'skills';
