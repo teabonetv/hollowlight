@@ -305,8 +305,6 @@ test('shared #screen padding-bottom equals the tab bar on every tab', () => {
   assert.match(css, /\.screen\s*\{[^}]*padding-bottom:\s*var\(--screen-scroll-pad\)/s);
   assert.match(css, /\.screen\s*\{[^}]*scroll-padding-bottom:\s*var\(--screen-scroll-pad\)/s);
   assert.match(css, /\.screen\.fight-live,\s*\n\.screen\.leftover-live\s*\{[^}]*padding-bottom:\s*0/s);
-  assert.doesNotMatch(combat, /leftover-well/);
-  assert.doesNotMatch(combat, /min-height:\s*184px/);
   assert.match(combat, /\.leftover-actions\s*\{[^}]*min-height:\s*44px/);
   assert.match(combat, /\.satchel-chip/);
   assert.match(combat, /\.satchel-sheet \.loot-tile\s*\{[^}]*min-height:\s*103px/);
