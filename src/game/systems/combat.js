@@ -753,7 +753,7 @@ export function fleeFight(state) {
   return { ok: true };
 }
 
-function consumeOilSip(state) {
+export function consumeOilSip(state) {
   for (const id of OIL_ORDER) {
     if (bank.bankCount(state.bank, id) > 0) {
       bank.bankPay(state.bank, [{ id, qty: 1 }]);

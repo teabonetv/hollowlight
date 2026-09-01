@@ -112,7 +112,7 @@ test('Camp spend on Lantern & Wick consumes goods/lumen, persists, and shortens 
   assert.equal(res.ok, true);
   assert.equal(upgradeLevel(s, 'lantern-wick'), 1);
   assert.equal(s.lumen, lumen0 - tier.lumen);
-  assert.equal(s.bank['lamp-oil'] ?? 0, oil0 - tier.items['lamp-oil']);
+  assert.equal(s.bank['lamp-oil'] ?? 0, oil0, 'wick spend must not steal lamp-oil');
   assert.equal(speedMultiplier(s), 1.05);
   const speed1 = combat.playerOffense(s, 'strike').speedMs;
   assert.equal(speed1, Math.round(2200 / 1.05));

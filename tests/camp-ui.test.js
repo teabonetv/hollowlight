@@ -50,13 +50,12 @@ test('track cards show next tier name, flavor, effect line and cost chips', () =
   assert.match(wick.textContent ?? '', /Scraped Wicks/);
   assert.match(wick.textContent ?? '', /\+5% action & Hunt speed per tier/);
   assert.match(wick.textContent ?? '', /✦8/, 'lumen chip present');
-  assert.match(wick.textContent ?? '', /Lamp-oil ×1/, 'material chip present');
+  assert.doesNotMatch(wick.textContent ?? '', /Lamp-oil/, 'wick 0 is lumen-only');
 });
 
 test('affordable tiers render an active Upgrade button wired to ctx.buyUpgrade', () => {
   const s = createState({ rngSeed: 3 });
   s.lumen += 8;
-  s.bank['lamp-oil'] = (s.bank['lamp-oil'] ?? 0) + 1;
   let called = null;
   const scr = tabs.renderCampScreen(makeCtx(s, {
     buyUpgrade: (id) => { called = id; },

@@ -17,7 +17,7 @@ export const OILS = {
   'lamp-oil': { intervalMs: 16000, name: 'Lamp-oil' },
 };
 
-export const OIL_ORDER = ['wick-oil', 'lamp-oil'];
+export const OIL_ORDER = ['lamp-oil', 'wick-oil'];
 
 export const OIL_CHECK_MS = 8000;
 export const FOG_BITE_MS = 2000;
