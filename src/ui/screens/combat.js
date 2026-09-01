@@ -5,7 +5,8 @@
 import { el, clear } from '../dom.js';
 import { filledIcon, icon } from '../icons.js';
 import { formatNumber, formatSeconds, formatNoun } from '../../core/format.js';
-import { ZONES, ZONE_BY_ID } from '../../game/data/combat/zones.js';
+import { ZONE_BY_ID } from '../../game/data/combat/zones.js';
+import { huntRoadZones, roadSubtitle } from '../../game/data/world/settlements.js';
 import { STYLES, STYLE_BY_ID } from '../../game/data/combat/styles.js';
 import { FOOD } from '../../game/data/combat/consumables.js';
 import { VIGIL_CATEGORY_BY_ID, VIGIL_TIER_BY_N } from '../../game/data/combat/vigils.js';
@@ -767,10 +768,11 @@ function vigilCard(ctx, st, paint) {
 
 function zonePicker(ctx, zoneId, paint, { heading = true } = {}) {
   const list = el('div', { class: 'zone-chips' });
-  for (const z of ZONES) {
+  for (const z of huntRoadZones()) {
     const unlock = combat.zoneUnlock(ctx.state, z.id);
     const btn = el('button', {
       class: `chip-btn ${z.id === zoneId ? 'on' : ''} ${unlock.ok ? '' : 'locked'}`,
+      'data-zone': z.id,
       onclick: () => {
         ctx.state.combat.zoneId = z.id;
         paint();
@@ -781,7 +783,7 @@ function zonePicker(ctx, zoneId, paint, { heading = true } = {}) {
   if (!heading) return list;
   return el('div', {},
     el('h2', { class: 'section-title combat-h' }, 'Stretches'),
-    el('p', { class: 'section-sub muted' }, 'Twelve beacons. Only Hearthway is kindled.'),
+    el('p', { class: 'section-sub muted' }, roadSubtitle(ctx.state)),
     list);
 }
 
@@ -806,11 +808,11 @@ function zoneFlavor(ctx, zoneId) {
   const wrap = el('div', { class: 'zone-body' });
   wrap.append(
     el('h2', { class: 'section-title combat-h' }, 'Stretches'),
-    el('p', { class: 'section-sub muted' }, 'Twelve beacons. Only Hearthway is kindled.'),
+    el('p', { class: 'section-sub muted' }, roadSubtitle(ctx.state)),
     el('h3', { class: 'track-name' }, z.stretch),
     el('p', { class: 'action-desc' }, z.flavor),
     el('p', { class: 'muted small' },
-      `Requires Combat ${z.levelReq}${z.kindled ? '' : ' · kindled beacon'}.`),
+      `Requires Combat ${z.levelReq}${unlock.kindled ? '' : ' · kindled beacon'}.`),
   );
   if (!unlock.ok) return wrap;
   const stretch = combat.ensureCombat(ctx.state).stretchKills[zoneId] ?? 0;

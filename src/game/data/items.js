@@ -447,7 +447,7 @@ const RAW = [
     { obtainable: true, slot: 'weapon', sources: ['Combat loot (Hearthway)'], uses: ['Combat Rite weapon', 'Altar offering', 'Sold for Lumen'] }),
   row('key-hearthway', 'Hearthway Key', 2, 'relic', 12,
     'Warm iron. The Warden’s permission, given grudgingly.',
-    { unique: true, obtainable: true, sources: ['The Hearth-Warden'], uses: ['Beacon ceremony (later)', 'Altar offering', 'Sold for Lumen'] }),
+    { unique: true, obtainable: true, sources: ['The Hearth-Warden'], uses: ['Warden rite — opens Ashfen', 'Altar offering', 'Sold for Lumen'] }),
   row('key-vespers', "Vesper's Key", 2, 'relic', 12,
     'A bell-tooth. It rings if you hold it still.',
     { unique: true, sources: ['The Vesper Abbess (unkindled)'], uses: ['Beacon ceremony (later)', 'Altar offering', 'Sold for Lumen'] }),

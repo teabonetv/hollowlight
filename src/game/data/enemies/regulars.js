@@ -60,6 +60,20 @@ export const REGULARS = [
     xp: 24, souls: 2, flavor: 'It comes up through cold cinders. It smells of kitchens nobody remembers.',
     loot: loot([L('lumen', [3, 5, 1]), L('graveresin', [1, 1, 0.15]), L('ash-sling', [1, 1, 0.04]), L('prayer-stub', [1, 1, 0.04])]) }),
 
+  // ── Ashfen (3) — first pilgrim-road wick, unlocked by the Warden rite ──
+  m({ id: 'fen-moth', name: 'Fen-moth', z: 'ashfen', cat: 'pale',
+    hp: 18, acc: 9, avo: 12, min: 1, max: 3, spd: 2700, style: 'shot', weak: 'strike', resist: 'rite',
+    xp: 12, souls: 1, flavor: 'Wet wings. It drinks the last of the camp-light and will not give it back.',
+    loot: loot([L('lumen', [1, 3, 1]), L('fogwort', [1, 1, 0.7]), L('wick-oil', [1, 1, 0.1])]) }),
+  m({ id: 'ash-wight', name: 'Ash-wight', z: 'ashfen', cat: 'wight',
+    hp: 26, acc: 12, avo: 10, min: 2, max: 4, spd: 2500, style: 'rite', weak: 'strike', resist: 'shot',
+    xp: 16, souls: 2, flavor: 'A pilgrim who sat down in the ash and forgot to stand.',
+    loot: loot([L('lumen', [2, 4, 1]), L('tinderscrap', [1, 2, 0.35]), L('soul-ember', [1, 1, 0.06])]) }),
+  m({ id: 'verge-crawler', name: 'Verge-crawler', z: 'ashfen', cat: 'horror',
+    hp: 30, acc: 11, avo: 8, min: 2, max: 5, spd: 3000, style: 'strike', weak: 'rite', resist: 'shot',
+    xp: 20, souls: 2, flavor: 'It keeps to the ditch. The road pretends not to know it.',
+    loot: loot([L('lumen', [2, 5, 1]), L('pall-fang', [1, 1, 0.16]), L('lantern-loaf', [1, 1, 0.08])]) }),
+
   // ── 2. Vesper's Rest (4) ──────────────────────────────────────
   m({ id: 'dusk-bell', name: 'Dusk-bell', z: 'vespers', cat: 'wight',
     hp: 36, acc: 14, avo: 12, min: 3, max: 6, spd: 2700, style: 'rite', weak: 'strike', resist: 'shot',

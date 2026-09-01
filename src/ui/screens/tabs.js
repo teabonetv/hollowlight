@@ -1,8 +1,8 @@
 // Camp, Bank, Map, Journal screens. Camp is a 5-second hearth (wants, lantern,
 // Keeper's Camp) — crafts, the stall, and the constellation live on Skills /
 // Bank / Almanac tabs, not a sitemap stack. Bank is an owned-first pack with
-// an opt-in Catalogue and a Stall buy-tab; Map shows the twelve-beacon
-// pilgrim road with only Hearthway kindled; Journal is the log.
+// an opt-in Catalogue and a Stall buy-tab; Map shows Hearthway and Ashfen
+// (Warden rite opens the road); Journal is the log.
 
 import { el, clear } from '../dom.js';
 import { icon } from '../icons.js';
@@ -16,11 +16,15 @@ import { formatNumber, formatDuration, formatSeconds } from '../../core/format.j
 import { nextWants, trueCompletion } from '../../game/systems/completion.js';
 import { DAILY_POOL_BY_ID } from '../../game/data/dailies.js';
 import { taskProgress } from '../../game/systems/dailies.js';
-import { ZONES } from '../../game/data/combat/zones.js';
 import * as combat from '../../game/systems/combat.js';
 import { ITEMS_BY_ID } from '../../game/data/items.js';
 import { RECIPES } from '../../game/data/recipes.js';
 import * as craft from '../../game/systems/craft.js';
+import { SETTLEMENTS, roadSubtitle } from '../../game/data/world/settlements.js';
+import { WARDEN_RITE } from '../../game/data/world/rites.js';
+import {
+  canPerformWardenRite, isAshfenReachable, riteOffering, riteNeedLabel,
+} from '../../game/systems/rite.js';
 import { renderBankScreen } from './bank.js';
 
 export { renderBankScreen };
@@ -144,6 +148,7 @@ export function renderCampScreen(ctx) {
 
   const tinderBanner = el('div', { class: 'empty-state camp-starve' });
   const repairCard = buildRepairCard(ctx);
+  const riteCard = buildWardenRiteCard(ctx);
   const handCard = buildHandCard(ctx);
   const craftCard = buildCraftCard(ctx, RECIPES[0]);
 
@@ -169,6 +174,10 @@ export function renderCampScreen(ctx) {
     dailyStrip(ctx),
 
     tinderBanner,
+
+    el('h2', { class: 'section-title' }, 'Warden rite'),
+    el('p', { class: 'section-sub muted' }, 'Open Ashfen — the first wick on the pilgrim road.'),
+    riteCard.node,
 
     el('h2', { class: 'section-title' }, 'The Lantern'),
     el('p', { class: 'section-sub muted' }, 'Repairs spend scrap and Lumen. A cracked chimney still burns — just poorer.'),
@@ -234,6 +243,7 @@ export function renderCampScreen(ctx) {
     emptyBanner.style.display = anyOwned ? 'none' : '';
     for (const r of trackRefs) r.update();
     repairCard.update();
+    riteCard.update();
     handCard.update();
     craftCard.update();
   }
@@ -403,6 +413,69 @@ function buildRepairCard(ctx) {
   };
 }
 
+function buildWardenRiteCard(ctx) {
+  const effectLine = el('span', { class: 'track-effect' });
+  const costChips = el('span', { class: 'chips' });
+  const riteBtn = el('button', {
+    class: 'btn btn-primary btn-wide',
+    type: 'button',
+    'data-rite': 'warden',
+  });
+
+  function paint() {
+    const done = isAshfenReachable(ctx.state);
+    const offering = riteOffering(ctx.state);
+    const check = canPerformWardenRite(ctx.state);
+    effectLine.textContent = done
+      ? 'Ashfen is kindled. The pilgrim verge is walkable.'
+      : (offering.path === 'key'
+        ? 'The Warden’s key will wake the first wick.'
+        : 'No key — a small offering of goods and Lumen will do.');
+    clear(costChips);
+    if (!done) {
+      for (const c of offering.chips) {
+        const have = c.id === 'lumen' ? (ctx.state.lumen ?? 0) : bankCount(ctx.state.bank, c.id);
+        costChips.append(el('span', {
+          class: `chip ${have >= c.qty ? 'chip-cost' : 'chip-cost chip-short'}`,
+        }, c.id === 'lumen' ? `✦${c.qty}` : `${c.name} ×${c.qty}`));
+      }
+    }
+    riteBtn.onclick = () => {
+      if (done) {
+        ctx.travelToSettlement?.('ashfen');
+        return;
+      }
+      ctx.performWardenRite?.();
+    };
+    if (done) {
+      riteBtn.textContent = 'Walk to Ashfen';
+      riteBtn.className = 'btn btn-primary btn-wide';
+      riteBtn.setAttribute('aria-disabled', 'false');
+    } else if (check.ok) {
+      riteBtn.textContent = offering.path === 'key' ? 'Perform the Warden rite' : 'Offer the rite';
+      riteBtn.className = 'btn btn-primary btn-wide';
+      riteBtn.setAttribute('aria-disabled', 'false');
+    } else {
+      riteBtn.textContent = riteNeedLabel(ctx.state, offering);
+      riteBtn.className = 'btn btn-ghost btn-wide btn-disabled';
+      riteBtn.setAttribute('aria-disabled', 'true');
+    }
+  }
+  paint();
+  return {
+    node: el('article', { class: 'card camp-rite', 'data-camp': 'rite' },
+      el('div', { class: 'track-head' },
+        el('span', { class: 'skill-icon glyph-flame', html: icon('flame') }),
+        el('span', { class: 'track-title' },
+          el('h3', { class: 'track-name' }, WARDEN_RITE.name),
+          effectLine)),
+      el('p', { class: 'track-flavor muted' }, WARDEN_RITE.flavor),
+      el('div', { class: 'action-chips' }, costChips),
+      riteBtn),
+    update: paint,
+  };
+}
+
 function buildHandCard(ctx) {
   const effectLine = el('span', { class: 'track-effect' });
   const heldName = el('span', { class: 'track-tier-name' });
@@ -508,33 +581,40 @@ function buildCraftCard(ctx, recipe) {
 
 export function renderMapScreen(ctx) {
   const road = el('ol', { class: 'map-road', role: 'list' });
-  ZONES.forEach((z) => {
-    const lit = combat.isBeaconKindled(ctx.state, z.beaconId);
-    road.append(el('li', {},
-      el('button', {
-        class: `map-node ${lit ? 'lit' : ''}`,
-        'aria-label': `${z.settlement}${lit ? ', kindled' : ', dark'}`,
-        onclick: () => {
-          if (lit) {
-            ctx.openSkill?.('combat');
-            ctx.toast(`${z.settlement} — the fog-line is walkable from here.`, 'success');
-          } else {
-            ctx.toast(`${z.settlement} waits in the dark. Relight it in a later wave.`, 'info');
-          }
+  const sub = el('p', { class: 'screen-sub' });
+  const foot = el('p', { class: 'footnote muted' });
+
+  function paint() {
+    clear(road);
+    for (const place of SETTLEMENTS) {
+      const lit = combat.isBeaconKindled(ctx.state, place.beaconId);
+      road.append(el('li', {},
+        el('button', {
+          class: `map-node ${lit ? 'lit' : 'dark'}`,
+          'data-settlement': place.id,
+          'aria-label': `${place.name}${lit ? ', kindled' : ', dark'}`,
+          onclick: () => ctx.travelToSettlement?.(place.id),
         },
-      },
-        el('span', { class: 'map-dot', html: lit ? icon('flame') : null }),
-        el('span', { class: 'map-name' }, z.settlement))));
-  });
+          el('span', { class: 'map-dot', html: lit ? icon('flame') : null }),
+          el('span', { class: 'map-name' }, place.name))));
+    }
+    road.append(el('li', {},
+      el('p', { class: 'map-rest muted', 'data-map': 'rest' },
+        'The road continues. Further beacons sleep — not this stretch.')));
+    sub.textContent = roadSubtitle(ctx.state);
+    foot.textContent = isAshfenReachable(ctx.state)
+      ? 'Ashfen is open. Hunt the pilgrim verge, or walk it from camp.'
+      : 'Ashfen opens with the Warden rite at camp. No later toast — the road begins there.';
+  }
+  paint();
 
   return {
     node: el('section', { class: 'screen' },
       el('header', { class: 'screen-head' },
         el('h1', { class: 'screen-title' }, 'The Pilgrim Road'),
-        el('p', { class: 'screen-sub' }, 'Twelve beacons once held the dark off the Hollow.')),
+        sub),
       road,
-      el('p', { class: 'footnote muted' },
-        'One beacon kindled. Eleven sleep. Each will unlock new crafts when relit.')),
-    update: () => {},
+      foot),
+    update: paint,
   };
 }

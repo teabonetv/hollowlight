@@ -125,6 +125,21 @@ export const ZONES = [
   },
 ];
 
-export const ZONE_BY_ID = Object.fromEntries(ZONES.map((z) => [z.id, z]));
+/** First pilgrim-road wick. Not one of the twelve roster stubs — Hunt reaches it after the Warden rite. */
+export const ASHFEN_ZONE = {
+  id: 'ashfen',
+  settlement: 'Ashfen',
+  beaconId: 'ashfen',
+  levelReq: 1,
+  kindled: false,
+  stretch: 'The pilgrim verge',
+  flavor: 'Ash underfoot, fen to the left. The road begins where the camp-light thins.',
+  lockCopy: 'Ashfen waits. Perform the Warden rite at camp.',
+};
+
+export const ZONE_BY_ID = {
+  ...Object.fromEntries(ZONES.map((z) => [z.id, z])),
+  ashfen: ASHFEN_ZONE,
+};
 
 export const KINDLED_BEACON_IDS = ZONES.filter((z) => z.kindled).map((z) => z.beaconId);

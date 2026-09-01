@@ -338,3 +338,16 @@ stitch at camp.
 | Satchel room | +2 / tier | `SATCHEL_ROOM_PER_TIER` on Keeper's Satchel | Same sink as bonus-find. Six tiers → 24 hollow. Yield math is unchanged. |
 | Over-cap saves | keep extras, block new kinds | `canAcceptStack` | Pre-S2e banks with more than 12 kinds are not truncated. |
 
+## Warden rite / Ashfen (S5a)
+
+Camp ceremony. Does not bump `SAVE_VERSION`. Kindles `ashfen` on `state.beacons.kindled`.
+
+| Constant | Value | Why |
+|---|---|---|
+| Key path | Hearthway Key ×1 | The Warden’s drop is the honest permission. |
+| Goods path | ✦8 + Fogwort ×2 + Tinderscrap ×5 | Starter pack can pay (20 / 4 / 30). No new item. |
+| Preference | key if held, else goods | Never demand both. |
+| Ashfen Combat req | 1 | Immediate Hunt after the rite. |
+| Ashfen roster | Fen-moth, Ash-wight, Verge-crawler | Three pale-things, no guardian dump, no Mining shafts. |
+| Map | Hearthway + Ashfen + one “road continues” | Does not toast “later wave”. Eleven stubs stay off the road list. |
+

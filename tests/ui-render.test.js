@@ -141,12 +141,17 @@ test('bank defaults to Owned — only carried stacks fill the working grid', () 
   assert.match(active?.textContent ?? '', /Owned/);
 });
 
-test('map lists twelve beacons with only the first kindled', () => {
+test('map lists Hearthway and Ashfen; Ashfen starts dark', () => {
   const state = createState({ nowMs: 0, rngSeed: 9 });
-  const scr = tabs.renderMapScreen(makeCtx(state));
+  const toasts = [];
+  const ctx = { ...makeCtx(state), toast(m) { toasts.push(m); } };
+  const scr = tabs.renderMapScreen(ctx);
   const nodes = scr.node.querySelectorAll('.map-node');
-  assert.equal(nodes.length, 12);
+  assert.equal(nodes.length, 2, 'camp + first road wick — not twelve stubs');
   assert.equal(nodes.filter((n) => n.matchesSelector('.lit')).length, 1);
+  assert.ok(scr.node.querySelector('[data-settlement="ashfen"]'));
+  assert.ok(scr.node.querySelector('[data-map="rest"]'));
+  assert.doesNotMatch(scr.node.textContent ?? '', /later wave/i);
 });
 
 test('journal renders entries newest-first and an empty state when blank', () => {
