@@ -145,7 +145,7 @@ export function renderCampScreen(ctx) {
   const tinderBanner = el('div', { class: 'empty-state camp-starve' });
   const repairCard = buildRepairCard(ctx);
   const handCard = buildHandCard(ctx);
-  const craftCard = buildCraftCard(ctx, RECIPES[0]);
+  const craftCards = RECIPES.map((r) => buildCraftCard(ctx, r));
 
   const root = el('section', { class: 'screen camp' },
     el('div', { class: 'sigil-wrap', 'aria-hidden': 'true' }, el('div', { class: 'sigil' })),
@@ -179,8 +179,8 @@ export function renderCampScreen(ctx) {
     handCard.node,
 
     el('h2', { class: 'section-title' }, 'Hearth craft'),
-    el('p', { class: 'section-sub muted' }, 'One press from Hunt Fogwort. Chandlercraft’s later lattice stays later.'),
-    craftCard.node,
+    el('p', { class: 'section-sub muted' }, 'Hunt mats at the hearth. Chandlercraft’s later lattice stays later.'),
+    ...craftCards.map((c) => c.node),
 
     // ── The Keeper's Camp — upgrade tracks (F1c economy sink) ──
     el('h2', { class: 'section-title' }, "The Keeper's Camp"),
@@ -235,7 +235,7 @@ export function renderCampScreen(ctx) {
     for (const r of trackRefs) r.update();
     repairCard.update();
     handCard.update();
-    craftCard.update();
+    for (const c of craftCards) c.update();
   }
   update();
 

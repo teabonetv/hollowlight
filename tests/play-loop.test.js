@@ -22,7 +22,7 @@ try { globalThis.navigator = {}; } catch { /* node ≥21 */ }
 
 const { createState } = await import('../src/game/state.js');
 const { SAVE_VERSION, serializeSave, deserializeSave } = await import('../src/core/save.js');
-const { PRESS_LAMP_OIL_ID, RECIPES, validateRecipes } = await import('../src/game/data/recipes.js');
+const { PRESS_LAMP_OIL_ID, STITCH_FOG_HOOD_ID, RECIPES, validateRecipes } = await import('../src/game/data/recipes.js');
 const { craftRecipe, canCraft, craftNeedLabel } = await import('../src/game/systems/craft.js');
 const { buyUpgrade, upgradeLevel, speedMultiplier } = await import('../src/game/systems/upgrades.js');
 const combat = await import('../src/game/systems/combat.js');
@@ -71,12 +71,14 @@ test('SAVE_VERSION stays 5', () => {
   assert.equal(SAVE_VERSION, 5);
 });
 
-test('one Hunt-mat recipe: Fogwort → Lamp-oil; leftover-well 184 stays gone', () => {
+test('hearth recipes: Lamp-oil + Fog-hood; leftover-well 184 stays gone', () => {
   assert.deepEqual(validateRecipes(), []);
-  assert.equal(RECIPES.length, 1);
+  assert.equal(RECIPES.length, 2);
   assert.equal(RECIPES[0].id, PRESS_LAMP_OIL_ID);
   assert.equal(RECIPES[0].costs.fogwort, 2);
   assert.equal(RECIPES[0].output.id, 'lamp-oil');
+  assert.equal(RECIPES[1].id, STITCH_FOG_HOOD_ID);
+  assert.equal(RECIPES[1].output.id, 'fog-hood');
   const ui = readFileSync(join(here, 'combat-ui.test.js'), 'utf8');
   assert.equal(ui.includes('leftoverWellMin'), false);
   const combatSrc = readFileSync(join(here, '../src/ui/screens/combat.js'), 'utf8');
