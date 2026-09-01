@@ -596,16 +596,15 @@ test('hub after kill still shows compact fight chrome', () => {
   const text = leftover.textContent ?? '';
   assert.match(text, /You/);
   assert.ok(leftover.classList.contains('leftover-station'));
-  assertSatchelChip(leftover, unpaidN(state));
-  assert.ok(leftover.querySelector('.acc-station'), 'Acc stays while unpaid loot waits');
-  assert.ok(leftover.querySelector('.hand-chip'), 'Knife/Unarmed stay while unpaid loot waits');
-  assert.ok(leftover.querySelector('.style-row'), 'styles stay while unpaid loot waits');
+  assertNoSatchel(leftover);
+  assert.ok(leftover.querySelector('.acc-station'), 'Acc stays after a wallet-only moth');
+  assert.ok(leftover.querySelector('.hand-chip'), 'Knife/Unarmed stay after a wallet-only moth');
+  assert.ok(leftover.querySelector('.style-row'), 'styles stay after a wallet-only moth');
   assert.match(leftover.querySelector('.hand-chip')?.textContent ?? '', /Knife|Unarmed/);
   assert.match(leftover.querySelector('.style-row')?.textContent ?? '', /Strike/);
   assert.match(leftover.querySelector('.style-row')?.textContent ?? '', /Shot/);
   assert.match(leftover.querySelector('.style-row')?.textContent ?? '', /Rite/);
-  const sheet = openSatchel(leftover);
-  assertSatchelFurniture(sheet, { expectWallet: true });
+  assert.equal(satchelSheet(), null, 'wallet-only moth must not open a satchel sheet');
   assert.match(text, /sip|Need oil/);
   assert.match(text, /Lantern-loaf \+14 · 8|Eat|No food/);
   assert.equal(/\+0/.test(leftover.querySelector('.eat-row')?.textContent ?? ''), false);
@@ -661,7 +660,6 @@ test('leftover Acc moves when Knife is unequipped or style shifts to Rite', () =
   const scr = renderSkillDetail(ctx, 'combat');
   const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover?.classList.contains('leftover-station'));
-  assertSatchelChip(leftover, unpaidN(state));
   assert.ok(leftover.querySelector('.acc-station'), 'Acc does not wait on Take all');
   const accOf = () => {
     const line = scr.node.querySelector('.leftover-station')?.querySelector('.acc-station')?.textContent ?? '';
@@ -992,7 +990,7 @@ test('leftover loot tray keeps prior chips after Hunt this foe and Take all pays
   const lumen0 = state.lumen;
   const souls0 = state.souls;
   const bank0 = { ...state.bank };
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const firstTray = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   assert.ok(firstTray.length >= 1);
   assert.ok(firstTray.every((e) => e.granted === false));
@@ -1000,7 +998,7 @@ test('leftover loot tray keeps prior chips after Hunt this foe and Take all pays
   assert.equal(state.souls, souls0);
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   const leftover = scr.node.querySelector('.leftover-station');
-  assertSatchelChip(leftover, firstTray.length);
+  assertSatchelChip(leftover, unpaidN(state));
   const { body } = assertLootFurniture(leftover, {
     minItemTiles: trayItems(firstTray).length,
     expectWallet: trayWallet(firstTray).length > 0,
@@ -1063,13 +1061,13 @@ test('leftover after Fall back still shows the held loot pile', () => {
   const state = createState({ rngSeed: 4 });
   const lumen0 = state.lumen;
   const souls0 = state.souls;
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const first = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   combat.startFight(state, 'pale-moth', { encounterSeed: 9 });
   combat.fleeFight(state);
   const leftover = renderSkillDetail(makeCtx(state), 'combat').node.querySelector('.leftover-station');
   assert.match(leftover.querySelector('.leftover-kicker')?.textContent ?? '', /Fell back from Pale Moth/);
-  assertSatchelChip(leftover, first.length);
+  assertSatchelChip(leftover, unpaidN(state));
   const sheet = openSatchel(leftover);
   const { body } = assertSatchelFurniture(sheet, {
     minItemTiles: trayItems(first).length,
@@ -1118,7 +1116,7 @@ test('pack-full Hunt another keeps leftover chips; Take all does not hide them',
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   assert.ok(scr.node.classList.contains('leftover-live'));
   const leftover = scr.node.querySelector('.leftover-station');
-  assertSatchelChip(leftover, 3);
+  assertSatchelChip(leftover, 1);
   const packed = assertLootFurniture(leftover, { minItemTiles: 1, expectWallet: true });
   assert.match(packed.body.textContent ?? '', /Pall-fang/);
   takeAllFromSatchel(leftover);
@@ -1148,7 +1146,7 @@ test('pack-full Hunt another keeps leftover chips; Take all does not hide them',
 
 test('leftover Eat heals in place without leaving leftover-live', () => {
   const state = createState({ rngSeed: 4 });
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const lumen0 = state.lumen;
   const tray = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   const max = combat.playerMaxHp(state);
@@ -1224,7 +1222,7 @@ test('ungranted leftover chips paint on the next live fight; kill still does not
   assertNoSatchel(first.node.querySelector('.combat-fight'));
   assert.equal(leftoverTake(first.node), null, 'empty live fight has no Take all');
 
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const pile = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   assert.ok(pile.length >= 1);
   assert.ok(pile.every((e) => e.granted === false));
@@ -1242,7 +1240,7 @@ test('ungranted leftover chips paint on the next live fight; kill still does not
   const fight = scr.node.querySelector('.combat-fight');
   assert.ok(fight);
   assert.equal(fight.classList.contains('leftover-station'), false);
-  assertSatchelChip(fight, pile.length);
+  assertSatchelChip(fight, unpaidN(state));
   assert.ok(leftoverTake(openSatchel(fight)));
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Eat/);
   assert.match(fight.querySelector('.eat-row')?.textContent ?? '', /Fall back/);
@@ -1254,7 +1252,7 @@ test('Take all from the live-fight tray pays once and the HUD lumen jumps', () =
   const lumen0 = state.lumen;
   const souls0 = state.souls;
   const bank0 = { ...state.bank };
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   scr.node.querySelector('.leftover-hunt').click();
@@ -1292,7 +1290,7 @@ test('Take all from the live-fight tray pays once and the HUD lumen jumps', () =
 
 test('Eat and Fall back survive ticks while the unpaid live-fight tray is mounted', () => {
   const state = createState({ rngSeed: 4 });
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   assert.ok((state.combat.lootTray ?? []).some((e) => e.granted === false));
   const max = combat.playerMaxHp(state);
   state.combat.player.hp = Math.max(8, max - 20);
@@ -1342,13 +1340,13 @@ test('leftover unpaid tray is loot furniture: glyph + name + qty, Take all still
   const lumen0 = state.lumen;
   const souls0 = state.souls;
   const bank0 = { ...state.bank };
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   assert.ok(held.length >= 1);
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover.classList.contains('leftover-station'));
-  assertSatchelChip(leftover, held.length);
+  assertSatchelChip(leftover, unpaidN(state));
   const { tiles, body } = assertLootFurniture(leftover, {
     minItemTiles: trayItems(held).length,
     expectWallet: trayWallet(held).length > 0,
@@ -1374,14 +1372,14 @@ test('live unpaid tray is the same furniture; Take all pays; compact height hold
   const state = createState({ rngSeed: 4 });
   const lumen0 = state.lumen;
   const souls0 = state.souls;
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   scr.node.querySelector('.leftover-hunt').click();
   assert.equal(state.combat.fighting, true);
   const fight = scr.node.querySelector('.combat-fight');
   assert.equal(fight.classList.contains('leftover-station'), false);
-  assertSatchelChip(fight, held.length);
+  assertSatchelChip(fight, unpaidN(state));
   const { tray, tiles } = assertLootFurniture(fight, {
     minItemTiles: trayItems(held).length,
     expectWallet: trayWallet(held).length > 0,
@@ -1435,7 +1433,7 @@ test('live unpaid furniture tiles survive combat ticks without remounting Eat/Fa
 
 test('leftover well Take all is a no-op the second time; Acc was never gated on pay', () => {
   const state = createState({ rngSeed: 4 });
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const lumen0 = state.lumen;
   const souls0 = state.souls;
   const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
@@ -1530,7 +1528,7 @@ function assertLeftoverUnpaidChrome(host) {
 
 test('leftover unpaid keeps Acc, kit, and styles without Take all', () => {
   const state = createState({ rngSeed: 4 });
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   assert.ok((state.combat.lootTray ?? []).some((e) => e.granted === false));
   const scr = renderSkillDetail(makeCtx(state), 'combat');
   const leftover = assertLeftoverUnpaidChrome(scr.node);
@@ -1539,7 +1537,7 @@ test('leftover unpaid keeps Acc, kit, and styles without Take all', () => {
 
 test('leftover unpaid Acc and kit remain after a second unpaid kill', () => {
   const state = createState({ rngSeed: 4 });
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const firstPile = (state.combat.lootTray ?? []).length;
   assert.ok(firstPile >= 1);
   const scr = renderSkillDetail(makeCtx(state), 'combat');
@@ -1548,7 +1546,7 @@ test('leftover unpaid Acc and kit remain after a second unpaid kill', () => {
   assert.ok(hunt);
   hunt.click();
   assert.equal(state.combat.fighting, true);
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   assert.ok((state.combat.lootTray ?? []).length >= firstPile);
   scr.update();
   const leftover = assertLeftoverUnpaidChrome(scr.node);
@@ -1558,7 +1556,7 @@ test('leftover unpaid Acc and kit remain after a second unpaid kill', () => {
 
 test('Take all is not the Acc-restore trigger on leftover unpaid', () => {
   const state = createState({ rngSeed: 4 });
-  assert.ok(killMoth(state));
+  assert.ok(killFoe(state, 'fog-rat'));
   const lumen0 = state.lumen;
   const held = (state.combat.lootTray ?? []).map((e) => ({ ...e }));
   const scr = renderSkillDetail(makeCtx(state), 'combat');
@@ -1673,7 +1671,7 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   const scr = renderSkillDetail(ctx, 'combat');
   const leftover = scr.node.querySelector('.leftover-station');
   assert.ok(leftover?.classList.contains('leftover-station'));
-  assertSatchelChip(leftover, 3);
+  assertSatchelChip(leftover, 1);
   const { itemTiles, body } = assertLootFurniture(leftover, { minItemTiles: 1, expectWallet: true });
   const itemTile = itemTiles[0];
   assert.ok(itemTile, 'Fogwort is a named loot tile, not a wallet chip');
@@ -1697,7 +1695,7 @@ test('Fogwort loot tiles are named inspectable items; soul and lumen are wallet,
   leftover.querySelector('.leftover-hunt').click();
   assert.equal(state.combat.fighting, true);
   const fight = scr.node.querySelector('.combat-fight');
-  assertSatchelChip(fight, 3);
+  assertSatchelChip(fight, 1);
   const liveSheet = openSatchel(fight);
   const liveItem = liveSheet.querySelector('.loot-tile.loot-item');
   assert.ok(liveItem);

@@ -1227,7 +1227,9 @@ function fleeButton(ctx, paint) {
 }
 
 function leftoverHasUngranted(st, ctx) {
-  return HuntSatchel.showChip(st, ctx);
+  if (ctx?.state) combat.settleWalletOnlyTray(ctx.state);
+  const next = ctx?.state ? combat.combatStatus(ctx.state) : st;
+  return HuntSatchel.showChip(next, ctx);
 }
 
 export function unpaidLootTapNote(name) {
