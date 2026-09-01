@@ -803,7 +803,8 @@ export function startFight(state, enemyId, { encounterSeed } = {}) {
   );
   const off = playerOffense(state, state.combat.player.style);
   const maxHp = playerMaxHp(state);
-  state.combat.player.hp = maxHp;
+  if (state.combat.player.hp <= 0) state.combat.player.hp = maxHp;
+  state.combat.player.hp = Math.min(state.combat.player.hp, maxHp);
 
   state.combat.fighting = true;
   state.combat.paused = false;
